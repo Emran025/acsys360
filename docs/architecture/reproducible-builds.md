@@ -2,7 +2,7 @@
 
 ## الإجابة الدقيقة
 
-نعم، توجد الآن صورة تطوير في `.devcontainer/Dockerfile` وإعداد `.devcontainer/devcontainer.json`. الصورة تثبت Ubuntu 24.04 وإصدار Flutter محددًا (`3.32.5`) وتثبت أدوات Linux Desktop. هذا يجعل بيئة compiler والتحليل وبناء Linux متطابقة بين المطور وGitHub عند استخدام نفس الصورة.
+نعم، توجد الآن صورة تطوير في `.devcontainer/Dockerfile` وإعداد `.devcontainer/devcontainer.json`. الصورة تثبت Ubuntu 24.04 وإصدار Flutter محددًا (`3.32.5`) وتثبت أدوات Linux Desktop. كما يثبت كل من CI وRelease workflow الإصدار نفسه صراحةً عبر `flutter-version: 3.32.5` بدل قناة `stable` المتحركة. هذا يجعل بيئة compiler والتحليل وبناء Linux متطابقة بين المطور وGitHub عند استخدام نفس الصورة.
 
 لكن لا يصح استخدام صورة Linux واحدة لبناء Windows وmacOS native. لذلك تستخدم Release workflow runners أصلية لكل منصة: Ubuntu لـ Linux، Windows لـ Windows، وmacOS لـ macOS. هذا ليس تناقضًا؛ الصورة توحّد بيئة التطوير والتحقق، بينما native runners مطلوبة لتجميع artifact الأصلي للمنصة.
 
@@ -10,10 +10,10 @@
 
 | الحدث | ما يحدث |
 |---|---|
-| Pull Request | checkout، Flutter stable، pub get، format check، analyze، tests |
-| Push إلى `main` | نفس الفحوصات وبناء Linux artifact للتحقق |
+| Pull Request | checkout، Flutter `3.32.5`، pub get، format check، analyze، tests |
+| Push إلى `main` | نفس الفحوصات وبناء Linux artifact للتحقق باستخدام Flutter `3.32.5` |
 | تغيير `.devcontainer` على `main` | بناء صورة التطوير ونشرها إلى `ghcr.io/<owner>/<repo>/dev` مع SHA و`latest` |
-| Tag من الشكل `vX.Y.Z` | بناء Linux/Windows/macOS على runners أصلية، ضغط artifacts، إنشاء GitHub Release وإرفاقها |
+| Tag من الشكل `vX.Y.Z` | بناء Linux/Windows/macOS على runners أصلية باستخدام Flutter `3.32.5`، ضغط artifacts، إنشاء GitHub Release وإرفاقها |
 | بعد إضافة compiler CLI | يضاف smoke step يترجم fixtures ويمنع release عند فشل العقد أو الترجمة |
 
 ## الصلاحيات والأمان
