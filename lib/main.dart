@@ -269,7 +269,11 @@ class _EditorShellState extends State<EditorShell> {
     }
     if (key == LogicalKeyboardKey.keyD &&
         (hardware.isControlPressed || hardware.isMetaPressed)) {
-      _duplicateLine();
+      if (hardware.isShiftPressed) {
+        _duplicateLine();
+      } else {
+        _selectNextOccurrence();
+      }
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -388,6 +392,212 @@ class _EditorShellState extends State<EditorShell> {
     );
     widget.controller.edit(
       TextEdit(offset: insertAt, before: '', after: insertion),
+    );
+  }
+
+  void _selectNextOccurrence() {
+    final selection = textController.selection;
+    if (!selection.isValid) return;
+    final text = textController.text;
+    var start = selection.start;
+    var end = selection.end;
+    if (start == end) {
+      while (start > 0 && _isWordCharacter(text[start - 1])) {
+        start--;
+      }
+      end = selection.end;
+      while (end < text.length && _isWordCharacter(text[end])) {
+        end++;
+      }
+      if (start == end) return;
+      textController.selection = TextSelection(
+        baseOffset: start,
+        extentOffset: end,
+      );
+      return;
+    }
+    final query = text.substring(start, end);
+    var nextStart = text.indexOf(query, end);
+    if (nextStart == -1) nextStart = text.indexOf(query);
+    if (nextStart == -1 || nextStart == start) return;
+    textController.selection = TextSelection(
+      baseOffset: nextStart,
+      extentOffset: nextStart + query.length,
+    );
+  }
+
+  bool _isWordCharacter(String value) =>
+      RegExp(r'[ء-يA-Za-z0-9_]').hasMatch(value);
+
+  void _applyEditorEdit(TextEdit edit, TextSelection selection) {
+    widget.controller.edit(edit);
+    textController.value = TextEditingValue(
+      text: widget.controller.activeDocument?.text ?? textController.text,
+      selection: selection,
+    );
+  }
+
+  ({int start, int end}) _currentLineBounds(TextSelection selection) {
+    final text = textController.text;
+    final start = text.lastIndexOf('\n', selection.start - 1) + 1;
+    final endIndex = text.indexOf('\n', selection.end);
+    return (start: start, end: endIndex == -1 ? text.length : endIndex);
+  }
+
+  void _deleteCurrentLine() {
+    final selection = textController.selection;
+    if (!selection.isValid) return;
+    final text = textController.text;
+    final line = _currentLineBounds(selection);
+    var start = line.start;
+    var end = line.end;
+    if (end < text.length) {
+      end++;
+    } else if (start > 0) {
+      start--;
+    }
+    _applyEditorEdit(
+      TextEdit(offset: start, before: text.substring(start, end), after: ''),
+      TextSelection.collapsed(offset: start),
+    );
+  }
+
+  void _insertLine({required bool above}) {
+    final selection = textController.selection;
+    if (!selection.isValid) return;
+    final line = _currentLineBounds(selection);
+    final insertAt = above ? line.start : line.end;
+    final insertion = '\n';
+    final nextOffset = above ? insertAt : insertAt + insertion.length;
+    _applyEditorEdit(
+      TextEdit(offset: insertAt, before: '', after: insertion),
+      TextSelection.collapsed(offset: nextOffset),
+    );
+  }
+
+  void _moveLine(int direction) {
+    final selection = textController.selection;
+    if (!selection.isValid) return;
+    final text = textController.text;
+    final line = _currentLineBounds(selection);
+    final relative = selection.start - line.start;
+    if (direction < 0) {
+      if (line.start == 0) return;
+      final previousStart = text.lastIndexOf('\n', line.start - 2) + 1;
+      final previousEnd = line.start - 1;
+      final previous = text.substring(previousStart, previousEnd);
+      final current = text.substring(line.start, line.end);
+      final nextText =
+          '${text.substring(0, previousStart)}$current\n$previous${text.substring(line.end)}';
+      widget.controller.edit(
+        TextEdit(
+          offset: previousStart,
+          before: text.substring(previousStart, line.end),
+          after: '$current\n$previous',
+        ),
+      );
+      textController.value = TextEditingValue(
+        text: nextText,
+        selection: TextSelection.collapsed(offset: previousStart + relative),
+      );
+      return;
+    }
+    if (line.end >= text.length) return;
+    final nextStart = line.end + 1;
+    final nextEndIndex = text.indexOf('\n', nextStart);
+    final nextEnd = nextEndIndex == -1 ? text.length : nextEndIndex;
+    final current = text.substring(line.start, line.end);
+    final next = text.substring(nextStart, nextEnd);
+    final nextText =
+        '${text.substring(0, line.start)}$next\n$current${text.substring(nextEnd)}';
+    widget.controller.edit(
+      TextEdit(
+        offset: line.start,
+        before: text.substring(line.start, nextEnd),
+        after: '$next\n$current',
+      ),
+    );
+    textController.value = TextEditingValue(
+      text: nextText,
+      selection: TextSelection.collapsed(
+        offset: line.start + next.length + 1 + relative,
+      ),
+    );
+  }
+
+  void _copyLine(int direction) {
+    final selection = textController.selection;
+    if (!selection.isValid) return;
+    final text = textController.text;
+    final line = _currentLineBounds(selection);
+    final current = text.substring(line.start, line.end);
+    final isCopyingUp = direction < 0;
+    final insertAt = isCopyingUp
+        ? line.start
+        : line.end < text.length
+        ? line.end + 1
+        : line.end;
+    final insertion = isCopyingUp ? '$current\n' : '\n$current';
+    final nextOffset = isCopyingUp
+        ? insertAt + current.length
+        : insertAt + 1 + (selection.start - line.start);
+    _applyEditorEdit(
+      TextEdit(offset: insertAt, before: '', after: insertion),
+      TextSelection.collapsed(offset: nextOffset),
+    );
+  }
+
+  void _selectCurrentLine() {
+    final selection = textController.selection;
+    if (!selection.isValid) return;
+    final line = _currentLineBounds(selection);
+    textController.selection = TextSelection(
+      baseOffset: line.start,
+      extentOffset: line.end,
+    );
+  }
+
+  void _selectAdjacentTab(int direction) {
+    final documents = widget.controller.workspace.documents;
+    if (documents.isEmpty) return;
+    final current = widget.controller.workspace.activeIndex;
+    final start = current < 0 ? 0 : current;
+    final next = (start + direction + documents.length) % documents.length;
+    widget.controller.selectTab(next);
+  }
+
+  void _closeActiveTab() {
+    final index = widget.controller.workspace.activeIndex;
+    if (index >= 0) _closeTab(index);
+  }
+
+  void _selectAdjacentDiagnostic(int direction) {
+    final diagnostics = widget.controller.diagnostics;
+    if (diagnostics.isEmpty) return;
+    final offset = _cursorOffset;
+    var index = direction > 0 ? 0 : diagnostics.length - 1;
+    if (direction > 0) {
+      for (var candidate = 0; candidate < diagnostics.length; candidate++) {
+        if (diagnostics[candidate].offset > offset) {
+          index = candidate;
+          break;
+        }
+      }
+    } else {
+      for (
+        var candidate = diagnostics.length - 1;
+        candidate >= 0;
+        candidate--
+      ) {
+        if (diagnostics[candidate].offset < offset) {
+          index = candidate;
+          break;
+        }
+      }
+    }
+    final diagnostic = diagnostics[index];
+    textController.selection = TextSelection.collapsed(
+      offset: diagnostic.offset.clamp(0, textController.text.length).toInt(),
     );
   }
 
@@ -606,6 +816,65 @@ class _EditorShellState extends State<EditorShell> {
         SingleActivator(LogicalKeyboardKey.f5): CompileIntent(),
         SingleActivator(LogicalKeyboardKey.keyF, control: true): FindIntent(),
         SingleActivator(LogicalKeyboardKey.keyF, meta: true): FindIntent(),
+        SingleActivator(LogicalKeyboardKey.keyN, control: true):
+            NewFileIntent(),
+        SingleActivator(LogicalKeyboardKey.keyN, meta: true): NewFileIntent(),
+        SingleActivator(LogicalKeyboardKey.keyO, control: true):
+            OpenFileIntent(),
+        SingleActivator(LogicalKeyboardKey.keyO, meta: true): OpenFileIntent(),
+        SingleActivator(LogicalKeyboardKey.keyW, control: true):
+            CloseEditorIntent(),
+        SingleActivator(LogicalKeyboardKey.keyW, meta: true):
+            CloseEditorIntent(),
+        SingleActivator(LogicalKeyboardKey.keyK, control: true, shift: true):
+            DeleteLineIntent(),
+        SingleActivator(LogicalKeyboardKey.keyK, meta: true, shift: true):
+            DeleteLineIntent(),
+        SingleActivator(LogicalKeyboardKey.enter, control: true):
+            InsertLineIntent(above: false),
+        SingleActivator(LogicalKeyboardKey.enter, meta: true): InsertLineIntent(
+          above: false,
+        ),
+        SingleActivator(LogicalKeyboardKey.enter, control: true, shift: true):
+            InsertLineIntent(above: true),
+        SingleActivator(LogicalKeyboardKey.enter, meta: true, shift: true):
+            InsertLineIntent(above: true),
+        SingleActivator(LogicalKeyboardKey.arrowUp, alt: true): MoveLineIntent(
+          direction: -1,
+        ),
+        SingleActivator(LogicalKeyboardKey.arrowDown, alt: true):
+            MoveLineIntent(direction: 1),
+        SingleActivator(LogicalKeyboardKey.arrowUp, alt: true, shift: true):
+            CopyLineIntent(direction: -1),
+        SingleActivator(LogicalKeyboardKey.arrowDown, alt: true, shift: true):
+            CopyLineIntent(direction: 1),
+        SingleActivator(LogicalKeyboardKey.keyL, control: true):
+            SelectLineIntent(),
+        SingleActivator(LogicalKeyboardKey.keyL, meta: true):
+            SelectLineIntent(),
+        SingleActivator(LogicalKeyboardKey.pageUp, control: true):
+            PreviousTabIntent(),
+        SingleActivator(LogicalKeyboardKey.pageDown, control: true):
+            NextTabIntent(),
+        SingleActivator(LogicalKeyboardKey.pageUp, meta: true):
+            PreviousTabIntent(),
+        SingleActivator(LogicalKeyboardKey.pageDown, meta: true):
+            NextTabIntent(),
+        SingleActivator(LogicalKeyboardKey.f8): NextDiagnosticIntent(
+          direction: 1,
+        ),
+        SingleActivator(LogicalKeyboardKey.f8, shift: true):
+            NextDiagnosticIntent(direction: -1),
+        SingleActivator(LogicalKeyboardKey.keyJ, control: true):
+            ToggleResultsIntent(),
+        SingleActivator(LogicalKeyboardKey.keyJ, meta: true):
+            ToggleResultsIntent(),
+        SingleActivator(LogicalKeyboardKey.keyF, alt: true, shift: true):
+            FormatDocumentIntent(),
+        SingleActivator(LogicalKeyboardKey.keyF, meta: true, alt: true):
+            FormatDocumentIntent(),
+        SingleActivator(LogicalKeyboardKey.keyI, control: true, shift: true):
+            FormatDocumentIntent(),
         SingleActivator(LogicalKeyboardKey.space, control: true):
             CompletionIntent(),
         SingleActivator(LogicalKeyboardKey.space, meta: true):
@@ -631,6 +900,45 @@ class _EditorShellState extends State<EditorShell> {
           ),
           FindIntent: CallbackAction<FindIntent>(
             onInvoke: (_) => _toggleFindReplace(),
+          ),
+          NewFileIntent: CallbackAction<NewFileIntent>(
+            onInvoke: (_) => _newFileFromWelcome(),
+          ),
+          OpenFileIntent: CallbackAction<OpenFileIntent>(
+            onInvoke: (_) => _openFile(),
+          ),
+          CloseEditorIntent: CallbackAction<CloseEditorIntent>(
+            onInvoke: (_) => _closeActiveTab(),
+          ),
+          DeleteLineIntent: CallbackAction<DeleteLineIntent>(
+            onInvoke: (_) => _deleteCurrentLine(),
+          ),
+          InsertLineIntent: CallbackAction<InsertLineIntent>(
+            onInvoke: (intent) => _insertLine(above: intent.above),
+          ),
+          MoveLineIntent: CallbackAction<MoveLineIntent>(
+            onInvoke: (intent) => _moveLine(intent.direction),
+          ),
+          CopyLineIntent: CallbackAction<CopyLineIntent>(
+            onInvoke: (intent) => _copyLine(intent.direction),
+          ),
+          SelectLineIntent: CallbackAction<SelectLineIntent>(
+            onInvoke: (_) => _selectCurrentLine(),
+          ),
+          PreviousTabIntent: CallbackAction<PreviousTabIntent>(
+            onInvoke: (_) => _selectAdjacentTab(-1),
+          ),
+          NextTabIntent: CallbackAction<NextTabIntent>(
+            onInvoke: (_) => _selectAdjacentTab(1),
+          ),
+          NextDiagnosticIntent: CallbackAction<NextDiagnosticIntent>(
+            onInvoke: (intent) => _selectAdjacentDiagnostic(intent.direction),
+          ),
+          ToggleResultsIntent: CallbackAction<ToggleResultsIntent>(
+            onInvoke: (_) => setState(() => resultsExpanded = !resultsExpanded),
+          ),
+          FormatDocumentIntent: CallbackAction<FormatDocumentIntent>(
+            onInvoke: (_) => widget.controller.formatActive(),
           ),
           CompletionIntent: CallbackAction<CompletionIntent>(
             onInvoke: (_) => controller.complete(_cursorOffset),
@@ -832,6 +1140,62 @@ class CompileIntent extends Intent {
 
 class FindIntent extends Intent {
   const FindIntent();
+}
+
+class NewFileIntent extends Intent {
+  const NewFileIntent();
+}
+
+class OpenFileIntent extends Intent {
+  const OpenFileIntent();
+}
+
+class CloseEditorIntent extends Intent {
+  const CloseEditorIntent();
+}
+
+class DeleteLineIntent extends Intent {
+  const DeleteLineIntent();
+}
+
+class InsertLineIntent extends Intent {
+  final bool above;
+  const InsertLineIntent({required this.above});
+}
+
+class MoveLineIntent extends Intent {
+  final int direction;
+  const MoveLineIntent({required this.direction});
+}
+
+class CopyLineIntent extends Intent {
+  final int direction;
+  const CopyLineIntent({required this.direction});
+}
+
+class SelectLineIntent extends Intent {
+  const SelectLineIntent();
+}
+
+class NextTabIntent extends Intent {
+  const NextTabIntent();
+}
+
+class PreviousTabIntent extends Intent {
+  const PreviousTabIntent();
+}
+
+class NextDiagnosticIntent extends Intent {
+  final int direction;
+  const NextDiagnosticIntent({required this.direction});
+}
+
+class ToggleResultsIntent extends Intent {
+  const ToggleResultsIntent();
+}
+
+class FormatDocumentIntent extends Intent {
+  const FormatDocumentIntent();
 }
 
 class _WelcomeEditor extends StatelessWidget {

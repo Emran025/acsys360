@@ -37,6 +37,45 @@ void main() {
     expect((response['threeAddressCode'] as List), isNotEmpty);
   });
 
+  test('CLI resolves project procedures across source files', () async {
+    final root = await Directory.systemTemp.createTemp('arabicc-project-');
+    addTearDown(() => root.delete(recursive: true));
+    final process = await Process.start(Platform.resolvedExecutable, [
+      'run',
+      'bin/arabicc.dart',
+      '--protocol',
+    ], workingDirectory: Directory.current.path);
+    process.stdin.writeln(
+      jsonEncode({
+        'protocolVersion': '0.3.0',
+        'rootPath': root.path,
+        'sourcePaths': ['main.arb', 'lib.arb'],
+        'sourceTexts': {
+          'main.arb': '''برنامج رئيسي {
+متغير س: صحيح;
+س = 3;
+اطبع_قيمة(س);
+}.''',
+          'lib.arb': '''برنامج مكتبة {
+اجراء اطبع_قيمة(بالقيمة قيمة: صحيح)؛ {
+اطبع(قيمة);
+};
+}.''',
+        },
+        'mode': 'project',
+      }),
+    );
+    await process.stdin.close();
+    final stdout = await process.stdout.transform(utf8.decoder).join();
+    final stderr = await process.stderr.transform(utf8.decoder).join();
+    final exitCode = await process.exitCode;
+
+    expect(exitCode, 0, reason: stderr);
+    final response = jsonDecode(stdout) as Map<String, dynamic>;
+    expect(response['success'], isTrue);
+    expect(response['diagnostics'], isEmpty);
+  });
+
   test('CLI returns a protocol diagnostic for malformed JSON', () async {
     final process = await Process.start(Platform.resolvedExecutable, [
       'run',
