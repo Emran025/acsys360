@@ -1,30 +1,37 @@
-import 'dart:io';
-
-import 'package:acsys360/data/repositories/local_workspace_repository.dart';
+import 'package:acsys360/domain/entities/document.dart';
+import 'package:acsys360/domain/repositories/workspace_repository.dart';
 import 'package:acsys360/main.dart';
 import 'package:acsys360/presentation/state/editor_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+class FakeWorkspaceRepository implements WorkspaceRepository {
+  final document = const Document(path: 'main.arb', text: 'برنامج اختبار {}.');
+
+  @override
+  Future<List<String>> listFiles(String rootPath) async => [document.path];
+
+  @override
+  Future<Document> read(String path) async => document;
+
+  @override
+  Future<void> write(Document document) async {}
+}
+
 void main() {
   testWidgets('opens an Arabic source document', (tester) async {
-    final directory = await Directory.systemTemp.createTemp('acsys360_test_');
-    final file = File('${directory.path}/main.arb');
-    await file.writeAsString('برنامج اختبار {}.');
     final controller = EditorController(
-      repository: LocalWorkspaceRepository(),
-      rootPath: directory.path,
+      repository: FakeWorkspaceRepository(),
+      rootPath: '.',
     );
 
     await tester.pumpWidget(ArabicEditorApp(controller: controller));
-    await tester.pumpAndSettle();
+    await tester.pump();
     expect(find.text('main.arb'), findsOneWidget);
 
     await tester.tap(find.text('main.arb'));
-    await tester.pumpAndSettle();
+    await tester.pump();
     expect(find.byType(TextField), findsOneWidget);
     expect(controller.activeDocument?.text, 'برنامج اختبار {}.');
-
-    await directory.delete(recursive: true);
   });
 }
