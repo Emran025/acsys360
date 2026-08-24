@@ -110,6 +110,28 @@ void main() {
     expect(field.textDirection, TextDirection.ltr);
   });
 
+  testWidgets('renders a navigable code minimap', (tester) async {
+    final controller = ArabicCodeController(
+      text: List.generate(80, (index) => 'اطبع($index)؛').join('\n'),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Material(
+          child: SizedBox(
+            height: 180,
+            child: LineNumberedEditor(controller: controller),
+          ),
+        ),
+      ),
+    );
+
+    final minimap = find.bySemanticsLabel('خريطة مصغرة للكود');
+    expect(minimap, findsOneWidget);
+    await tester.tap(minimap, warnIfMissed: false);
+    await tester.pump();
+  });
+
   testWidgets('configures theme colors and collapsible panels', (tester) async {
     final controller = EditorController(
       repository: FakeWorkspaceRepository(),

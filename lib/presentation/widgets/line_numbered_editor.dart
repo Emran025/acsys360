@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../domain/entities/editor_diagnostic.dart';
 import '../theme/app_theme.dart';
+import 'code_minimap.dart';
 
 class LineNumberedEditor extends StatefulWidget {
   final TextEditingController controller;
@@ -110,6 +111,7 @@ class _LineNumberedEditorState extends State<LineNumberedEditor> {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
+        textDirection: TextDirection.ltr,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
@@ -193,6 +195,14 @@ class _LineNumberedEditorState extends State<LineNumberedEditor> {
                   ),
                 ),
               ),
+            ),
+          ),
+          SizedBox(
+            width: 118,
+            child: CodeMinimap(
+              controller: widget.controller,
+              scrollController: editorScrollController,
+              diagnostics: widget.diagnostics,
             ),
           ),
         ],
