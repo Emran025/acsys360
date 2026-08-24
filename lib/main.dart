@@ -644,136 +644,135 @@ class _EditorShellState extends State<EditorShell> {
                       setState(() => topBarExpanded = !topBarExpanded),
                 ),
                 Expanded(
-                  child: Directionality(
-                    textDirection: TextDirection.ltr,
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 300,
-                          child: Directionality(
-                            textDirection: TextDirection.rtl,
-                            child: WorkspaceExplorer(
-                              rootPath: controller.workspace.rootPath,
-                              nodes: controller.tree,
-                              isLoading: isRefreshing,
-                              hasCutPath: controller.hasCutPath,
-                              selectedPath: controller.selectedExplorerPath,
-                              selectedDirectoryPath:
-                                  controller.selectedDirectoryPath,
-                              onSelect: controller.selectExplorerPath,
-                              onChooseFolder: _pickWorkspace,
-                              onOpenFile: _openFile,
-                              onRefresh: _refreshFiles,
-                              onNewFile: _newFileAt,
-                              onNewFolder: _newFolderAt,
-                              onOpen: controller.open,
-                              onDelete: _deletePath,
-                              onRename: _renamePath,
-                              onCut: controller.cut,
-                              onPaste: controller.paste,
-                            ),
+                  child: Row(
+                    textDirection: TextDirection.rtl,
+                    children: [
+                      SizedBox(
+                        width: 300,
+                        child: Directionality(
+                          textDirection: TextDirection.rtl,
+                          child: WorkspaceExplorer(
+                            rootPath: controller.workspace.rootPath,
+                            nodes: controller.tree,
+                            isLoading: isRefreshing,
+                            hasCutPath: controller.hasCutPath,
+                            selectedPath: controller.selectedExplorerPath,
+                            selectedDirectoryPath:
+                                controller.selectedDirectoryPath,
+                            onSelect: controller.selectExplorerPath,
+                            onChooseFolder: _pickWorkspace,
+                            onOpenFile: _openFile,
+                            onRefresh: _refreshFiles,
+                            onNewFile: _newFileAt,
+                            onNewFolder: _newFolderAt,
+                            onOpen: controller.open,
+                            onDelete: _deletePath,
+                            onRename: _renamePath,
+                            onCut: controller.cut,
+                            onPaste: controller.paste,
                           ),
                         ),
-                        const VerticalDivider(width: 1),
-                        Expanded(
-                          child: Directionality(
-                            textDirection: TextDirection.rtl,
-                            child: Column(
-                              children: [
-                                _Tabs(
-                                  controller: controller,
-                                  onClose: _closeTab,
+                      ),
+                      const VerticalDivider(width: 1),
+                      Expanded(
+                        child: Directionality(
+                          textDirection: TextDirection.rtl,
+                          child: Column(
+                            children: [
+                              _Tabs(controller: controller, onClose: _closeTab),
+                              _Breadcrumb(
+                                rootPath: controller.workspace.rootPath,
+                                activePath: active?.path,
+                              ),
+                              if (showFindReplace)
+                                FindReplaceBar(
+                                  findController: findController,
+                                  replaceController: replaceController,
+                                  matches: controller.searchMatches.length,
+                                  currentMatch: controller.currentMatchIndex,
+                                  onSearch: _search,
+                                  onFirst: _firstMatch,
+                                  onPrevious: _previousMatch,
+                                  onNext: _nextMatch,
+                                  onReplaceCurrent: _replaceCurrent,
+                                  onReplaceAll: _replaceAll,
+                                  onClose: _toggleFindReplace,
                                 ),
-                                if (showFindReplace)
-                                  FindReplaceBar(
-                                    findController: findController,
-                                    replaceController: replaceController,
-                                    matches: controller.searchMatches.length,
-                                    currentMatch: controller.currentMatchIndex,
-                                    onSearch: _search,
-                                    onFirst: _firstMatch,
-                                    onPrevious: _previousMatch,
-                                    onNext: _nextMatch,
-                                    onReplaceCurrent: _replaceCurrent,
-                                    onReplaceAll: _replaceAll,
-                                    onClose: _toggleFindReplace,
-                                  ),
-                                Expanded(
-                                  child: Stack(
-                                    children: [
-                                      GestureDetector(
-                                        behavior: HitTestBehavior.translucent,
-                                        onSecondaryTapUp: (details) =>
-                                            _showEditorMenu(
-                                              details.globalPosition,
-                                            ),
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(14),
-                                          child: active == null
-                                              ? const _EmptyEditor()
-                                              : LineNumberedEditor(
-                                                  controller: textController,
-                                                  focusNode: editorFocusNode,
-                                                  diagnostics:
-                                                      controller.diagnostics,
-                                                  onChanged: _onTextChanged,
-                                                  onSelectionChanged:
-                                                      _onSelectionChanged,
-                                                  onTap: _hideTransientUi,
-                                                  onDiagnosticTap:
-                                                      _showDiagnosticLamp,
-                                                  onKeyEvent: _handleEditorKey,
-                                                ),
+                              Expanded(
+                                child: Stack(
+                                  children: [
+                                    GestureDetector(
+                                      behavior: HitTestBehavior.translucent,
+                                      onSecondaryTapUp: (details) =>
+                                          _showEditorMenu(
+                                            details.globalPosition,
+                                          ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(14),
+                                        child: active == null
+                                            ? const _EmptyEditor()
+                                            : LineNumberedEditor(
+                                                controller: textController,
+                                                focusNode: editorFocusNode,
+                                                diagnostics:
+                                                    controller.diagnostics,
+                                                onChanged: _onTextChanged,
+                                                onSelectionChanged:
+                                                    _onSelectionChanged,
+                                                onTap: _hideTransientUi,
+                                                onDiagnosticTap:
+                                                    _showDiagnosticLamp,
+                                                onKeyEvent: _handleEditorKey,
+                                              ),
+                                      ),
+                                    ),
+                                    if (visibleDiagnostic != null)
+                                      Positioned(
+                                        top: 12,
+                                        right: 12,
+                                        width: 340,
+                                        child: _DiagnosticPopover(
+                                          diagnostic: visibleDiagnostic!,
+                                          onApply: (action) {
+                                            widget.controller.applyCodeAction(
+                                              action,
+                                            );
+                                            _hideTransientUi();
+                                          },
+                                          onClose: _hideTransientUi,
                                         ),
                                       ),
-                                      if (visibleDiagnostic != null)
-                                        Positioned(
-                                          top: 12,
-                                          right: 12,
-                                          width: 340,
-                                          child: _DiagnosticPopover(
-                                            diagnostic: visibleDiagnostic!,
-                                            onApply: (action) {
-                                              widget.controller.applyCodeAction(
-                                                action,
-                                              );
-                                              _hideTransientUi();
-                                            },
-                                            onClose: _hideTransientUi,
-                                          ),
+                                    if (controller.assistance?.help != null)
+                                      Positioned(
+                                        top: 12,
+                                        right: 12,
+                                        width: 340,
+                                        child: _HelpPopover(
+                                          help: controller.assistance!.help!,
+                                          onClose: controller.clearAssist,
                                         ),
-                                      if (controller.assistance?.help != null)
-                                        Positioned(
-                                          top: 12,
-                                          right: 12,
-                                          width: 340,
-                                          child: _HelpPopover(
-                                            help: controller.assistance!.help!,
-                                            onClose: controller.clearAssist,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
+                                      ),
+                                  ],
                                 ),
-                                CollapsiblePanel(
-                                  title: 'نتائج الترجمة',
-                                  icon: Icons.terminal_rounded,
-                                  expanded: resultsExpanded,
-                                  expandedHeight: 160,
-                                  onToggle: () => setState(
-                                    () => resultsExpanded = !resultsExpanded,
-                                  ),
-                                  child: _DiagnosticsPanel(
-                                    controller: controller,
-                                  ),
+                              ),
+                              CollapsiblePanel(
+                                title: 'نتائج الترجمة',
+                                icon: Icons.terminal_rounded,
+                                expanded: resultsExpanded,
+                                expandedHeight: 160,
+                                onToggle: () => setState(
+                                  () => resultsExpanded = !resultsExpanded,
                                 ),
-                                _StatusBar(controller: controller),
-                              ],
-                            ),
+                                child: _DiagnosticsPanel(
+                                  controller: controller,
+                                ),
+                              ),
+                              _StatusBar(controller: controller),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -989,40 +988,262 @@ String _prettyJson(Object? value) {
   }
 }
 
-class _Tabs extends StatelessWidget {
+class _Tabs extends StatefulWidget {
   final EditorController controller;
   final Future<void> Function(int index) onClose;
   const _Tabs({required this.controller, required this.onClose});
 
   @override
-  Widget build(BuildContext context) => Directionality(
-    textDirection: TextDirection.rtl,
-    child: SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+  State<_Tabs> createState() => _TabsState();
+}
+
+class _TabsState extends State<_Tabs> {
+  final _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final documents = widget.controller.workspace.documents;
+    return SizedBox(
+      height: 38,
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        textDirection: TextDirection.ltr,
         children: [
-          for (
-            var index = 0;
-            index < controller.workspace.documents.length;
-            index++
-          )
-            InputChip(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              label: Text(
-                '${controller.workspace.documents[index].path.split(Platform.pathSeparator).last}${controller.workspace.documents[index].isDirty ? ' *' : ''}',
-              ),
-              selected:
-                  controller.workspace.documents[index].path ==
-                  controller.activeDocument?.path,
-              onPressed: () => controller.selectTab(index),
-              onDeleted: () => onClose(index),
+          _TabScrollButton(
+            icon: Icons.chevron_left_rounded,
+            tooltip: 'تمرير التبويبات يسارًا',
+            onPressed: () => _scrollBy(220),
+          ),
+          Expanded(
+            child: ListView.separated(
+              controller: _scrollController,
+              scrollDirection: Axis.horizontal,
+              itemCount: documents.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 1),
+              itemBuilder: (context, index) {
+                final document = documents[index];
+                final active =
+                    document.path == widget.controller.activeDocument?.path;
+                final name = document.path.split(Platform.pathSeparator).last;
+                return InkWell(
+                  onTap: () => widget.controller.selectTab(index),
+                  child: Container(
+                    constraints: const BoxConstraints(
+                      minWidth: 118,
+                      maxWidth: 220,
+                    ),
+                    padding: const EdgeInsetsDirectional.only(
+                      start: 10,
+                      end: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: active
+                          ? Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest
+                          : null,
+                      border: Border(
+                        bottom: BorderSide(
+                          color: active
+                              ? Theme.of(context).colorScheme.primary
+                              : Colors.transparent,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      textDirection: TextDirection.ltr,
+                      children: [
+                        Icon(
+                          _tabFileIcon(document.path),
+                          size: 16,
+                          color: active
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 7),
+                        Expanded(
+                          child: Text(
+                            '$name${document.isDirty ? ' *' : ''}',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: active ? FontWeight.w700 : null,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'إغلاق الملف',
+                          onPressed: () => widget.onClose(index),
+                          icon: const Icon(Icons.close_rounded, size: 15),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 24,
+                            minHeight: 24,
+                          ),
+                          style: IconButton.styleFrom(
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.zero,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
+          ),
+          _TabScrollButton(
+            icon: Icons.chevron_right_rounded,
+            tooltip: 'تمرير التبويبات يمينًا',
+            onPressed: () => _scrollBy(-220),
+          ),
         ],
       ),
+    );
+  }
+
+  void _scrollBy(double amount) {
+    if (!_scrollController.hasClients) return;
+    final target = (_scrollController.offset + amount).clamp(
+      0.0,
+      _scrollController.position.maxScrollExtent,
+    );
+    _scrollController.animateTo(
+      target,
+      duration: const Duration(milliseconds: 160),
+      curve: Curves.easeOut,
+    );
+  }
+}
+
+class _TabScrollButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  const _TabScrollButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+    tooltip: tooltip,
+    onPressed: onPressed,
+    icon: Icon(icon, size: 19),
+    padding: EdgeInsets.zero,
+    constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+    style: IconButton.styleFrom(
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
     ),
+  );
+}
+
+IconData _tabFileIcon(String path) {
+  final extension = path.split('.').length > 1
+      ? path.split('.').last.toLowerCase()
+      : '';
+  return switch (extension) {
+    'arb' => Icons.code_rounded,
+    'dart' ||
+    'js' ||
+    'ts' ||
+    'php' ||
+    'py' ||
+    'java' ||
+    'cs' => Icons.integration_instructions_outlined,
+    'json' || 'yaml' || 'yml' || 'xml' => Icons.data_object_rounded,
+    'md' || 'txt' => Icons.description_outlined,
+    'png' || 'jpg' || 'jpeg' || 'svg' => Icons.image_outlined,
+    _ => Icons.insert_drive_file_outlined,
+  };
+}
+
+class _Breadcrumb extends StatelessWidget {
+  final String rootPath;
+  final String? activePath;
+
+  const _Breadcrumb({required this.rootPath, required this.activePath});
+
+  @override
+  Widget build(BuildContext context) {
+    final path = activePath;
+    if (path == null) return const SizedBox(height: 28);
+    final root = Directory(rootPath).absolute.path;
+    final absolute = File(path).absolute.path;
+    final relative = absolute.startsWith('$root${Platform.pathSeparator}')
+        ? absolute.substring(root.length + 1)
+        : absolute;
+    final segments = relative
+        .split(Platform.pathSeparator)
+        .where((segment) => segment.isNotEmpty)
+        .toList();
+    if (segments.isEmpty) return const SizedBox(height: 28);
+    return SizedBox(
+      height: 28,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+            bottom: BorderSide(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+          ),
+        ),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Row(
+            textDirection: TextDirection.ltr,
+            children: [
+              _BreadcrumbItem(
+                icon: Icons.folder_open_outlined,
+                label: root.split(Platform.pathSeparator).last,
+              ),
+              for (final segment in segments) ...[
+                const Icon(Icons.chevron_right_rounded, size: 15),
+                _BreadcrumbItem(
+                  icon: segment == segments.last
+                      ? _tabFileIcon(segment)
+                      : Icons.folder_outlined,
+                  label: segment,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BreadcrumbItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _BreadcrumbItem({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(
+        icon,
+        size: 15,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+      const SizedBox(width: 5),
+      Text(label, style: Theme.of(context).textTheme.labelMedium),
+    ],
   );
 }
 
