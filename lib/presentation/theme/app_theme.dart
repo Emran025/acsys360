@@ -1,42 +1,27 @@
 import 'package:flutter/material.dart';
 
-enum AppAccent {
-  ocean('أزرق بحري', Color(0xFF355C7D)),
-  emerald('زمردي', Color(0xFF247A68)),
-  violet('بنفسجي', Color(0xFF6C4BA5)),
-  amber('كهرماني', Color(0xFF9A6415));
-
-  final String label;
-  final Color color;
-
-  const AppAccent(this.label, this.color);
-}
-
 abstract final class AppTheme {
+  static const brandOrange = Color(0xFFFF9500);
+  static const brandBlack = Color(0xFF0B0B0B);
+  static const lightSurface = Color(0xFFF5F2ED);
+  static const darkSurface = Color(0xFF141414);
   static const fontFamily = 'Cairo';
 
-  static ThemeData light({AppAccent accent = AppAccent.ocean}) => _theme(
-    brightness: Brightness.light,
-    seed: accent.color,
-    surface: const Color(0xFFF7F9FC),
-  );
+  static ThemeData light() =>
+      _theme(brightness: Brightness.light, surface: lightSurface);
 
-  static ThemeData dark({AppAccent accent = AppAccent.ocean}) => _theme(
-    brightness: Brightness.dark,
-    seed: accent.color,
-    surface: const Color(0xFF111820),
-  );
+  static ThemeData dark() =>
+      _theme(brightness: Brightness.dark, surface: darkSurface);
 
   static ThemeData _theme({
     required Brightness brightness,
-    required Color seed,
     required Color surface,
   }) {
     final scheme = ColorScheme.fromSeed(
-      seedColor: seed,
+      seedColor: brandOrange,
       brightness: brightness,
       surface: surface,
-    );
+    ).copyWith(primary: brandOrange, onPrimary: brandBlack);
     final base = ThemeData(
       colorScheme: scheme,
       brightness: brightness,
@@ -61,15 +46,15 @@ abstract final class AppTheme {
         filled: true,
         fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.48),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: scheme.primary, width: 1.4),
         ),
         contentPadding: const EdgeInsets.symmetric(
@@ -83,6 +68,9 @@ abstract final class AppTheme {
         thickness: 1,
       ),
       listTileTheme: const ListTileThemeData(minVerticalPadding: 4),
+      popupMenuTheme: PopupMenuThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
     );
   }
 }

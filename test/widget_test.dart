@@ -4,7 +4,7 @@ import 'package:acsys360/domain/repositories/workspace_repository.dart';
 import 'package:acsys360/main.dart';
 import 'package:acsys360/presentation/state/editor_controller.dart';
 import 'package:acsys360/presentation/widgets/line_numbered_editor.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class FakeWorkspaceRepository implements WorkspaceRepository {
@@ -70,18 +70,12 @@ void main() {
     await tester.pumpWidget(ArabicEditorApp(controller: controller));
     await tester.pump();
     expect(find.byTooltip('الوضع الداكن'), findsOneWidget);
-    expect(find.byTooltip('ألوان الثيم'), findsOneWidget);
+    expect(find.byType(SvgPicture), findsOneWidget);
     expect(find.byKey(const ValueKey('topbar-toggle')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('collapse-نتائج الترجمة')),
       findsOneWidget,
     );
-
-    await tester.tap(find.byTooltip('ألوان الثيم'));
-    await tester.pump();
-    expect(find.text('زمردي'), findsOneWidget);
-    await tester.tap(find.text('زمردي'));
-    await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const ValueKey('topbar-toggle')));
     await tester.pumpAndSettle();

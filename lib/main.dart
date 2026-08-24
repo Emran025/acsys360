@@ -68,7 +68,6 @@ class ArabicEditorApp extends StatefulWidget {
 
 class _ArabicEditorAppState extends State<ArabicEditorApp> {
   ThemeMode themeMode = ThemeMode.light;
-  AppAccent accent = AppAccent.ocean;
 
   void _toggleTheme() {
     setState(() {
@@ -78,10 +77,6 @@ class _ArabicEditorAppState extends State<ArabicEditorApp> {
     });
   }
 
-  void _selectAccent(AppAccent value) {
-    setState(() => accent = value);
-  }
-
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: widget.controller,
@@ -89,13 +84,11 @@ class _ArabicEditorAppState extends State<ArabicEditorApp> {
       debugShowCheckedModeBanner: false,
       title: 'محرر اللغة العربية',
       themeMode: themeMode,
-      theme: AppTheme.light(accent: accent),
-      darkTheme: AppTheme.dark(accent: accent),
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
       home: EditorShell(
         controller: widget.controller,
         onToggleTheme: _toggleTheme,
-        onSelectAccent: _selectAccent,
-        accent: accent,
         isDark: themeMode == ThemeMode.dark,
       ),
     ),
@@ -105,16 +98,12 @@ class _ArabicEditorAppState extends State<ArabicEditorApp> {
 class EditorShell extends StatefulWidget {
   final EditorController controller;
   final VoidCallback? onToggleTheme;
-  final ValueChanged<AppAccent>? onSelectAccent;
-  final AppAccent accent;
   final bool isDark;
 
   const EditorShell({
     super.key,
     required this.controller,
     this.onToggleTheme,
-    this.onSelectAccent,
-    this.accent = AppAccent.ocean,
     this.isDark = false,
   });
 
@@ -327,13 +316,9 @@ class _EditorShellState extends State<EditorShell> {
                   activePath: active?.path,
                   isDark: widget.isDark,
                   expanded: topBarExpanded,
-                  accent: widget.accent,
-                  onSelectAccent: widget.onSelectAccent ?? (_) {},
                   onChooseFolder: _pickWorkspace,
                   onSave: controller.save,
                   onSaveAll: controller.saveAll,
-                  onUndo: controller.undo,
-                  onRedo: controller.redo,
                   onFind: _toggleFindReplace,
                   onComplete: () => controller.complete(_cursorOffset),
                   onHelp: () => controller.help(_cursorOffset),
