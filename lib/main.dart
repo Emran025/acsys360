@@ -11,6 +11,7 @@ import 'domain/entities/document.dart';
 import 'presentation/state/editor_controller.dart';
 import 'presentation/theme/app_theme.dart';
 import 'presentation/widgets/editor_dialogs.dart';
+import 'presentation/widgets/collapsible_panel.dart';
 import 'presentation/widgets/editor_top_bar.dart';
 import 'presentation/widgets/find_replace_bar.dart';
 import 'presentation/widgets/line_numbered_editor.dart';
@@ -67,6 +68,7 @@ class ArabicEditorApp extends StatefulWidget {
 
 class _ArabicEditorAppState extends State<ArabicEditorApp> {
   ThemeMode themeMode = ThemeMode.light;
+  AppAccent accent = AppAccent.ocean;
 
   void _toggleTheme() {
     setState(() {
@@ -76,6 +78,10 @@ class _ArabicEditorAppState extends State<ArabicEditorApp> {
     });
   }
 
+  void _selectAccent(AppAccent value) {
+    setState(() => accent = value);
+  }
+
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: widget.controller,
@@ -83,11 +89,13 @@ class _ArabicEditorAppState extends State<ArabicEditorApp> {
       debugShowCheckedModeBanner: false,
       title: 'محرر اللغة العربية',
       themeMode: themeMode,
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
+      theme: AppTheme.light(accent: accent),
+      darkTheme: AppTheme.dark(accent: accent),
       home: EditorShell(
         controller: widget.controller,
         onToggleTheme: _toggleTheme,
+        onSelectAccent: _selectAccent,
+        accent: accent,
         isDark: themeMode == ThemeMode.dark,
       ),
     ),
@@ -97,12 +105,16 @@ class _ArabicEditorAppState extends State<ArabicEditorApp> {
 class EditorShell extends StatefulWidget {
   final EditorController controller;
   final VoidCallback? onToggleTheme;
+  final ValueChanged<AppAccent>? onSelectAccent;
+  final AppAccent accent;
   final bool isDark;
 
   const EditorShell({
     super.key,
     required this.controller,
     this.onToggleTheme,
+    this.onSelectAccent,
+    this.accent = AppAccent.ocean,
     this.isDark = false,
   });
 
@@ -117,6 +129,8 @@ class _EditorShellState extends State<EditorShell> {
   String? boundPath;
   bool showFindReplace = false;
   bool isRefreshing = false;
+  bool topBarExpanded = true;
+  bool resultsExpanded = true;
 
   @override
   void initState() {
@@ -312,6 +326,9 @@ class _EditorShellState extends State<EditorShell> {
                   rootPath: controller.workspace.rootPath,
                   activePath: active?.path,
                   isDark: widget.isDark,
+                  expanded: topBarExpanded,
+                  accent: widget.accent,
+                  onSelectAccent: widget.onSelectAccent ?? (_) {},
                   onChooseFolder: _pickWorkspace,
                   onSave: controller.save,
                   onSaveAll: controller.saveAll,
@@ -322,6 +339,8 @@ class _EditorShellState extends State<EditorShell> {
                   onHelp: () => controller.help(_cursorOffset),
                   onCompile: controller.compile,
                   onToggleTheme: widget.onToggleTheme ?? () {},
+                  onToggleExpanded: () =>
+                      setState(() => topBarExpanded = !topBarExpanded),
                 ),
                 Expanded(
                   child: Row(
@@ -369,12 +388,16 @@ class _EditorShellState extends State<EditorShell> {
                                       ),
                               ),
                             ),
-                            const Divider(height: 1),
-                            SizedBox(
-                              height: 120,
+                            CollapsiblePanel(
+                              title: 'نتائج الترجمة',
+                              icon: Icons.terminal_rounded,
+                              expanded: resultsExpanded,
+                              expandedHeight: 160,
+                              onToggle: () => setState(
+                                () => resultsExpanded = !resultsExpanded,
+                              ),
                               child: _DiagnosticsPanel(controller: controller),
                             ),
-                            const Divider(height: 1),
                             _StatusBar(controller: controller),
                           ],
                         ),

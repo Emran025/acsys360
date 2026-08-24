@@ -60,7 +60,7 @@ void main() {
     expect(controller.activeDocument?.text, 'برنامج اختبار {}.');
   });
 
-  testWidgets('toggles the editor theme', (tester) async {
+  testWidgets('configures theme colors and collapsible panels', (tester) async {
     final controller = EditorController(
       repository: FakeWorkspaceRepository(),
       rootPath: '.',
@@ -69,9 +69,22 @@ void main() {
     await tester.pumpWidget(ArabicEditorApp(controller: controller));
     await tester.pump();
     expect(find.byTooltip('الوضع الداكن'), findsOneWidget);
+    expect(find.byTooltip('ألوان الثيم'), findsOneWidget);
+    expect(find.byTooltip('طي الشريط العلوي'), findsOneWidget);
+    expect(find.byTooltip('طي اللوحة'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('الوضع الداكن'));
+    await tester.tap(find.byTooltip('ألوان الثيم'));
     await tester.pump();
-    expect(find.byTooltip('الوضع الفاتح'), findsOneWidget);
+    expect(find.text('زمردي'), findsOneWidget);
+    await tester.tap(find.text('زمردي'));
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('طي الشريط العلوي'));
+    await tester.pump();
+    expect(find.byTooltip('توسيع الشريط العلوي'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('طي اللوحة'));
+    await tester.pump();
+    expect(find.byTooltip('توسيع اللوحة'), findsOneWidget);
   });
 }
