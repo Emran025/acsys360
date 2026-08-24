@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:compiler_contracts/compiler_contracts.dart';
 
-import '../../domain/entities/compilation_result.dart';
 import '../../domain/entities/document.dart';
 import '../../domain/repositories/workspace_repository.dart';
 
@@ -14,7 +13,8 @@ typedef CompilerProcessStarter =
       String? workingDirectory,
     });
 
-class ProcessCompilerRepository implements CompilerRepository {
+class ProcessCompilerRepository
+    implements CompilerRepository, AssistRepository {
   final String executable;
   final List<String> arguments;
   final CompilationMode mode;
@@ -36,10 +36,7 @@ class ProcessCompilerRepository implements CompilerRepository {
     required List<Document> documents,
   }) async {
     if (sourcePath.isEmpty) {
-      return const CompilationResult(
-        success: false,
-        payload: {'diagnostics': [], 'message': 'لا يوجد ملف للترجمة'},
-      ).payload;
+      return _processFailure('لا يوجد ملف للترجمة', -1);
     }
 
     final sourcePaths = <String>{
@@ -84,6 +81,83 @@ class ProcessCompilerRepository implements CompilerRepository {
     } on Object catch (error) {
       return _processFailure(error.toString(), -1);
     }
+  }
+
+  @override
+  Future<AssistResponse> complete({
+    required String rootPath,
+    required String sourcePath,
+    required String sourceText,
+    required int offset,
+    List<String> symbols = const [],
+  }) => _assist(
+    rootPath: rootPath,
+    request: AssistRequest(
+      sourcePath: sourcePath,
+      sourceText: sourceText,
+      offset: offset,
+      action: AssistAction.completion,
+      symbols: symbols,
+    ),
+  );
+
+  @override
+  Future<AssistResponse> help({
+    required String rootPath,
+    required String sourcePath,
+    required String sourceText,
+    required int offset,
+  }) => _assist(
+    rootPath: rootPath,
+    request: AssistRequest(
+      sourcePath: sourcePath,
+      sourceText: sourceText,
+      offset: offset,
+      action: AssistAction.help,
+    ),
+  );
+
+  Future<AssistResponse> _assist({
+    required String rootPath,
+    required AssistRequest request,
+  }) async {
+    try {
+      final process = await startProcess(
+        executable,
+        _assistArguments,
+        workingDirectory: processWorkingDirectory ?? rootPath,
+      );
+      process.stdin.writeln(jsonEncode(request.toJson()));
+      await process.stdin.close();
+      final output = await process.stdout.transform(utf8.decoder).join();
+      final errorOutput = await process.stderr.transform(utf8.decoder).join();
+      final exitCode = await process.exitCode;
+      if (output.trim().isEmpty) {
+        throw FormatException(
+          errorOutput.isEmpty
+              ? 'فشل تشغيل خدمة المساعدة ($exitCode)'
+              : errorOutput,
+        );
+      }
+      final decoded = jsonDecode(output);
+      if (decoded is! Map) {
+        throw const FormatException('استجابة المساعدة ليست كائن JSON');
+      }
+      return AssistResponse.fromJson(Map<String, dynamic>.from(decoded));
+    } on FormatException {
+      rethrow;
+    } on Object catch (error) {
+      throw FormatException('تعذر تشغيل خدمة المساعدة: $error');
+    }
+  }
+
+  List<String> get _assistArguments {
+    final protocolIndex = arguments.lastIndexOf('--protocol');
+    if (protocolIndex == -1) return const ['--assist'];
+    return [
+      for (var index = 0; index < arguments.length; index++)
+        index == protocolIndex ? '--assist' : arguments[index],
+    ];
   }
 
   Map<String, dynamic> _processFailure(String message, int exitCode) => {

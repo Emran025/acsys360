@@ -1,3 +1,4 @@
+import 'package:compiler_contracts/compiler_contracts.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../domain/entities/compilation_result.dart';
@@ -18,18 +19,21 @@ class EditorController extends ChangeNotifier {
   final FindText findText;
   final ReplaceAllText replaceAllText;
   final CompilerRepository? compiler;
+  final AssistRepository? assistant;
 
   Workspace workspace;
   List<String> files = const [];
   List<FileNode> tree = const [];
   Object? error;
   CompilationResult? compilation;
+  AssistResponse? assistance;
   List<SearchMatch> searchMatches = const [];
 
   EditorController({
     required this.repository,
     required String rootPath,
     this.compiler,
+    this.assistant,
   }) : workspace = Workspace(rootPath: rootPath),
        openDocument = OpenDocument(repository),
        saveDocument = SaveDocument(repository),
@@ -46,6 +50,7 @@ class EditorController extends ChangeNotifier {
     files = const [];
     tree = const [];
     compilation = null;
+    assistance = null;
     await refreshFiles();
   }
 
@@ -63,6 +68,7 @@ class EditorController extends ChangeNotifier {
   void selectTab(int index) {
     workspace = workspace.select(index);
     searchMatches = const [];
+    assistance = null;
     notifyListeners();
   }
 
@@ -160,7 +166,60 @@ class EditorController extends ChangeNotifier {
   void edit(TextEdit change) {
     workspace = applyEdit(workspace, change);
     searchMatches = const [];
+    assistance = null;
     notifyListeners();
+  }
+
+  Future<void> complete(int offset) async {
+    final service = assistant;
+    final active = workspace.activeDocument;
+    if (service == null || active == null) return;
+    try {
+      assistance = await service.complete(
+        rootPath: workspace.rootPath,
+        sourcePath: active.path,
+        sourceText: active.text,
+        offset: offset,
+        symbols: _knownSymbols(),
+      );
+      error = null;
+    } catch (exception) {
+      error = exception;
+    }
+    notifyListeners();
+  }
+
+  void clearAssist() {
+    if (assistance == null) return;
+    assistance = null;
+    notifyListeners();
+  }
+
+  Future<void> help(int offset) async {
+    final service = assistant;
+    final active = workspace.activeDocument;
+    if (service == null || active == null) return;
+    try {
+      assistance = await service.help(
+        rootPath: workspace.rootPath,
+        sourcePath: active.path,
+        sourceText: active.text,
+        offset: offset,
+      );
+      error = null;
+    } catch (exception) {
+      error = exception;
+    }
+    notifyListeners();
+  }
+
+  List<String> _knownSymbols() {
+    final table = compilation?.payload['symbolTable'];
+    if (table is! List) return const [];
+    return [
+      for (final item in table)
+        if (item is Map && item['name'] is String) item['name'] as String,
+    ];
   }
 
   void undo() {
