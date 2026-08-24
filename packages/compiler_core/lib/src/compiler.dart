@@ -3,6 +3,7 @@ import 'codegen/assembly.dart';
 import 'codegen/three_address.dart';
 import 'lexer/lexer.dart';
 import 'runtime/interpreter.dart';
+import 'ir/typed_ir.dart';
 import 'model/token.dart';
 import 'parser/parser.dart';
 import 'semantic/semantic.dart';
@@ -15,6 +16,7 @@ class CompilationResult {
   final List<Diagnostic> diagnostics;
   final String assembly;
   final List<String> executionOutput;
+  final TypedIrProgram? intermediateRepresentation;
 
   const CompilationResult(
     this.tokens,
@@ -24,6 +26,7 @@ class CompilationResult {
     this.diagnostics, {
     this.assembly = '',
     this.executionOutput = const [],
+    this.intermediateRepresentation,
   });
 
   bool get success => diagnostics.isEmpty && program != null;
@@ -35,6 +38,7 @@ class CompilationResult {
     'symbolTable': semantic?.toJson()['symbols'],
     'threeAddressCode': threeAddressCode,
     'assembly': assembly,
+    'intermediateRepresentation': intermediateRepresentation?.toJson(),
     'executionOutput': executionOutput,
     'diagnostics': diagnostics.map((item) => item.toJson()).toList(),
   };
@@ -68,14 +72,30 @@ class Compiler {
     final tac = diagnostics.isEmpty
         ? ThreeAddressGenerator().generate(parsed.program!)
         : const <String>[];
-    final assembly = diagnostics.isEmpty
+    final ir = diagnostics.isEmpty
+        ? TypedIrProgram.fromTac(
+            tac,
+            symbolTypes: {
+              for (final symbol in semantic.symbols.values)
+                symbol.name: IrType.fromName(symbol.type),
+            },
+          )
+        : null;
+    final irDiagnostics = ir == null
+        ? const <Diagnostic>[]
+        : [
+            for (final message in ir.diagnostics)
+              Diagnostic('ir', message, parsed.program!.position),
+          ];
+    final stageDiagnostics = [...diagnostics, ...irDiagnostics];
+    final assembly = stageDiagnostics.isEmpty
         ? const AssemblyGenerator().generate(tac)
         : '';
-    final executionResult = diagnostics.isEmpty && execute
+    final executionResult = stageDiagnostics.isEmpty && execute
         ? const Interpreter().execute(parsed.program!)
         : const ExecutionResult();
     final allDiagnostics = [
-      ...diagnostics,
+      ...stageDiagnostics,
       ...executionResult.diagnostics.map(
         (message) => Diagnostic('execution', message, parsed.program!.position),
       ),
@@ -88,6 +108,7 @@ class Compiler {
       allDiagnostics,
       assembly: assembly,
       executionOutput: executionResult.output,
+      intermediateRepresentation: ir,
     );
   }
 }
