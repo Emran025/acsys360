@@ -70,7 +70,7 @@ class EditorTopBar extends StatelessWidget {
                 child: Row(
                   children: [
                     _BrandBlock(activeName: _activeName, rootPath: rootPath),
-                    const Spacer(),
+                    const SizedBox(width: 24),
                     _ToolbarGroup(
                       label: 'تحرير',
                       children: [
@@ -272,7 +272,6 @@ class _AccentPicker extends StatelessWidget {
     ],
     child: IconButton.filledTonal(
       onPressed: null,
-      tooltip: 'ألوان الثيم',
       icon: Icon(Icons.palette_outlined, color: accent.color, size: 19),
     ),
   );
