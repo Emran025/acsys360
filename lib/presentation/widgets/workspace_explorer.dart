@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../domain/entities/file_node.dart';
 
-enum _WorkspaceAction { open, cut, delete, paste, newFile, newFolder }
+enum _WorkspaceAction { open, cut, delete, paste, newFile, newFolder, rename }
 
 class WorkspaceExplorer extends StatelessWidget {
   final String rootPath;
@@ -21,6 +21,7 @@ class WorkspaceExplorer extends StatelessWidget {
   final Future<void> Function(String rootPath) onNewFolder;
   final Future<void> Function(String path) onOpen;
   final Future<void> Function(String path) onDelete;
+  final Future<void> Function(String path) onRename;
   final void Function(String path) onCut;
   final Future<void> Function(String targetDirectory) onPaste;
 
@@ -40,6 +41,7 @@ class WorkspaceExplorer extends StatelessWidget {
     required this.onNewFolder,
     required this.onOpen,
     required this.onDelete,
+    required this.onRename,
     required this.onCut,
     required this.onPaste,
   });
@@ -58,11 +60,15 @@ class WorkspaceExplorer extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 12, 6),
+            padding: const EdgeInsets.fromLTRB(12, 8, 8, 2),
             child: Row(
               children: [
-                Icon(Icons.folder_copy_outlined, color: colors.primary),
-                const SizedBox(width: 8),
+                Icon(
+                  Icons.folder_copy_outlined,
+                  color: colors.primary,
+                  size: 19,
+                ),
+                const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     'مستكشف المشروع',
@@ -71,16 +77,17 @@ class WorkspaceExplorer extends StatelessWidget {
                     ),
                   ),
                 ),
-                IconButton(
-                  onPressed: isLoading ? null : onRefresh,
-                  icon: const Icon(Icons.refresh_rounded),
+                _ExplorerIcon(
+                  key: const ValueKey('workspace-refresh'),
+                  icon: Icons.refresh_rounded,
                   tooltip: 'تحديث الملفات',
+                  onPressed: isLoading ? null : onRefresh,
                 ),
               ],
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Row(
               children: [
                 _ExplorerIcon(
@@ -99,7 +106,7 @@ class WorkspaceExplorer extends StatelessWidget {
                 _ExplorerIcon(
                   key: const ValueKey('workspace-open-file'),
                   icon: Icons.file_open_outlined,
-                  tooltip: 'فتح ملف عربي',
+                  tooltip: 'فتح ملف',
                   onPressed: onOpenFile,
                 ),
                 _ExplorerIcon(
@@ -112,41 +119,34 @@ class WorkspaceExplorer extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: InkWell(
               borderRadius: BorderRadius.circular(8),
               onTap: onChooseFolder,
               onSecondaryTapUp: (details) =>
                   _showRootMenu(context, details.globalPosition),
               child: Ink(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
                 decoration: BoxDecoration(
                   color: colors.primaryContainer.withValues(alpha: .42),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.folder_open_rounded, color: colors.primary),
-                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.folder_open_rounded,
+                      color: colors.primary,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 7),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _rootName.isEmpty ? 'اختر مجلدًا' : _rootName,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          Text(
-                            rootPath,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
+                      child: Text(
+                        _rootName.isEmpty ? 'اختر مجلدًا' : _rootName,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                     ),
-                    const Icon(Icons.chevron_left_rounded),
+                    const Icon(Icons.chevron_left_rounded, size: 18),
                   ],
                 ),
               ),
@@ -163,7 +163,7 @@ class WorkspaceExplorer extends StatelessWidget {
                     child: nodes.isEmpty
                         ? const _EmptyExplorer()
                         : ListView(
-                            padding: const EdgeInsets.fromLTRB(8, 6, 8, 16),
+                            padding: const EdgeInsets.fromLTRB(4, 3, 4, 12),
                             children: [
                               for (final node in nodes)
                                 _WorkspaceTreeNode(
@@ -173,6 +173,7 @@ class WorkspaceExplorer extends StatelessWidget {
                                   onSelect: onSelect,
                                   onOpen: onOpen,
                                   onDelete: onDelete,
+                                  onRename: onRename,
                                   onCut: onCut,
                                   onPaste: onPaste,
                                   onNewFile: onNewFile,
@@ -195,7 +196,7 @@ class WorkspaceExplorer extends StatelessWidget {
         if (hasCutPath)
           const PopupMenuItem(
             value: _WorkspaceAction.paste,
-            child: Text('لصق الملف هنا'),
+            child: Text('لصق هنا'),
           ),
         const PopupMenuItem(
           value: _WorkspaceAction.newFile,
@@ -236,7 +237,7 @@ class WorkspaceExplorer extends StatelessWidget {
 class _ExplorerIcon extends StatelessWidget {
   final IconData icon;
   final String tooltip;
-  final Future<void> Function() onPressed;
+  final Future<void> Function()? onPressed;
 
   const _ExplorerIcon({
     super.key,
@@ -248,7 +249,13 @@ class _ExplorerIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Tooltip(
     message: tooltip,
-    child: IconButton(onPressed: onPressed, icon: Icon(icon, size: 19)),
+    child: IconButton(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 18),
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 34, minHeight: 30),
+    ),
   );
 }
 
@@ -258,9 +265,9 @@ class _EmptyExplorer extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Center(
     child: Padding(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(20),
       child: Text(
-        'لا توجد ملفات .arb داخل هذا المجلد',
+        'المجلد فارغ',
         textAlign: TextAlign.center,
         style: Theme.of(context).textTheme.bodyMedium,
       ),
@@ -275,6 +282,7 @@ class _WorkspaceTreeNode extends StatelessWidget {
   final void Function(String path, {required bool isDirectory}) onSelect;
   final Future<void> Function(String path) onOpen;
   final Future<void> Function(String path) onDelete;
+  final Future<void> Function(String path) onRename;
   final void Function(String path) onCut;
   final Future<void> Function(String targetDirectory) onPaste;
   final Future<void> Function(String rootPath) onNewFile;
@@ -287,6 +295,7 @@ class _WorkspaceTreeNode extends StatelessWidget {
     required this.onSelect,
     required this.onOpen,
     required this.onDelete,
+    required this.onRename,
     required this.onCut,
     required this.onPaste,
     required this.onNewFile,
@@ -295,38 +304,59 @@ class _WorkspaceTreeNode extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!node.isDirectory) {
-      final colors = Theme.of(context).colorScheme;
-      return GestureDetector(
-        onSecondaryTapUp: (details) {
-          onSelect(node.path, isDirectory: false);
-          _showFileMenu(context, details.globalPosition);
-        },
+    if (!node.isDirectory) return _buildFile(context);
+    return _buildDirectory(context);
+  }
+
+  Widget _buildFile(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onSecondaryTapUp: (details) {
+        onSelect(node.path, isDirectory: false);
+        _showFileMenu(context, details.globalPosition);
+      },
+      child: Material(
+        color: Colors.transparent,
         child: ListTile(
           dense: true,
           visualDensity: VisualDensity.compact,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+          contentPadding: const EdgeInsetsDirectional.only(start: 4, end: 8),
           selected: node.path == selectedPath,
-          selectedTileColor: colors.primaryContainer.withValues(alpha: .36),
-          leading: const Icon(Icons.code_rounded, size: 18),
-          title: Text(node.name, overflow: TextOverflow.ellipsis),
+          selectedTileColor: colors.primaryContainer.withValues(alpha: .38),
+          leading: Icon(
+            _fileIcon,
+            size: 17,
+            color: node.path == selectedPath
+                ? colors.primary
+                : colors.onSurfaceVariant,
+          ),
+          title: Text(
+            node.name,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: node.path == selectedPath ? colors.primary : null,
+            ),
+          ),
           onTap: () {
             onSelect(node.path, isDirectory: false);
             onOpen(node.path);
           },
         ),
-      );
-    }
+      ),
+    );
+  }
+
+  Widget _buildDirectory(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return GestureDetector(
       onSecondaryTapUp: (details) {
         onSelect(node.path, isDirectory: true);
         _showDirectoryMenu(context, details.globalPosition);
       },
-      child: DecoratedBox(
+      child: Container(
         decoration: BoxDecoration(
           color: node.path == selectedPath
-              ? colors.primaryContainer.withValues(alpha: .36)
+              ? colors.primaryContainer.withValues(alpha: .38)
               : null,
           borderRadius: BorderRadius.circular(8),
         ),
@@ -335,28 +365,24 @@ class _WorkspaceTreeNode extends StatelessWidget {
           child: ExpansionTile(
             initiallyExpanded: false,
             onExpansionChanged: (_) => onSelect(node.path, isDirectory: true),
-            tilePadding: const EdgeInsets.symmetric(horizontal: 8),
-            childrenPadding: const EdgeInsetsDirectional.only(start: 14),
-            leading: const Icon(Icons.folder_outlined, size: 19),
-            title: Text(node.name, overflow: TextOverflow.ellipsis),
-            children: [
-              Padding(
-                padding: const EdgeInsetsDirectional.only(start: 14),
-                child: Row(
-                  children: [
-                    _TreeAction(
-                      tooltip: 'ملف جديد داخل ${node.name}',
-                      icon: Icons.note_add_outlined,
-                      onPressed: () => onNewFile(node.path),
-                    ),
-                    _TreeAction(
-                      tooltip: 'مجلد جديد داخل ${node.name}',
-                      icon: Icons.create_new_folder_outlined,
-                      onPressed: () => onNewFolder(node.path),
-                    ),
-                  ],
-                ),
+            tilePadding: const EdgeInsetsDirectional.only(start: 2, end: 4),
+            childrenPadding: const EdgeInsetsDirectional.only(start: 16),
+            visualDensity: VisualDensity.compact,
+            leading: Icon(
+              Icons.folder_outlined,
+              size: 18,
+              color: node.path == selectedPath
+                  ? colors.primary
+                  : colors.onSurfaceVariant,
+            ),
+            title: Text(
+              node.name,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: node.path == selectedPath ? colors.primary : null,
               ),
+            ),
+            children: [
               for (final child in node.children)
                 _WorkspaceTreeNode(
                   node: child,
@@ -365,6 +391,7 @@ class _WorkspaceTreeNode extends StatelessWidget {
                   onSelect: onSelect,
                   onOpen: onOpen,
                   onDelete: onDelete,
+                  onRename: onRename,
                   onCut: onCut,
                   onPaste: onPaste,
                   onNewFile: onNewFile,
@@ -377,6 +404,23 @@ class _WorkspaceTreeNode extends StatelessWidget {
     );
   }
 
+  IconData get _fileIcon {
+    final extension = node.name.toLowerCase().split('.').last;
+    return switch (extension) {
+      'arb' || 'json' || 'yaml' || 'yml' => Icons.data_object_rounded,
+      'dart' || 'js' || 'ts' || 'tsx' || 'jsx' => Icons.code_rounded,
+      'css' || 'scss' || 'html' => Icons.language_rounded,
+      'md' || 'txt' => Icons.article_outlined,
+      'png' || 'jpg' || 'jpeg' || 'gif' || 'svg' => Icons.image_outlined,
+      'php' ||
+      'py' ||
+      'java' ||
+      'c' ||
+      'cpp' => Icons.integration_instructions_outlined,
+      _ => Icons.insert_drive_file_outlined,
+    };
+  }
+
   Future<void> _showFileMenu(BuildContext context, Offset position) async {
     final action = await _showMenu(
       context,
@@ -384,11 +428,16 @@ class _WorkspaceTreeNode extends StatelessWidget {
       items: const [
         PopupMenuItem(value: _WorkspaceAction.open, child: Text('فتح')),
         PopupMenuItem(value: _WorkspaceAction.cut, child: Text('قص')),
+        PopupMenuItem(
+          value: _WorkspaceAction.rename,
+          child: Text('إعادة تسمية'),
+        ),
         PopupMenuItem(value: _WorkspaceAction.delete, child: Text('حذف')),
       ],
     );
     if (action == _WorkspaceAction.open) await onOpen(node.path);
     if (action == _WorkspaceAction.cut) onCut(node.path);
+    if (action == _WorkspaceAction.rename) await onRename(node.path);
     if (action == _WorkspaceAction.delete) await onDelete(node.path);
   }
 
@@ -400,7 +449,7 @@ class _WorkspaceTreeNode extends StatelessWidget {
         if (hasCutPath)
           const PopupMenuItem(
             value: _WorkspaceAction.paste,
-            child: Text('لصق الملف هنا'),
+            child: Text('لصق هنا'),
           ),
         const PopupMenuItem(
           value: _WorkspaceAction.newFile,
@@ -410,12 +459,19 @@ class _WorkspaceTreeNode extends StatelessWidget {
           value: _WorkspaceAction.newFolder,
           child: Text('مجلد جديد هنا'),
         ),
+        const PopupMenuItem(value: _WorkspaceAction.cut, child: Text('قص')),
+        const PopupMenuItem(
+          value: _WorkspaceAction.rename,
+          child: Text('إعادة تسمية'),
+        ),
         const PopupMenuItem(value: _WorkspaceAction.delete, child: Text('حذف')),
       ],
     );
     if (action == _WorkspaceAction.paste) await onPaste(node.path);
     if (action == _WorkspaceAction.newFile) await onNewFile(node.path);
     if (action == _WorkspaceAction.newFolder) await onNewFolder(node.path);
+    if (action == _WorkspaceAction.cut) onCut(node.path);
+    if (action == _WorkspaceAction.rename) await onRename(node.path);
     if (action == _WorkspaceAction.delete) await onDelete(node.path);
   }
 
@@ -432,23 +488,5 @@ class _WorkspaceTreeNode extends StatelessWidget {
       MediaQuery.of(context).size.height - position.dy,
     ),
     items: items,
-  );
-}
-
-class _TreeAction extends StatelessWidget {
-  final String tooltip;
-  final IconData icon;
-  final Future<void> Function() onPressed;
-
-  const _TreeAction({
-    required this.tooltip,
-    required this.icon,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) => Tooltip(
-    message: tooltip,
-    child: IconButton(onPressed: onPressed, icon: Icon(icon, size: 17)),
   );
 }
