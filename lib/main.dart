@@ -9,6 +9,7 @@ import 'data/repositories/process_compiler_repository.dart';
 import 'domain/entities/document.dart';
 import 'domain/entities/file_node.dart';
 import 'presentation/state/editor_controller.dart';
+import 'presentation/widgets/find_replace_bar.dart';
 
 void main() {
   final repository = LocalWorkspaceRepository();
@@ -54,7 +55,10 @@ class EditorShell extends StatefulWidget {
 
 class _EditorShellState extends State<EditorShell> {
   final textController = TextEditingController();
+  final findController = TextEditingController();
+  final replaceController = TextEditingController();
   String? boundPath;
+  bool showFindReplace = false;
 
   @override
   void initState() {
@@ -67,6 +71,8 @@ class _EditorShellState extends State<EditorShell> {
   void dispose() {
     widget.controller.removeListener(_syncDocument);
     textController.dispose();
+    findController.dispose();
+    replaceController.dispose();
     super.dispose();
   }
 
@@ -158,6 +164,30 @@ class _EditorShellState extends State<EditorShell> {
     widget.controller.closeTab(index, discard: document.isDirty);
   }
 
+  void _toggleFindReplace() {
+    setState(() => showFindReplace = !showFindReplace);
+    if (showFindReplace) {
+      findController.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: findController.text.length,
+      );
+    }
+  }
+
+  void _search(String value) {
+    widget.controller.search(value);
+  }
+
+  void _replaceAll() {
+    final count = widget.controller.replaceAll(
+      findController.text,
+      replaceController.text,
+    );
+    if (!mounted || count == 0) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('تم استبدال $count تطابقات')));
+  }
+
   void _onTextChanged(String value) {
     final document = widget.controller.activeDocument;
     if (document == null || value == document.text) return;
@@ -179,6 +209,8 @@ class _EditorShellState extends State<EditorShell> {
         SingleActivator(LogicalKeyboardKey.keyY, control: true): RedoIntent(),
         SingleActivator(LogicalKeyboardKey.keyY, meta: true): RedoIntent(),
         SingleActivator(LogicalKeyboardKey.f5): CompileIntent(),
+        SingleActivator(LogicalKeyboardKey.keyF, control: true): FindIntent(),
+        SingleActivator(LogicalKeyboardKey.keyF, meta: true): FindIntent(),
       },
       child: Actions(
         actions: {
@@ -193,6 +225,9 @@ class _EditorShellState extends State<EditorShell> {
           ),
           CompileIntent: CallbackAction<CompileIntent>(
             onInvoke: (_) => controller.compile(),
+          ),
+          FindIntent: CallbackAction<FindIntent>(
+            onInvoke: (_) => _toggleFindReplace(),
           ),
         },
         child: Directionality(
@@ -242,6 +277,11 @@ class _EditorShellState extends State<EditorShell> {
                   tooltip: 'حفظ الكل',
                 ),
                 IconButton(
+                  onPressed: _toggleFindReplace,
+                  icon: const Icon(Icons.search),
+                  tooltip: 'بحث واستبدال',
+                ),
+                IconButton(
                   onPressed: controller.compile,
                   icon: const Icon(Icons.play_arrow),
                   tooltip: 'ترجمة',
@@ -256,6 +296,15 @@ class _EditorShellState extends State<EditorShell> {
                   child: Column(
                     children: [
                       _Tabs(controller: controller, onClose: _closeTab),
+                      if (showFindReplace)
+                        FindReplaceBar(
+                          findController: findController,
+                          replaceController: replaceController,
+                          matches: controller.searchMatches.length,
+                          onSearch: _search,
+                          onReplaceAll: _replaceAll,
+                          onClose: _toggleFindReplace,
+                        ),
                       Expanded(
                         child: active == null
                             ? const Center(
@@ -310,6 +359,10 @@ class RedoIntent extends Intent {
 
 class CompileIntent extends Intent {
   const CompileIntent();
+}
+
+class FindIntent extends Intent {
+  const FindIntent();
 }
 
 class _Explorer extends StatelessWidget {

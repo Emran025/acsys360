@@ -5,6 +5,7 @@ import '../../domain/entities/document.dart';
 import '../../domain/entities/file_node.dart';
 import '../../domain/entities/workspace.dart';
 import '../../domain/repositories/workspace_repository.dart';
+import '../../domain/usecases/find_replace.dart';
 import '../../domain/usecases/workspace_actions.dart';
 
 class EditorController extends ChangeNotifier {
@@ -14,6 +15,8 @@ class EditorController extends ChangeNotifier {
   final ApplyEdit applyEdit;
   final UndoEdit undoEdit;
   final RedoEdit redoEdit;
+  final FindText findText;
+  final ReplaceAllText replaceAllText;
   final CompilerRepository? compiler;
 
   Workspace workspace;
@@ -21,6 +24,7 @@ class EditorController extends ChangeNotifier {
   List<FileNode> tree = const [];
   Object? error;
   CompilationResult? compilation;
+  List<SearchMatch> searchMatches = const [];
 
   EditorController({
     required this.repository,
@@ -31,7 +35,9 @@ class EditorController extends ChangeNotifier {
        saveDocument = SaveDocument(repository),
        applyEdit = const ApplyEdit(),
        undoEdit = const UndoEdit(),
-       redoEdit = const RedoEdit();
+       redoEdit = const RedoEdit(),
+       findText = const FindText(),
+       replaceAllText = const ReplaceAllText();
 
   Document? get activeDocument => workspace.activeDocument;
 
@@ -56,6 +62,7 @@ class EditorController extends ChangeNotifier {
 
   void selectTab(int index) {
     workspace = workspace.select(index);
+    searchMatches = const [];
     notifyListeners();
   }
 
@@ -123,8 +130,36 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void search(String query, {bool caseSensitive = true}) {
+    final active = workspace.activeDocument;
+    searchMatches = active == null
+        ? const []
+        : findText(active.text, query, caseSensitive: caseSensitive);
+    notifyListeners();
+  }
+
+  int replaceAll(
+    String query,
+    String replacement, {
+    bool caseSensitive = true,
+  }) {
+    final active = workspace.activeDocument;
+    if (active == null) return 0;
+    final result = replaceAllText(
+      active.text,
+      query,
+      replacement,
+      caseSensitive: caseSensitive,
+    );
+    if (result.count == 0) return 0;
+    edit(TextEdit(offset: 0, before: active.text, after: result.text));
+    searchMatches = const [];
+    return result.count;
+  }
+
   void edit(TextEdit change) {
     workspace = applyEdit(workspace, change);
+    searchMatches = const [];
     notifyListeners();
   }
 
