@@ -190,7 +190,12 @@ class _MinimapPainter extends CustomPainter {
             ? colors.error
             : colors.secondary;
       canvas.drawRect(
-        Rect.fromLTWH(1, line * lineScale, 3, math.max(2, lineScale)),
+        Rect.fromLTWH(
+          1,
+          line * lineScale,
+          3,
+          math.max(2.0, lineScale).toDouble(),
+        ),
         paint,
       );
     }
