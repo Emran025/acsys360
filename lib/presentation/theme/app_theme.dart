@@ -1,17 +1,29 @@
 import 'package:flutter/material.dart';
 
+enum AppAccent {
+  ocean('أزرق بحري', Color(0xFF355C7D)),
+  emerald('زمردي', Color(0xFF247A68)),
+  violet('بنفسجي', Color(0xFF6C4BA5)),
+  amber('كهرماني', Color(0xFF9A6415));
+
+  final String label;
+  final Color color;
+
+  const AppAccent(this.label, this.color);
+}
+
 abstract final class AppTheme {
   static const fontFamily = 'Cairo';
 
-  static ThemeData light() => _theme(
+  static ThemeData light({AppAccent accent = AppAccent.ocean}) => _theme(
     brightness: Brightness.light,
-    seed: const Color(0xFF355C7D),
+    seed: accent.color,
     surface: const Color(0xFFF7F9FC),
   );
 
-  static ThemeData dark() => _theme(
+  static ThemeData dark({AppAccent accent = AppAccent.ocean}) => _theme(
     brightness: Brightness.dark,
-    seed: const Color(0xFF8FB8D8),
+    seed: accent.color,
     surface: const Color(0xFF111820),
   );
 
