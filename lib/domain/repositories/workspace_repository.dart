@@ -22,6 +22,7 @@ abstract interface class CompilerRepository {
     required List<Document> documents,
     String target = 'none',
     String? artifactDirectory,
+    CompilationMode? mode,
   });
 }
 

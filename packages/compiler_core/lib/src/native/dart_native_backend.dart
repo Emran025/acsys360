@@ -1,24 +1,25 @@
 import 'dart:io';
 
 import '../ast/ast.dart';
+import '../model/token.dart';
 
 class NativeArtifactResult {
   final String? executablePath;
   final String sourcePath;
   final List<String> diagnostics;
+  final bool verified;
 
   const NativeArtifactResult({
     required this.sourcePath,
     this.executablePath,
     this.diagnostics = const [],
+    this.verified = false,
   });
 
-  bool get success => executablePath != null && diagnostics.isEmpty;
+  bool get success => executablePath != null && diagnostics.isEmpty && verified;
 }
 
 class DartNativeEmitter {
-  DartNativeEmitter();
-
   final Map<String, String> _globalNames = {};
   final Map<String, String> _procedureNames = {};
   final Map<String, ProcedureDeclaration> _procedures = {};
@@ -29,21 +30,92 @@ class DartNativeEmitter {
 
   String emit(ProgramNode program) {
     _reset(program);
+    _names = Map<String, String>.from(_globalNames);
     final out = <String>[];
     out.add("import 'dart:io';");
-    out.add("import 'dart:math' as math;");
     out.add('');
     out.add('class _Box<T> {');
     out.add('  T value;');
     out.add('  _Box(this.value);');
     out.add('}');
     out.add('');
-    out.add('dynamic _readValue() {');
+    out.add('dynamic _readValue(dynamic current) {');
     out.add('  final line = stdin.readLineSync();');
-    out.add("  if (line == null) return 0;");
-    out.add("  if (line == 'صح') return true;");
-    out.add("  if (line == 'خطأ') return false;");
-    out.add('  return num.tryParse(line!) ?? line;');
+    out.add("  if (line == null) throw StateError('لا توجد قيمة إدخال');");
+    out.add("  if (current is bool) {");
+    out.add("    if (line == 'صح') return true;");
+    out.add("    if (line == 'خطأ') return false;");
+    out.add("    throw StateError('الإدخال المنطقي يجب أن يكون صح أو خطأ');");
+    out.add('  }');
+    out.add('  if (current is double) {');
+    out.add('    final parsed = double.tryParse(line);');
+    out.add(
+      "    if (parsed == null) throw StateError('الإدخال الحقيقي غير صالح');",
+    );
+    out.add('    return parsed;');
+    out.add('  }');
+    out.add('  if (current is int) {');
+    out.add('    final parsed = int.tryParse(line);');
+    out.add(
+      "    if (parsed == null) throw StateError('الإدخال الصحيح غير صالح');",
+    );
+    out.add('    return parsed;');
+    out.add('  }');
+    out.add('  return line;');
+    out.add('}');
+    out.add('');
+    out.add('String _formatValue(dynamic value) =>');
+    out.add("    value is bool ? (value ? 'صح' : 'خطأ') : '\u0024value';");
+    out.add('void _printValues(List<dynamic> values) =>');
+    out.add('    print(values.map(_formatValue).join(\' \'));');
+    out.add('dynamic _arabicAdd(dynamic left, dynamic right) =>');
+    out.add(
+      "    left is String || right is String ? '\u0024left\u0024right' : left + right;",
+    );
+    out.add('num _asNum(dynamic value) {');
+    out.add('  if (value is num) return value;');
+    out.add("  throw StateError('القيمة ليست رقمية أثناء التنفيذ');");
+    out.add('}');
+    out.add('int _asInt(dynamic value) {');
+    out.add('  if (value is int) return value;');
+    out.add(
+      '  if (value is num && value == value.truncate()) return value.toInt();',
+    );
+    out.add("  throw StateError('القيمة ليست عددًا صحيحًا أثناء التنفيذ');");
+    out.add('}');
+    out.add('num _arabicDivide(dynamic left, dynamic right) {');
+    out.add('  final divisor = _asNum(right);');
+    out.add("  if (divisor == 0) throw StateError('لا يمكن القسمة على صفر');");
+    out.add('  return _asNum(left) / divisor;');
+    out.add('}');
+    out.add('int _arabicIntegerDivide(dynamic left, dynamic right) {');
+    out.add('  final divisor = _asInt(right);');
+    out.add(
+      "  if (divisor == 0) throw StateError('لا يمكن القسمة الصحيحة على صفر');",
+    );
+    out.add('  return _asInt(left) ~/ divisor;');
+    out.add('}');
+    out.add('int _arabicRemainder(dynamic left, dynamic right) {');
+    out.add('  final divisor = _asInt(right);');
+    out.add(
+      "  if (divisor == 0) throw StateError('لا يمكن حساب باقي القسمة على صفر');",
+    );
+    out.add('  return _asInt(left) % divisor;');
+    out.add('}');
+    out.add('num _arabicPow(dynamic left, dynamic right) {');
+    out.add('  final base = _asNum(left);');
+    out.add('  final exponent = _asInt(right);');
+    out.add('  var result = 1.0;');
+    out.add('  if (exponent < 0) {');
+    out.add(
+      '    for (var index = 0; index > exponent; index--) result /= base;',
+    );
+    out.add('  } else {');
+    out.add(
+      '    for (var index = 0; index < exponent; index++) result *= base;',
+    );
+    out.add('  }');
+    out.add('  return result;');
     out.add('}');
     out.add('');
 
@@ -69,7 +141,6 @@ class DartNativeEmitter {
       }
     }
 
-    _names = Map<String, String>.from(_globalNames);
     out.add('void main() {');
     _indent = 1;
     for (final statement in program.statements) {
@@ -87,9 +158,9 @@ class DartNativeEmitter {
     _names = {};
     _nameIndex = 0;
     for (final declaration in program.declarations) {
-      if (declaration is TypeDeclaration)
+      if (declaration is TypeDeclaration) {
         _types[declaration.name] = declaration.type;
-      if (declaration is ProcedureDeclaration) {
+      } else if (declaration is ProcedureDeclaration) {
         _procedures[declaration.name] = declaration;
         _procedureNames[declaration.name] = 'p${_procedureNames.length}';
       }
@@ -145,13 +216,11 @@ class DartNativeEmitter {
       return '$prefix${_lvalue(node.name, node.selectors)} = ${_expression(node.expression)};';
     }
     if (node is ReadStatement) {
-      return '$prefix${_lvalue(node.name, node.selectors)} = _readValue();';
+      final target = _lvalue(node.name, node.selectors);
+      return '$prefix$target = _readValue($target);';
     }
     if (node is PrintStatement) {
-      return [
-        for (final value in node.values)
-          '${prefix}print(${_expression(value)});',
-      ].join('\n');
+      return '$prefix${'_printValues([${node.values.map(_expression).join(', ')}]);'}';
     }
     if (node is CallStatement) return _call(node, prefix);
     if (node is IfStatement) {
@@ -183,9 +252,12 @@ class DartNativeEmitter {
       final from = _expression(node.from);
       final to = _expression(node.to);
       final step = node.step == null ? '1' : _expression(node.step!);
+      final stepName = '_step${_nameIndex++}';
       final result = <String>[
-        '${prefix}for (dynamic $variable = $from, _step = $step; ; $variable += _step) {',
-        '${'  ' * (_indent + 1)}if ((_step >= 0 && $variable > $to) || (_step < 0 && $variable < $to)) break;',
+        '${prefix}final $stepName = _asInt($step);',
+        '${prefix}if ($stepName == 0) throw StateError(\'خطوة التكرار لا يمكن أن تساوي صفرًا\');',
+        '${prefix}for (dynamic $variable = _asInt($from); ; $variable += $stepName) {',
+        '${'  ' * (_indent + 1)}if (($stepName >= 0 && $variable > _asInt($to)) || ($stepName < 0 && $variable < _asInt($to))) break;',
       ];
       _indent++;
       result.addAll(node.body.map(_statement));
@@ -207,8 +279,13 @@ class DartNativeEmitter {
   String _call(CallStatement call, String prefix) {
     final procedure = _procedures[call.name];
     final name = _procedureNames[call.name] ?? call.name;
-    if (procedure == null ||
-        !procedure.parameters.any((item) => item.byReference)) {
+    if (procedure == null) {
+      throw StateError('الإجراء "${call.name}" غير موجود في native backend');
+    }
+    if (procedure.parameters.length != call.arguments.length) {
+      throw StateError('عدد معاملات الإجراء "${call.name}" غير صحيح');
+    }
+    if (!procedure.parameters.any((item) => item.byReference)) {
       return '$prefix$name(${call.arguments.map(_expression).join(', ')});';
     }
     final result = <String>['${prefix}{'];
@@ -216,10 +293,11 @@ class DartNativeEmitter {
     final arguments = <String>[];
     for (var index = 0; index < call.arguments.length; index++) {
       final argument = call.arguments[index];
-      final parameter = index < procedure.parameters.length
-          ? procedure.parameters[index]
-          : null;
-      if (parameter?.byReference == true && argument is VariableReference) {
+      final parameter = procedure.parameters[index];
+      if (parameter.byReference) {
+        if (argument is! VariableReference) {
+          throw StateError('معامل المرجع يجب أن يكون متغيرًا قابلًا للإسناد');
+        }
         final box = '_box${index}_${_nameIndex++}';
         final target = _lvalue(argument.name, argument.selectors);
         result.add(
@@ -249,18 +327,19 @@ class DartNativeEmitter {
     if (node is BinaryExpression) {
       final left = _expression(node.left);
       final right = _expression(node.right);
-      final operator = switch (node.operator) {
-        '=< ' => '<=',
-        '=<' => '<=',
-        '=>' => '>=',
-        r'\' => '~/',
-        '^' => '^',
-        _ => node.operator,
+      return switch (node.operator) {
+        '+' => '_arabicAdd($left, $right)',
+        r'\' => '_arabicIntegerDivide($left, $right)',
+        '/' => '_arabicDivide($left, $right)',
+        '%' => '_arabicRemainder($left, $right)',
+        '^' => '_arabicPow($left, $right)',
+        '=< ' => '($left <= $right)',
+        '=<' => '($left <= $right)',
+        '=>' => '($left >= $right)',
+        _ => '($left ${node.operator} $right)',
       };
-      if (node.operator == '^') return 'math.pow($left, $right)';
-      return '($left $operator $right)';
     }
-    return 'null';
+    throw StateError('تعبير غير مدعوم في native backend');
   }
 
   String _lvalue(String name, List<AccessSelector> selectors) {
@@ -269,52 +348,74 @@ class DartNativeEmitter {
       if (selector is IndexSelector) {
         value = '$value[${_expression(selector.index)}]';
       } else if (selector is FieldSelector) {
-        value = "$value['${selector.name}']";
+        value = "$value['${_escapeDart(selector.name)}']";
       }
     }
     return value;
   }
 
-  String _defaultValue(TypeSpec? spec, String? simple) {
+  String _defaultValue(
+    TypeSpec? spec,
+    String? simple, [
+    Set<String>? resolving,
+  ]) {
+    final active = resolving ?? <String>{};
     if (spec is NamedTypeSpec) {
+      final builtin = _defaultSimple(spec.name);
+      if (builtin != null) return builtin;
       final alias = _types[spec.name];
-      if (alias != null) return _defaultValue(alias, spec.name);
-      return _defaultValue(null, spec.name);
+      if (alias == null) {
+        throw StateError('النوع "${spec.name}" غير موجود في native backend');
+      }
+      if (!active.add(spec.name)) {
+        throw StateError('مرجع دائري في النوع "${spec.name}"');
+      }
+      final result = _defaultValue(alias, null, active);
+      active.remove(spec.name);
+      return result;
     }
     if (spec is ArrayTypeSpec) {
-      return 'List<dynamic>.filled(${spec.length}, ${_defaultValue(spec.elementType, null)})';
+      return 'List<dynamic>.generate(${spec.length}, (_) => ${_defaultValue(spec.elementType, null, active)})';
     }
     if (spec is RecordTypeSpec) {
       final fields = <String>[];
       for (final field in spec.fields) {
         for (final name in field.names) {
-          fields.add("'$name': ${_defaultValue(field.type, null)}");
+          fields.add(
+            "'${_escapeDart(name)}': ${_defaultValue(field.type, null, active)}",
+          );
         }
       }
       return '{${fields.join(', ')}}';
     }
-    return switch (simple) {
-      'منطقي' => 'false',
-      'حرفي' => "''",
-      'خيط_رمزي' => "''",
-      'حقيقي' => '0.0',
-      _ => '0',
-    };
+    return _defaultSimple(simple) ?? '0';
   }
 
-  String _literal(String value, dynamic type) {
-    if (value == 'صح') return 'true';
-    if (value == 'خطأ') return 'false';
-    if (value.startsWith('"') ||
-        value.startsWith("'") ||
-        value.startsWith('‘')) {
-      if (value.startsWith('‘') && value.endsWith('’')) {
-        return "'${value.substring(1, value.length - 1)}'";
-      }
-      return value;
-    }
-    return value;
-  }
+  String? _defaultSimple(String? type) => switch (type) {
+    'منطقي' => 'false',
+    'حرفي' => "''",
+    'خيط_رمزي' => "''",
+    'حقيقي' => '0.0',
+    'صحيح' => '0',
+    _ => null,
+  };
+
+  String _literal(String value, TokenKind type) => switch (type) {
+    TokenKind.boolean when value == 'صح' => 'true',
+    TokenKind.boolean when value == 'خطأ' => 'false',
+    TokenKind.integer => value,
+    TokenKind.real => value,
+    TokenKind.string || TokenKind.character => "'${_escapeDart(value)}'",
+    _ => "'${_escapeDart(value)}'",
+  };
+
+  String _escapeDart(String value) => value
+      .replaceAll('\\', '\\\\')
+      .replaceAll("'", "\\'")
+      .replaceAll(r'$', r'\$')
+      .replaceAll('\n', '\\n')
+      .replaceAll('\r', '\\r')
+      .replaceAll('\t', '\\t');
 
   String _declareLocal(String name) {
     final dartName = _newName();
@@ -340,23 +441,40 @@ class DartNativeArtifactBuilder {
         '${directory.path}${Platform.pathSeparator}$executableName.dart';
     final executablePath =
         '${directory.path}${Platform.pathSeparator}$executableName${Platform.isWindows ? '.exe' : ''}';
-    await File(sourcePath).writeAsString(DartNativeEmitter().emit(program));
-    final process = await Process.run(dartExecutable, [
-      'compile',
-      'exe',
-      sourcePath,
-      '-o',
-      executablePath,
-    ], runInShell: Platform.isWindows);
-    if (process.exitCode != 0 || !File(executablePath).existsSync()) {
+    try {
+      await File(sourcePath).writeAsString(DartNativeEmitter().emit(program));
+      final process = await Process.run(dartExecutable, [
+        'compile',
+        'exe',
+        sourcePath,
+        '-o',
+        executablePath,
+      ], runInShell: Platform.isWindows);
+      final exists = File(executablePath).existsSync();
+      if (process.exitCode != 0 || !exists) {
+        return NativeArtifactResult(
+          sourcePath: sourcePath,
+          diagnostics: ['فشل بناء native artifact: ${process.stderr}'.trim()],
+        );
+      }
+      final stat = await File(executablePath).stat();
+      final executableBit = Platform.isWindows || (stat.mode & 0x49) != 0;
+      if (!executableBit || stat.size == 0) {
+        return NativeArtifactResult(
+          sourcePath: sourcePath,
+          diagnostics: ['تم إنشاء ملف غير قابل للتنفيذ: $executablePath'],
+        );
+      }
       return NativeArtifactResult(
         sourcePath: sourcePath,
-        diagnostics: ['فشل بناء native artifact: ${process.stderr}'.trim()],
+        executablePath: executablePath,
+        verified: true,
+      );
+    } on Object catch (error) {
+      return NativeArtifactResult(
+        sourcePath: sourcePath,
+        diagnostics: ['فشل بناء native artifact: $error'],
       );
     }
-    return NativeArtifactResult(
-      sourcePath: sourcePath,
-      executablePath: executablePath,
-    );
   }
 }

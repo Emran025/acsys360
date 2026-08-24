@@ -33,6 +33,7 @@ class EditorLanguageServer {
     required List<Document> documents,
     String target = 'none',
     String? artifactDirectory,
+    CompilationMode? mode,
   }) async {
     final response = await compiler.compile(
       rootPath: rootPath,
@@ -40,6 +41,7 @@ class EditorLanguageServer {
       documents: documents,
       target: target,
       artifactDirectory: artifactDirectory,
+      mode: mode,
     );
     final compilation = CompilationResult(
       success: response['success'] == true,
