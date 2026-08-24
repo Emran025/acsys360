@@ -1360,6 +1360,7 @@ class _DiagnosticsPanelState extends State<_DiagnosticsPanel> {
     '3AC',
     'Assembly',
     'التنفيذ',
+    'Artifact',
   ];
 
   @override
@@ -1424,8 +1425,20 @@ class _DiagnosticsPanelState extends State<_DiagnosticsPanel> {
           ? 'لا يوجد خرج تنفيذ'
           : result.executionOutput.join('\n'),
     ),
+    8 => _artifacts(result),
     _ => const SizedBox.shrink(),
   };
+
+  Widget _artifacts(CompilationResult result) {
+    if (result.artifacts.isEmpty) {
+      return _selectable(
+        'لا يوجد artifact. استخدم Ctrl/Cmd+F5 بعد نجاح التحليل والبناء.',
+      );
+    }
+    return _selectable(
+      ['تم التحقق من artifact الناتج:', ...result.artifacts].join('\n'),
+    );
+  }
 
   Widget _diagnostics(CompilationResult result) {
     if (result.diagnostics.isEmpty) {
