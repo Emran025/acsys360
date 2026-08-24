@@ -168,103 +168,146 @@ class _EditorShellState extends State<EditorShell> {
   Widget build(BuildContext context) {
     final controller = widget.controller;
     final active = controller.activeDocument;
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('محرر اللغة العربية'),
-          actions: [
-            IconButton(
-              onPressed: _pickWorkspace,
-              icon: const Icon(Icons.folder_open),
-              tooltip: 'فتح مجلد',
+    return Shortcuts(
+      shortcuts: const {
+        SingleActivator(LogicalKeyboardKey.keyS, control: true): SaveIntent(),
+        SingleActivator(LogicalKeyboardKey.keyS, meta: true): SaveIntent(),
+        SingleActivator(LogicalKeyboardKey.keyZ, control: true): UndoIntent(),
+        SingleActivator(LogicalKeyboardKey.keyZ, meta: true): UndoIntent(),
+        SingleActivator(LogicalKeyboardKey.keyY, control: true): RedoIntent(),
+        SingleActivator(LogicalKeyboardKey.keyY, meta: true): RedoIntent(),
+        SingleActivator(LogicalKeyboardKey.keyF5): CompileIntent(),
+      },
+      child: Actions(
+        actions: {
+          SaveIntent: CallbackAction<SaveIntent>(
+            onInvoke: (_) => controller.save(),
+          ),
+          UndoIntent: CallbackAction<UndoIntent>(
+            onInvoke: (_) => controller.undo(),
+          ),
+          RedoIntent: CallbackAction<RedoIntent>(
+            onInvoke: (_) => controller.redo(),
+          ),
+          CompileIntent: CallbackAction<CompileIntent>(
+            onInvoke: (_) => controller.compile(),
+          ),
+        },
+        child: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('محرر اللغة العربية'),
+              actions: [
+                IconButton(
+                  onPressed: _pickWorkspace,
+                  icon: const Icon(Icons.folder_open),
+                  tooltip: 'فتح مجلد',
+                ),
+                IconButton(
+                  onPressed: _newFile,
+                  icon: const Icon(Icons.note_add),
+                  tooltip: 'ملف جديد',
+                ),
+                IconButton(
+                  onPressed: _pickFile,
+                  icon: const Icon(Icons.description),
+                  tooltip: 'فتح ملف',
+                ),
+                IconButton(
+                  onPressed: controller.refreshFiles,
+                  icon: const Icon(Icons.refresh),
+                  tooltip: 'تحديث',
+                ),
+                IconButton(
+                  onPressed: controller.undo,
+                  icon: const Icon(Icons.undo),
+                  tooltip: 'تراجع',
+                ),
+                IconButton(
+                  onPressed: controller.redo,
+                  icon: const Icon(Icons.redo),
+                  tooltip: 'إعادة',
+                ),
+                IconButton(
+                  onPressed: controller.save,
+                  icon: const Icon(Icons.save),
+                  tooltip: 'حفظ',
+                ),
+                IconButton(
+                  onPressed: controller.saveAll,
+                  icon: const Icon(Icons.save_as),
+                  tooltip: 'حفظ الكل',
+                ),
+                IconButton(
+                  onPressed: controller.compile,
+                  icon: const Icon(Icons.play_arrow),
+                  tooltip: 'ترجمة',
+                ),
+              ],
             ),
-            IconButton(
-              onPressed: _newFile,
-              icon: const Icon(Icons.note_add),
-              tooltip: 'ملف جديد',
-            ),
-            IconButton(
-              onPressed: _pickFile,
-              icon: const Icon(Icons.description),
-              tooltip: 'فتح ملف',
-            ),
-            IconButton(
-              onPressed: controller.refreshFiles,
-              icon: const Icon(Icons.refresh),
-              tooltip: 'تحديث',
-            ),
-            IconButton(
-              onPressed: controller.undo,
-              icon: const Icon(Icons.undo),
-              tooltip: 'تراجع',
-            ),
-            IconButton(
-              onPressed: controller.redo,
-              icon: const Icon(Icons.redo),
-              tooltip: 'إعادة',
-            ),
-            IconButton(
-              onPressed: controller.save,
-              icon: const Icon(Icons.save),
-              tooltip: 'حفظ',
-            ),
-            IconButton(
-              onPressed: controller.saveAll,
-              icon: const Icon(Icons.save_as),
-              tooltip: 'حفظ الكل',
-            ),
-            IconButton(
-              onPressed: controller.compile,
-              icon: const Icon(Icons.play_arrow),
-              tooltip: 'ترجمة',
-            ),
-          ],
-        ),
-        body: Row(
-          children: [
-            SizedBox(width: 260, child: _Explorer(controller: controller)),
-            const VerticalDivider(width: 1),
-            Expanded(
-              child: Column(
-                children: [
-                  _Tabs(controller: controller, onClose: _closeTab),
-                  Expanded(
-                    child: active == null
-                        ? const Center(
-                            child: Text('افتح ملفًا من مستكشف المشروع'),
-                          )
-                        : TextField(
-                            controller: textController,
-                            onChanged: _onTextChanged,
-                            expands: true,
-                            maxLines: null,
-                            textDirection: TextDirection.rtl,
-                            style: const TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 15,
-                            ),
-                            decoration: const InputDecoration(
-                              contentPadding: EdgeInsets.all(16),
-                              border: InputBorder.none,
-                            ),
-                          ),
+            body: Row(
+              children: [
+                SizedBox(width: 260, child: _Explorer(controller: controller)),
+                const VerticalDivider(width: 1),
+                Expanded(
+                  child: Column(
+                    children: [
+                      _Tabs(controller: controller, onClose: _closeTab),
+                      Expanded(
+                        child: active == null
+                            ? const Center(
+                                child: Text('افتح ملفًا من مستكشف المشروع'),
+                              )
+                            : TextField(
+                                controller: textController,
+                                onChanged: _onTextChanged,
+                                expands: true,
+                                maxLines: null,
+                                textDirection: TextDirection.rtl,
+                                style: const TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 15,
+                                ),
+                                decoration: const InputDecoration(
+                                  contentPadding: EdgeInsets.all(16),
+                                  border: InputBorder.none,
+                                ),
+                              ),
+                      ),
+                      const Divider(height: 1),
+                      SizedBox(
+                        height: 120,
+                        child: _DiagnosticsPanel(controller: controller),
+                      ),
+                      const Divider(height: 1),
+                      _StatusBar(controller: controller),
+                    ],
                   ),
-                  const Divider(height: 1),
-                  SizedBox(
-                    height: 120,
-                    child: _DiagnosticsPanel(controller: controller),
-                  ),
-                  const Divider(height: 1),
-                  _StatusBar(controller: controller),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
+}
+
+class SaveIntent extends Intent {
+  const SaveIntent();
+}
+
+class UndoIntent extends Intent {
+  const UndoIntent();
+}
+
+class RedoIntent extends Intent {
+  const RedoIntent();
+}
+
+class CompileIntent extends Intent {
+  const CompileIntent();
 }
 
 class _Explorer extends StatelessWidget {
