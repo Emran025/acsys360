@@ -13,27 +13,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-      - run: flutter pub get
-      - run: dart format --output=none --set-exit-if-changed lib test
-      - run: flutter analyze
-      - run: flutter test --coverage
+      - name: Build the pinned development image
+        run: docker build --file .devcontainer/Dockerfile --tag acsys360-dev .
+      - name: Format, analyze, and test inside the development image
+        run: >-
+          docker run --rm
+          --volume "${{ github.workspace }}:/workspace/acsys360"
+          --workdir /workspace/acsys360
+          acsys360-dev
+          bash -lc "flutter pub get && dart format --output=none --set-exit-if-changed lib test && flutter analyze && flutter test"
 
   desktop-build:
     needs: analyze-and-test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-      - run: flutter config --enable-linux-desktop
-      - run: flutter pub get
-      - run: flutter build linux --release
+      - name: Build the pinned development image
+        run: docker build --file .devcontainer/Dockerfile --tag acsys360-dev .
+      - name: Build Linux desktop inside the development image
+        run: >-
+          docker run --rm
+          --volume "${{ github.workspace }}:/workspace/acsys360"
+          --workdir /workspace/acsys360
+          acsys360-dev
+          bash -lc "flutter pub get && flutter build linux --release"
       - uses: actions/upload-artifact@v4
         with:
           name: acsys360-linux
