@@ -53,10 +53,10 @@
 
 ## تشغيل المترجم داخل حزمة Desktop
 
-في بيئة التطوير يبقى التشغيل عبر `dart run packages/compiler_core/bin/arabicc.dart --protocol` حتى يمكن تعديل مصدر المترجم بسرعة. أما Release workflow فينفذ `dart compile exe` على runner المنصة، ثم ينسخ الناتج إلى مجلد `compiler` بجوار executable المحرر داخل كل bundle. عند تشغيل النسخة المصدرة يبحث المحرر عن `compiler/arabicc` أو `compiler/arabicc.exe` ويشغل الملف نفسه مع `--protocol`، ويستبدلها داخليًا بـ `--assist` لطلبات الإكمال والمساعدة. إذا لم يجد الملف المضمّن يعود لمسار التطوير فقط.
+في بيئة التطوير يبقى التشغيل عبر `dart run packages/compiler_core/bin/arabicc.dart --protocol` حتى يمكن تعديل مصدر المترجم بسرعة. أما Release workflow فينفذ `dart compile exe` على runner المنصة، ثم ينسخ الناتج إلى مجلد `compiler` بجوار executable المحرر داخل كل bundle، ويرفق Dart SDK إلى `compiler/dart-sdk` حتى يستطيع target `dart-native` بناء artifact من النسخة المصدرة دون اعتماد على SDK خارجي. عند تشغيل النسخة المصدرة يبحث المحرر عن `compiler/arabicc` أو `compiler/arabicc.exe` ويشغل الملف نفسه مع `--protocol`، ويستبدلها داخليًا بـ `--assist` لطلبات الإكمال والمساعدة. إذا لم يجد الملف المضمّن يعود لمسار التطوير فقط.
 
-لا يعني ذلك أن Windows output ملف EXE منفردًا؛ Flutter Desktop يحتاج executable وDLL و`data` وملفات runtime. الناتج القابل للنقل هو ZIP يحتوي `acsys360.exe` ومجلده الكامل، إضافة إلى `compiler/arabicc.exe`، وبذلك لا يحتاج المستخدم إلى Dart SDK أو مصدر المستودع.
+لا يعني ذلك أن Windows output ملف EXE منفردًا؛ Flutter Desktop يحتاج executable وDLL و`data` وملفات runtime. الناتج القابل للنقل هو ZIP يحتوي `acsys360.exe` ومجلده الكامل، إضافة إلى `compiler/arabicc.exe` و`compiler/dart-sdk`، وبذلك لا يحتاج المستخدم إلى تثبيت Dart SDK أو توفير مصدر المستودع.
 
 ## ما لم ينفذ بعد
 
-العقد يعرّف شكل النقل، وCLI يمرر كل ملف إلى lexer/parser/semantic ثم يجمع النتائج في استجابة project، مع تحليل project-level للإجراءات والأنواع المصدرة. لا تُسرّب المتغيرات بين الملفات دون import syntax. يدعم الإصدار `dart-native` طلب بناء artifact في `artifactDirectory` عندما تتوفر Dart toolchain، ولا يعيد المسار إلا بعد إنشاء executable والتحقق من وجوده. أما `target: none` فيبقى السلوك الافتراضي المتوافق مع الترجمة والتحليل والتنفيذ الداخلي.
+العقد يعرّف شكل النقل، وCLI يمرر كل ملف إلى lexer/parser/semantic ثم يجمع النتائج في استجابة project، مع تحليل project-level للإجراءات والأنواع المصدرة. لا تُسرّب المتغيرات بين الملفات دون import syntax. يدعم الإصدار `dart-native` طلب بناء artifact في `artifactDirectory`، ويستخدم Dart SDK المضمّن في release أو `DART_EXECUTABLE`/PATH في التطوير، ولا يعيد المسار إلا بعد إنشاء executable والتحقق من وجوده. أما `target: none` فيبقى السلوك الافتراضي المتوافق مع الترجمة والتحليل والتنفيذ الداخلي.
