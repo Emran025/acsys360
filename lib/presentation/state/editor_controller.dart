@@ -55,6 +55,15 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool closeTab(int index, {bool discard = false}) {
+    if (index < 0 || index >= workspace.documents.length) return false;
+    final document = workspace.documents[index];
+    if (document.isDirty && !discard) return false;
+    workspace = workspace.close(index);
+    notifyListeners();
+    return true;
+  }
+
   Future<void> open(String path) async {
     try {
       workspace = await openDocument(workspace, path);

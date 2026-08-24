@@ -84,6 +84,33 @@ class _EditorShellState extends State<EditorShell> {
     if (path != null && mounted) await widget.controller.changeRoot(path);
   }
 
+  Future<void> _closeTab(int index) async {
+    final document = widget.controller.workspace.documents[index];
+    if (document.isDirty) {
+      final discard = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('تغييرات غير محفوظة'),
+          content: Text(
+            'هل تريد إغلاق ${document.path.split(Platform.pathSeparator).last} دون حفظ؟',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('إغلاق دون حفظ'),
+            ),
+          ],
+        ),
+      );
+      if (discard != true) return;
+    }
+    widget.controller.closeTab(index, discard: document.isDirty);
+  }
+
   void _onTextChanged(String value) {
     final document = widget.controller.activeDocument;
     if (document == null || value == document.text) return;
@@ -141,7 +168,7 @@ class _EditorShellState extends State<EditorShell> {
             Expanded(
               child: Column(
                 children: [
-                  _Tabs(controller: controller),
+                  _Tabs(controller: controller, onClose: _closeTab),
                   Expanded(
                     child: active == null
                         ? const Center(
@@ -227,7 +254,8 @@ class _DiagnosticsPanel extends StatelessWidget {
 
 class _Tabs extends StatelessWidget {
   final EditorController controller;
-  const _Tabs({required this.controller});
+  final Future<void> Function(int index) onClose;
+  const _Tabs({required this.controller, required this.onClose});
 
   @override
   Widget build(BuildContext context) => SingleChildScrollView(
@@ -247,6 +275,7 @@ class _Tabs extends StatelessWidget {
                 controller.workspace.documents[index].path ==
                 controller.activeDocument?.path,
             onPressed: () => controller.selectTab(index),
+            onDeleted: () => onClose(index),
           ),
       ],
     ),

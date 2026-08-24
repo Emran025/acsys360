@@ -10,6 +10,10 @@ void main() {
   assert(edited.isDirty);
   assert(edited.undo().text == 'abc');
   assert(edited.undo().redo().text == 'aXYZc');
+  final branched = edited.undo().edit(
+    const TextEdit(offset: 1, before: 'b', after: 'Q'),
+  );
+  assert(branched.redo().text == branched.text);
 
   final second = const Document(path: 'second.arb', text: 'second');
   final workspace = Workspace(rootPath: '.')
