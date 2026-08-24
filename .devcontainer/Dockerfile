@@ -13,7 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN curl -fsSL "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz" \
     | tar -xJ -C /opt
 
-RUN flutter config --enable-linux-desktop \
+RUN git config --global --add safe.directory /opt/flutter \
+    && flutter config --enable-linux-desktop \
     && flutter precache --linux \
     && dart --disable-analytics \
     && flutter --disable-analytics
