@@ -50,6 +50,11 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void selectTab(int index) {
+    workspace = workspace.select(index);
+    notifyListeners();
+  }
+
   Future<void> open(String path) async {
     try {
       workspace = await openDocument(workspace, path);
