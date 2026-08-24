@@ -259,6 +259,14 @@ class _EditorShellState extends State<EditorShell> {
     await widget.controller.delete(path);
   }
 
+  Future<void> _renamePath(String path) async {
+    final currentName = path.split(Platform.pathSeparator).last;
+    final newName = await showRenameDialog(context, currentName: currentName);
+    if (newName != null && mounted) {
+      await widget.controller.rename(path, newName);
+    }
+  }
+
   Future<void> _saveAs() async {
     final active = widget.controller.activeDocument;
     if (active == null) return;
@@ -474,107 +482,125 @@ class _EditorShellState extends State<EditorShell> {
                       setState(() => topBarExpanded = !topBarExpanded),
                 ),
                 Expanded(
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 300,
-                        child: WorkspaceExplorer(
-                          rootPath: controller.workspace.rootPath,
-                          nodes: controller.tree,
-                          isLoading: isRefreshing,
-                          hasCutPath: controller.hasCutPath,
-                          selectedPath: controller.selectedExplorerPath,
-                          selectedDirectoryPath:
-                              controller.selectedDirectoryPath,
-                          onSelect: controller.selectExplorerPath,
-                          onChooseFolder: _pickWorkspace,
-                          onOpenFile: _openFile,
-                          onRefresh: _refreshFiles,
-                          onNewFile: _newFileAt,
-                          onNewFolder: _newFolderAt,
-                          onOpen: controller.open,
-                          onDelete: _deletePath,
-                          onCut: controller.cut,
-                          onPaste: controller.paste,
+                  child: Directionality(
+                    textDirection: TextDirection.ltr,
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 300,
+                          child: Directionality(
+                            textDirection: TextDirection.rtl,
+                            child: WorkspaceExplorer(
+                              rootPath: controller.workspace.rootPath,
+                              nodes: controller.tree,
+                              isLoading: isRefreshing,
+                              hasCutPath: controller.hasCutPath,
+                              selectedPath: controller.selectedExplorerPath,
+                              selectedDirectoryPath:
+                                  controller.selectedDirectoryPath,
+                              onSelect: controller.selectExplorerPath,
+                              onChooseFolder: _pickWorkspace,
+                              onOpenFile: _openFile,
+                              onRefresh: _refreshFiles,
+                              onNewFile: _newFileAt,
+                              onNewFolder: _newFolderAt,
+                              onOpen: controller.open,
+                              onDelete: _deletePath,
+                              onRename: _renamePath,
+                              onCut: controller.cut,
+                              onPaste: controller.paste,
+                            ),
+                          ),
                         ),
-                      ),
-                      const VerticalDivider(width: 1),
-                      Expanded(
-                        child: Column(
-                          children: [
-                            _Tabs(controller: controller, onClose: _closeTab),
-                            if (showFindReplace)
-                              FindReplaceBar(
-                                findController: findController,
-                                replaceController: replaceController,
-                                matches: controller.searchMatches.length,
-                                currentMatch: controller.currentMatchIndex,
-                                onSearch: _search,
-                                onFirst: _firstMatch,
-                                onPrevious: _previousMatch,
-                                onNext: _nextMatch,
-                                onReplaceCurrent: _replaceCurrent,
-                                onReplaceAll: _replaceAll,
-                                onClose: _toggleFindReplace,
-                              ),
-                            Expanded(
-                              child: Stack(
-                                children: [
-                                  GestureDetector(
-                                    behavior: HitTestBehavior.translucent,
-                                    onSecondaryTapUp: (details) =>
-                                        _showEditorMenu(details.globalPosition),
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(14),
-                                      child: active == null
-                                          ? const _EmptyEditor()
-                                          : LineNumberedEditor(
-                                              controller: textController,
-                                              focusNode: editorFocusNode,
-                                              onChanged: _onTextChanged,
-                                              onTap: _showDiagnosticLamp,
-                                            ),
-                                    ),
+                        const VerticalDivider(width: 1),
+                        Expanded(
+                          child: Directionality(
+                            textDirection: TextDirection.rtl,
+                            child: Column(
+                              children: [
+                                _Tabs(
+                                  controller: controller,
+                                  onClose: _closeTab,
+                                ),
+                                if (showFindReplace)
+                                  FindReplaceBar(
+                                    findController: findController,
+                                    replaceController: replaceController,
+                                    matches: controller.searchMatches.length,
+                                    currentMatch: controller.currentMatchIndex,
+                                    onSearch: _search,
+                                    onFirst: _firstMatch,
+                                    onPrevious: _previousMatch,
+                                    onNext: _nextMatch,
+                                    onReplaceCurrent: _replaceCurrent,
+                                    onReplaceAll: _replaceAll,
+                                    onClose: _toggleFindReplace,
                                   ),
-                                  if (controller.assistance != null)
-                                    Align(
-                                      alignment: Alignment.topRight,
-                                      child: Padding(
-                                        padding: const EdgeInsets.only(
-                                          top: 22,
-                                          right: 22,
-                                        ),
-                                        child: ConstrainedBox(
-                                          constraints: const BoxConstraints(
-                                            maxWidth: 360,
-                                            maxHeight: 190,
-                                          ),
-                                          child: _AssistPanel(
-                                            response: controller.assistance!,
-                                            onSelect: _applyCompletion,
-                                            onClose: controller.clearAssist,
-                                          ),
+                                Expanded(
+                                  child: Stack(
+                                    children: [
+                                      GestureDetector(
+                                        behavior: HitTestBehavior.translucent,
+                                        onSecondaryTapUp: (details) =>
+                                            _showEditorMenu(
+                                              details.globalPosition,
+                                            ),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(14),
+                                          child: active == null
+                                              ? const _EmptyEditor()
+                                              : LineNumberedEditor(
+                                                  controller: textController,
+                                                  focusNode: editorFocusNode,
+                                                  onChanged: _onTextChanged,
+                                                  onTap: _showDiagnosticLamp,
+                                                ),
                                         ),
                                       ),
-                                    ),
-                                ],
-                              ),
+                                      if (controller.assistance != null)
+                                        Align(
+                                          alignment: Alignment.topRight,
+                                          child: Padding(
+                                            padding: const EdgeInsets.only(
+                                              top: 22,
+                                              right: 22,
+                                            ),
+                                            child: ConstrainedBox(
+                                              constraints: const BoxConstraints(
+                                                maxWidth: 360,
+                                                maxHeight: 190,
+                                              ),
+                                              child: _AssistPanel(
+                                                response:
+                                                    controller.assistance!,
+                                                onSelect: _applyCompletion,
+                                                onClose: controller.clearAssist,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                CollapsiblePanel(
+                                  title: 'نتائج الترجمة',
+                                  icon: Icons.terminal_rounded,
+                                  expanded: resultsExpanded,
+                                  expandedHeight: 160,
+                                  onToggle: () => setState(
+                                    () => resultsExpanded = !resultsExpanded,
+                                  ),
+                                  child: _DiagnosticsPanel(
+                                    controller: controller,
+                                  ),
+                                ),
+                                _StatusBar(controller: controller),
+                              ],
                             ),
-                            CollapsiblePanel(
-                              title: 'نتائج الترجمة',
-                              icon: Icons.terminal_rounded,
-                              expanded: resultsExpanded,
-                              expandedHeight: 160,
-                              onToggle: () => setState(
-                                () => resultsExpanded = !resultsExpanded,
-                              ),
-                              child: _DiagnosticsPanel(controller: controller),
-                            ),
-                            _StatusBar(controller: controller),
-                          ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ],

@@ -51,6 +51,9 @@ class FakeWorkspaceRepository implements WorkspaceRepository {
 
   @override
   Future<void> move(String sourcePath, String targetDirectory) async {}
+
+  @override
+  Future<void> rename(String path, String newName) async {}
 }
 
 void main() {
