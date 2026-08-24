@@ -17,9 +17,14 @@ void main() {
     ArabicEditorApp(
       controller: EditorController(
         repository: repository,
-        compiler: const ProcessCompilerRepository(
+        compiler: ProcessCompilerRepository(
           executable: 'dart',
-          arguments: ['run', 'packages/compiler_core/bin/arabicc.dart'],
+          arguments: [
+            'run',
+            'packages/compiler_core/bin/arabicc.dart',
+            '--protocol',
+          ],
+          processWorkingDirectory: Directory.current.path,
         ),
         rootPath: Directory.current.path,
       ),

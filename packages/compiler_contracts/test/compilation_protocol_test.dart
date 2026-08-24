@@ -17,6 +17,10 @@ void main() {
         '/workspace/project/main.arb',
         '/workspace/project/lib.arb',
       ],
+      sourceTexts: {
+        '/workspace/project/main.arb': 'برنامج رئيسي {}.',
+        '/workspace/project/lib.arb': 'برنامج مساعد {}.',
+      },
       mode: CompilationMode.project,
       entryPath: '/workspace/project/main.arb',
     );
@@ -27,6 +31,7 @@ void main() {
 
     expect(decoded.rootPath, request.rootPath);
     expect(decoded.sourcePaths, request.sourcePaths);
+    expect(decoded.sourceTexts, request.sourceTexts);
     expect(decoded.mode, CompilationMode.project);
     expect(decoded.entryPath, request.entryPath);
   });
