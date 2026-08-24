@@ -308,6 +308,10 @@ void main() {
     await tester.pump();
     final field = find.byType(TextField);
     await tester.tap(field);
+    final textFieldController = tester.widget<TextField>(field).controller!;
+    textFieldController.selection = TextSelection.collapsed(
+      offset: textFieldController.text.length,
+    );
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump();
 
