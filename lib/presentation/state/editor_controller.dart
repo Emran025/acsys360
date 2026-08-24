@@ -5,10 +5,12 @@ import 'package:flutter/foundation.dart';
 
 import '../../domain/entities/compilation_result.dart';
 import '../../domain/entities/document.dart';
+import '../../domain/entities/editor_diagnostic.dart';
 import '../../domain/entities/file_node.dart';
 import '../../domain/entities/workspace.dart';
 import '../../domain/repositories/workspace_repository.dart';
 import '../../domain/usecases/find_replace.dart';
+import '../../domain/usecases/editor_language_server.dart';
 import '../../domain/usecases/format_arabic_source.dart';
 import '../../domain/usecases/workspace_actions.dart';
 
@@ -31,7 +33,18 @@ class EditorController extends ChangeNotifier {
   CompilationResult? compilation;
   AssistResponse? assistance;
   List<SearchMatch> searchMatches = const [];
+  List<EditorDiagnostic> diagnostics = const [];
   String? cutPath;
+
+  EditorLanguageServer? get languageServer {
+    final compilerService = compiler;
+    final assistantService = assistant;
+    if (compilerService == null || assistantService == null) return null;
+    return EditorLanguageServer(
+      compiler: compilerService,
+      assistant: assistantService,
+    );
+  }
 
   EditorController({
     required this.repository,
@@ -54,6 +67,7 @@ class EditorController extends ChangeNotifier {
     files = const [];
     tree = const [];
     compilation = null;
+    diagnostics = const [];
     assistance = null;
     await refreshFiles();
   }
@@ -270,12 +284,38 @@ class EditorController extends ChangeNotifier {
   void edit(TextEdit change) {
     workspace = applyEdit(workspace, change);
     searchMatches = const [];
+    diagnostics = const [];
     assistance = null;
     notifyListeners();
   }
 
+  Future<void> analyze() => compile();
+
+  EditorDiagnostic? diagnosticAt(int offset) {
+    for (final diagnostic in diagnostics) {
+      if (diagnostic.containsOffset(offset)) return diagnostic;
+    }
+    return null;
+  }
+
+  void applyCodeAction(EditorCodeAction action) {
+    final document = activeDocument;
+    if (document == null) return;
+    final offset = action.offset.clamp(0, document.text.length).toInt();
+    final end = (offset + action.length)
+        .clamp(offset, document.text.length)
+        .toInt();
+    edit(
+      TextEdit(
+        offset: offset,
+        before: document.text.substring(offset, end),
+        after: action.replacement,
+      ),
+    );
+  }
+
   Future<void> complete(int offset) async {
-    final service = assistant;
+    final service = languageServer;
     final active = workspace.activeDocument;
     if (service == null || active == null) return;
     try {
@@ -300,7 +340,7 @@ class EditorController extends ChangeNotifier {
   }
 
   Future<void> help(int offset) async {
-    final service = assistant;
+    final service = languageServer;
     final active = workspace.activeDocument;
     if (service == null || active == null) return;
     try {
@@ -337,19 +377,21 @@ class EditorController extends ChangeNotifier {
   }
 
   Future<void> compile() async {
-    final service = compiler;
-    if (service == null) return;
+    final service = languageServer;
     final active = workspace.activeDocument;
-    if (active == null) return;
-    final response = await service.compile(
-      rootPath: workspace.rootPath,
-      sourcePath: active.path,
-      documents: workspace.documents,
-    );
-    compilation = CompilationResult(
-      success: response['success'] == true,
-      payload: response,
-    );
+    if (service == null || active == null) return;
+    try {
+      final analysis = await service.analyze(
+        rootPath: workspace.rootPath,
+        sourcePath: active.path,
+        documents: workspace.documents,
+      );
+      compilation = analysis.compilation;
+      diagnostics = analysis.diagnostics;
+      error = null;
+    } catch (exception) {
+      error = exception;
+    }
     notifyListeners();
   }
 }

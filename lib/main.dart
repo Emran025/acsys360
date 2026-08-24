@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -16,6 +17,7 @@ import 'presentation/widgets/collapsible_panel.dart';
 import 'presentation/widgets/editor_top_bar.dart';
 import 'presentation/widgets/find_replace_bar.dart';
 import 'presentation/widgets/arabic_code_controller.dart';
+import 'presentation/widgets/diagnostic_lamp_dialog.dart';
 import 'presentation/widgets/line_numbered_editor.dart';
 import 'presentation/widgets/workspace_explorer.dart';
 
@@ -122,6 +124,7 @@ class _EditorShellState extends State<EditorShell> {
   bool isRefreshing = false;
   bool topBarExpanded = true;
   bool resultsExpanded = true;
+  Timer? analysisTimer;
 
   @override
   void initState() {
@@ -133,6 +136,7 @@ class _EditorShellState extends State<EditorShell> {
   @override
   void dispose() {
     widget.controller.removeListener(_syncDocument);
+    analysisTimer?.cancel();
     textController.dispose();
     findController.dispose();
     replaceController.dispose();
@@ -151,11 +155,45 @@ class _EditorShellState extends State<EditorShell> {
 
   void _syncDocument() {
     final document = widget.controller.activeDocument;
-    if (document == null) return;
-    if (document.path != boundPath || textController.text != document.text) {
+    if (document == null) {
+      textController.setDiagnostics(const []);
+      return;
+    }
+    final pathChanged = document.path != boundPath;
+    if (pathChanged || textController.text != document.text) {
       boundPath = document.path;
       textController.value = TextEditingValue(text: document.text);
     }
+    textController.setDiagnostics(widget.controller.diagnostics);
+    if (pathChanged) _scheduleAnalysis();
+  }
+
+  void _scheduleAnalysis() {
+    analysisTimer?.cancel();
+    if (widget.controller.activeDocument == null) return;
+    analysisTimer = Timer(const Duration(milliseconds: 350), () async {
+      if (!mounted) return;
+      await widget.controller.analyze();
+      if (!mounted || !_shouldSuggest) return;
+      await widget.controller.complete(_cursorOffset);
+    });
+  }
+
+  bool get _shouldSuggest {
+    final offset = _cursorOffset;
+    if (offset == 0 || offset > textController.text.length) return false;
+    final character = textController.text.substring(offset - 1, offset);
+    return RegExp(r'[ء-يA-Za-z_]').hasMatch(character);
+  }
+
+  Future<void> _showDiagnosticLamp() async {
+    final diagnostic = widget.controller.diagnosticAt(_cursorOffset);
+    if (diagnostic == null || !mounted) return;
+    final action = await showDiagnosticLampDialog(
+      context,
+      diagnostic: diagnostic,
+    );
+    if (action != null && mounted) widget.controller.applyCodeAction(action);
   }
 
   int get _cursorOffset {
@@ -326,6 +364,7 @@ class _EditorShellState extends State<EditorShell> {
         after: value.substring(start, valueEnd),
       ),
     );
+    _scheduleAnalysis();
   }
 
   @override
@@ -436,26 +475,46 @@ class _EditorShellState extends State<EditorShell> {
                                 onReplaceAll: _replaceAll,
                                 onClose: _toggleFindReplace,
                               ),
-                            if (controller.assistance != null)
-                              _AssistPanel(
-                                response: controller.assistance!,
-                                onSelect: _applyCompletion,
-                                onClose: controller.clearAssist,
-                              ),
                             Expanded(
-                              child: GestureDetector(
-                                behavior: HitTestBehavior.translucent,
-                                onSecondaryTapUp: (details) =>
-                                    _showEditorMenu(details.globalPosition),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(14),
-                                  child: active == null
-                                      ? const _EmptyEditor()
-                                      : LineNumberedEditor(
-                                          controller: textController,
-                                          onChanged: _onTextChanged,
+                              child: Stack(
+                                children: [
+                                  GestureDetector(
+                                    behavior: HitTestBehavior.translucent,
+                                    onSecondaryTapUp: (details) =>
+                                        _showEditorMenu(details.globalPosition),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(14),
+                                      child: active == null
+                                          ? const _EmptyEditor()
+                                          : LineNumberedEditor(
+                                              controller: textController,
+                                              onChanged: _onTextChanged,
+                                              onTap: _showDiagnosticLamp,
+                                            ),
+                                    ),
+                                  ),
+                                  if (controller.assistance != null)
+                                    Align(
+                                      alignment: Alignment.topRight,
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(
+                                          top: 22,
+                                          right: 22,
                                         ),
-                                ),
+                                        child: ConstrainedBox(
+                                          constraints: const BoxConstraints(
+                                            maxWidth: 360,
+                                            maxHeight: 190,
+                                          ),
+                                          child: _AssistPanel(
+                                            response: controller.assistance!,
+                                            onSelect: _applyCompletion,
+                                            onClose: controller.clearAssist,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
                             CollapsiblePanel(
