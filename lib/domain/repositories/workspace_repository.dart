@@ -9,6 +9,7 @@ abstract interface class WorkspaceRepository {
 abstract interface class CompilerRepository {
   Future<Map<String, dynamic>> compile({
     required String rootPath,
+    required String sourcePath,
     required List<Document> documents,
   });
 }

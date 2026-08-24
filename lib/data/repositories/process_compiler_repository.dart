@@ -7,15 +7,33 @@ import '../../domain/repositories/workspace_repository.dart';
 
 class ProcessCompilerRepository implements CompilerRepository {
   final String executable;
-  const ProcessCompilerRepository({required this.executable});
+  final List<String> arguments;
+
+  const ProcessCompilerRepository({
+    required this.executable,
+    this.arguments = const [],
+  });
 
   @override
   Future<Map<String, dynamic>> compile({
     required String rootPath,
+    required String sourcePath,
     required List<Document> documents,
   }) async {
-    final process = await Process.run(executable, [rootPath]);
-    if (process.stdout.toString().trim().isEmpty) {
+    final active = sourcePath;
+    if (active.isEmpty) {
+      return const CompilationResult(
+        success: false,
+        payload: {'diagnostics': [], 'message': 'لا يوجد ملف للترجمة'},
+      ).payload;
+    }
+
+    final process = await Process.run(executable, [
+      ...arguments,
+      active,
+    ], workingDirectory: rootPath);
+    final output = process.stdout.toString().trim();
+    if (output.isEmpty) {
       return CompilationResult(
         success: false,
         payload: {
@@ -25,6 +43,6 @@ class ProcessCompilerRepository implements CompilerRepository {
         },
       ).payload;
     }
-    return jsonDecode(process.stdout.toString()) as Map<String, dynamic>;
+    return jsonDecode(output) as Map<String, dynamic>;
   }
 }

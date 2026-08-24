@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'data/repositories/local_workspace_repository.dart';
+import 'data/repositories/process_compiler_repository.dart';
 import 'domain/entities/document.dart';
 import 'presentation/state/editor_controller.dart';
 
@@ -12,6 +13,10 @@ void main() {
     ArabicEditorApp(
       controller: EditorController(
         repository: repository,
+        compiler: const ProcessCompilerRepository(
+          executable: 'dart',
+          arguments: ['run', 'packages/compiler_core/bin/arabicc.dart'],
+        ),
         rootPath: Directory.current.path,
       ),
     ),
@@ -109,6 +114,11 @@ class _EditorShellState extends State<EditorShell> {
               icon: const Icon(Icons.save),
               tooltip: 'حفظ',
             ),
+            IconButton(
+              onPressed: controller.compile,
+              icon: const Icon(Icons.play_arrow),
+              tooltip: 'ترجمة',
+            ),
           ],
         ),
         body: Row(
@@ -141,13 +151,9 @@ class _EditorShellState extends State<EditorShell> {
                           ),
                   ),
                   const Divider(height: 1),
-                  const SizedBox(
+                  SizedBox(
                     height: 120,
-                    child: Center(
-                      child: Text(
-                        'لوحة النتائج ستتصل بعقد المترجم في المرحلة التالية',
-                      ),
-                    ),
+                    child: _DiagnosticsPanel(controller: controller),
                   ),
                 ],
               ),
@@ -179,6 +185,31 @@ class _Explorer extends StatelessWidget {
       if (controller.files.isEmpty) const Text('لا توجد ملفات .arb'),
     ],
   );
+}
+
+class _DiagnosticsPanel extends StatelessWidget {
+  final EditorController controller;
+  const _DiagnosticsPanel({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    final result = controller.compilation;
+    if (result == null) return const Center(child: Text('لا توجد نتيجة ترجمة'));
+    if (result.diagnostics.isEmpty) {
+      return Center(
+        child: Text(result.success ? 'تمت الترجمة بنجاح' : 'فشلت الترجمة'),
+      );
+    }
+    return ListView(
+      padding: const EdgeInsets.all(8),
+      children: [
+        for (final diagnostic in result.diagnostics)
+          Text(
+            '${diagnostic['phase'] ?? 'compiler'}: ${diagnostic['message'] ?? diagnostic}',
+          ),
+      ],
+    );
+  }
 }
 
 class _Tabs extends StatelessWidget {

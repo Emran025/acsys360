@@ -81,8 +81,11 @@ class EditorController extends ChangeNotifier {
   Future<void> compile() async {
     final service = compiler;
     if (service == null) return;
+    final active = workspace.activeDocument;
+    if (active == null) return;
     final response = await service.compile(
       rootPath: workspace.rootPath,
+      sourcePath: active.path,
       documents: workspace.documents,
     );
     compilation = CompilationResult(
