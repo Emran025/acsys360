@@ -111,6 +111,24 @@ class LanguageCatalog {
       syntax: 'اعد تعليمة حتى(شرط)',
     ),
     LanguageHelpEntry(
+      keyword: 'من',
+      title: 'بداية نوع قائمة',
+      description: 'يفصل حجم القائمة عن نوع عناصرها.',
+      syntax: 'قائمة[العدد] من النوع',
+    ),
+    LanguageHelpEntry(
+      keyword: 'الى',
+      title: 'نهاية مجال التكرار',
+      description: 'يفصل بداية مجال كرر عن نهايته.',
+      syntax: 'كرر(المتغير = البداية الى النهاية)',
+    ),
+    LanguageHelpEntry(
+      keyword: 'اضف',
+      title: 'خطوة التكرار',
+      description: 'يحدد مقدار الزيادة الاختيارية في مجال كرر.',
+      syntax: 'كرر(المتغير = البداية الى النهاية اضف الخطوة)',
+    ),
+    LanguageHelpEntry(
       keyword: 'حتى',
       title: 'نهاية تكرار حتى',
       description: 'يحدد شرط نهاية تكرار اعد.',

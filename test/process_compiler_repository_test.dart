@@ -35,8 +35,9 @@ void main() {
       ],
     );
 
-    expect(response['protocolVersion'], '0.2.0');
+    expect(response['protocolVersion'], '0.3.0');
     expect(response['success'], isTrue);
+    expect(response['executionOutput'], ['2', '4']);
     expect((response['syntaxTree'] as Map)['kind'], 'project');
     expect(response['tokens'], isNotEmpty);
   });

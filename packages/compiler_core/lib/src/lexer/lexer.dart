@@ -11,7 +11,20 @@ class LexerResult {
 class Lexer {
   static final keywords = LanguageCatalog.keywordSet;
 
-  static const punctuation = {'{', '}', '(', ')', '[', ']', ';', ',', '.', ':'};
+  static const punctuation = {
+    '{',
+    '}',
+    '(',
+    ')',
+    '[',
+    ']',
+    ';',
+    '؛',
+    ',',
+    '،',
+    '.',
+    ':',
+  };
   static const operators = {
     '+',
     '-',
@@ -57,7 +70,12 @@ class Lexer {
         tokens.add(_character(diagnostics, start));
       } else if (punctuation.contains(char)) {
         _advance();
-        tokens.add(Token(TokenKind.punctuation, char, start));
+        final lexeme = switch (char) {
+          '؛' => ';',
+          '،' => ',',
+          _ => char,
+        };
+        tokens.add(Token(TokenKind.punctuation, lexeme, start));
       } else {
         final pair = _peek + _peekNext;
         if (operators.contains(pair)) {
@@ -164,7 +182,7 @@ class Lexer {
       value.codeUnitAt(0) >= 48 && value.codeUnitAt(0) <= 57;
 
   bool _isArabicLetter(String value) {
-    if (value.isEmpty) return false;
+    if (value.isEmpty || value == '؛' || value == '،') return false;
     final code = value.codeUnitAt(0);
     return (code >= 0x0600 && code <= 0x06ff) ||
         (code >= 0x0750 && code <= 0x077f) ||
