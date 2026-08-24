@@ -59,6 +59,26 @@ class FakeWorkspaceRepository implements WorkspaceRepository {
 }
 
 void main() {
+  testWidgets('starts with no folder and shows the welcome workspace', (
+    tester,
+  ) async {
+    final controller = EditorController(
+      repository: FakeWorkspaceRepository(),
+      rootPath: '',
+    );
+
+    await tester.pumpWidget(ArabicEditorApp(controller: controller));
+    await tester.pump();
+
+    expect(find.text('No Folder Opened'), findsOneWidget);
+    expect(find.text('Open Editors'), findsOneWidget);
+    expect(find.text('فتح مجلد'), findsAtLeastNWidgets(1));
+    expect(find.text('ملف جديد'), findsOneWidget);
+    expect(find.text('فتح ملف'), findsAtLeastNWidgets(1));
+    expect(find.text('مستكشف المشروع'), findsNothing);
+    expect(find.text('Welcome'), findsAtLeastNWidgets(1));
+  });
+
   testWidgets('opens an Arabic source document', (tester) async {
     final controller = EditorController(
       repository: FakeWorkspaceRepository(),
@@ -204,6 +224,27 @@ void main() {
 
     expect(controller.text, 'بر');
     expect(span.toPlainText(), 'برنامج');
+  });
+
+  testWidgets('typing remains editable while ghost completion is visible', (
+    tester,
+  ) async {
+    final controller = ArabicCodeController(text: 'بر');
+    controller.setGhostText('نامج', 2);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Material(
+          child: SizedBox(
+            height: 180,
+            child: LineNumberedEditor(controller: controller),
+          ),
+        ),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextField), 'برنامج');
+    expect(controller.text, 'برنامج');
   });
 
   testWidgets('shows a diagnostic lamp in the editor gutter', (tester) async {

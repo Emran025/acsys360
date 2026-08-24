@@ -6,7 +6,7 @@
 
 ## الإصدار الحالي
 
-الإصدار الحالي هو `0.2.0`. يجب أن يظهر الحقل `protocolVersion` في كل طلب واستجابة. يرفض الطرف المستقبل الإصدار غير المدعوم برسالة خطأ واضحة بدل تفسير payload مختلف بصمت.
+الإصدار الحالي هو `0.3.0`. يجب أن يظهر الحقل `protocolVersion` في كل طلب واستجابة. يرفض الطرف المستقبل الإصدار غير المدعوم برسالة خطأ واضحة بدل تفسير payload مختلف بصمت.
 
 ## طلب الترجمة
 
@@ -33,8 +33,11 @@
 | `syntaxTree` | `Map?` | شجرة التحليل النحوي عند توفرها |
 | `symbolTable` | `List<SymbolRecord>` | الرموز المستخرجة مع مواقعها |
 | `threeAddressCode` | `List<String>` | الشفرة الوسيطة |
-| `assembly` | `String` | الشفرة التجميعية |
-| `artifacts` | `List<String>` | مسارات الملفات التنفيذية أو مخرجات البناء |
+| `assembly` | `String` | الشفرة التجميعية النصية الناتجة من TAC |
+| `executionOutput` | `List<String>` | أسطر stdout من التنفيذ الفعلي للبرنامج الصحيح داخل compiler runtime |
+| `artifacts` | `List<String>` | مسارات الملفات التنفيذية أو مخرجات البناء؛ تكون فارغة ما لم ينفذ target backend موثوق |
+
+`assembly` في الإصدار الحالي مخرج NASM-like قابل للفحص الأكاديمي، وليس ملفًا assembled. وبالمثل، `executionOutput` لا يُسمى artifact ولا يحوّل interpreter إلى EXE. لا يعيد المترجم مسار artifact وهميًا.
 
 ## SourceSpan وDiagnostic
 
@@ -54,4 +57,4 @@
 
 ## ما لم ينفذ بعد
 
-العقد يعرّف شكل النقل، وCLI الحالي يمرر كل ملف إلى lexer/parser/semantic ثم يجمع النتائج في استجابة project، مع فحص project-level محدود لتعارض أسماء المتغيرات. لا يدعي ذلك تحليل dependencies أو import resolution عابرًا للملفات بعد. المرحلة التالية هي إضافة تحليل dependencies وsymbol resolution عابر للملفات. أما مسار stdin/stdout والـ adapter واختبار smoke الأساسي وبناء compiler executable المضمّن في release فقد نُفذت واختُبرت في workflow.
+العقد يعرّف شكل النقل، وCLI الحالي يمرر كل ملف إلى lexer/parser/semantic ثم يجمع النتائج في استجابة project، مع فحص project-level محدود لتعارض أسماء المتغيرات. لا يدعي ذلك تحليل dependencies أو import resolution عابرًا للملفات بعد، كما أن target backend لإنتاج EXE من برنامج اللغة نفسه لم يُنفذ بعد؛ لذلك تبقى `artifacts` فارغة حاليًا. المرحلة التالية هي إضافة تحليل dependencies وsymbol resolution عابر للملفات، ثم backend target موثق ومختبر لا يعيد artifact إلا بعد إنشائه والتحقق منه. أما مسار stdin/stdout والـ adapter واختبار smoke الأساسي وبناء compiler executable المضمّن في release فقد نُفذت واختُبرت في workflow.

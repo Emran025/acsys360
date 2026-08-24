@@ -8,7 +8,7 @@ void main() {
     final root = await Directory.systemTemp.createTemp('arabicc-protocol-');
     addTearDown(() => root.delete(recursive: true));
     final request = jsonEncode({
-      'protocolVersion': '0.2.0',
+      'protocolVersion': '0.3.0',
       'rootPath': root.path,
       'sourcePaths': ['main.arb', 'lib.arb'],
       'sourceTexts': {
@@ -30,7 +30,7 @@ void main() {
 
     expect(exitCode, 0, reason: stderr);
     final response = jsonDecode(stdout) as Map<String, dynamic>;
-    expect(response['protocolVersion'], '0.2.0');
+    expect(response['protocolVersion'], '0.3.0');
     expect(response['success'], isTrue);
     expect((response['syntaxTree'] as Map)['kind'], 'project');
     expect((response['tokens'] as List), isNotEmpty);
@@ -63,7 +63,7 @@ void main() {
     ], workingDirectory: Directory.current.path);
     process.stdin.writeln(
       jsonEncode({
-        'protocolVersion': '0.2.0',
+        'protocolVersion': '0.3.0',
         'requestType': 'assist',
         'sourcePath': 'main.arb',
         'sourceText': 'مت',
@@ -94,7 +94,7 @@ void main() {
     ], workingDirectory: Directory.current.path);
     process.stdin.writeln(
       jsonEncode({
-        'protocolVersion': '0.2.0',
+        'protocolVersion': '0.3.0',
         'requestType': 'assist',
         'sourcePath': 'main.arb',
         'sourceText': 'برنامج ',
