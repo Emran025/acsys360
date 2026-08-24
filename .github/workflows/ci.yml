@@ -26,6 +26,9 @@ jobs:
       - name: Analyze shared contracts
         working-directory: packages/compiler_contracts
         run: dart analyze
+      - name: Test shared contracts
+        working-directory: packages/compiler_contracts
+        run: dart test
 
   editor:
     runs-on: ubuntu-latest
