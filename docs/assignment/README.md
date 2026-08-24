@@ -15,6 +15,7 @@
 | [05-testing-and-build.md](05-testing-and-build.md) | الاختبارات، CI، الإصدارات، ومعايير القبول |
 | [06-deliverables-checklist.md](06-deliverables-checklist.md) | قائمة التسليم النهائية ومطابقة الملفات للمطلوب |
 | [07-vscode-editing-reference.md](07-vscode-editing-reference.md) | خلاصة دراسة سلوك VS Code ومراجعها التنفيذية |
+| [08-minimap-reference.md](08-minimap-reference.md) | مواصفة Minimap والتنقل السريع داخل الملف |
 
 ## مبدأ الدقة
 
