@@ -44,7 +44,9 @@ void main() {
   });
 
   test('builds only the active document for a native target', () async {
-    final root = await Directory.systemTemp.createTemp('acsys360-native-adapter-');
+    final root = await Directory.systemTemp.createTemp(
+      'acsys360-native-adapter-',
+    );
     addTearDown(() => root.delete(recursive: true));
     final mainPath = '${root.path}/main.arb';
     final otherPath = '${root.path}/other.arb';
