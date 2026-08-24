@@ -17,6 +17,9 @@ jobs:
       - uses: dart-lang/setup-dart@v1
         with:
           sdk: 3.12.2
+      - name: Get compiler core dependencies
+        working-directory: packages/compiler_core
+        run: dart pub get
       - name: Analyze compiler core
         working-directory: packages/compiler_core
         run: dart analyze

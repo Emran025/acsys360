@@ -13,8 +13,12 @@ void main() {
     await File(mainPath).writeAsString('هذا الملف على القرص غير صالح');
     await File(libPath).writeAsString('هذا الملف على القرص غير صالح');
 
+    final flutterRoot = Platform.environment['FLUTTER_ROOT'];
+    final dartExecutable = flutterRoot == null
+        ? Platform.resolvedExecutable
+        : '$flutterRoot/bin/cache/dart-sdk/bin/dart';
     final repository = ProcessCompilerRepository(
-      executable: Platform.resolvedExecutable,
+      executable: dartExecutable,
       arguments: [
         'run',
         'packages/compiler_core/bin/arabicc.dart',
