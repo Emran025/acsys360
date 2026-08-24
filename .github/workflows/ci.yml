@@ -23,6 +23,9 @@ jobs:
       - name: Run compiler self-tests
         working-directory: packages/compiler_core
         run: dart run bin/self_test.dart
+      - name: Get shared contracts dependencies
+        working-directory: packages/compiler_contracts
+        run: dart pub get
       - name: Analyze shared contracts
         working-directory: packages/compiler_contracts
         run: dart analyze
