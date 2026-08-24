@@ -5,10 +5,12 @@ import 'package:flutter/foundation.dart';
 
 import '../../domain/entities/compilation_result.dart';
 import '../../domain/entities/document.dart';
+import '../../domain/entities/editor_diagnostic.dart';
 import '../../domain/entities/file_node.dart';
 import '../../domain/entities/workspace.dart';
 import '../../domain/repositories/workspace_repository.dart';
 import '../../domain/usecases/find_replace.dart';
+import '../../domain/usecases/editor_language_server.dart';
 import '../../domain/usecases/format_arabic_source.dart';
 import '../../domain/usecases/workspace_actions.dart';
 
@@ -31,7 +33,21 @@ class EditorController extends ChangeNotifier {
   CompilationResult? compilation;
   AssistResponse? assistance;
   List<SearchMatch> searchMatches = const [];
+  int currentMatchIndex = -1;
+  List<EditorDiagnostic> diagnostics = const [];
   String? cutPath;
+  String? selectedExplorerPath;
+  String? selectedDirectoryPath;
+
+  EditorLanguageServer? get languageServer {
+    final compilerService = compiler;
+    final assistantService = assistant;
+    if (compilerService == null || assistantService == null) return null;
+    return EditorLanguageServer(
+      compiler: compilerService,
+      assistant: assistantService,
+    );
+  }
 
   EditorController({
     required this.repository,
@@ -54,7 +70,10 @@ class EditorController extends ChangeNotifier {
     files = const [];
     tree = const [];
     compilation = null;
+    diagnostics = const [];
     assistance = null;
+    selectedExplorerPath = null;
+    selectedDirectoryPath = null;
     await refreshFiles();
   }
 
@@ -85,9 +104,12 @@ class EditorController extends ChangeNotifier {
     return true;
   }
 
-  Future<void> create(String name) async {
+  Future<void> create(String name, {String? rootPath}) async {
     try {
-      final document = await repository.create(workspace.rootPath, name);
+      final document = await repository.create(
+        rootPath ?? workspace.rootPath,
+        name,
+      );
       workspace = workspace.open(document);
       await refreshFiles();
       error = null;
@@ -98,9 +120,9 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> createFolder(String name) async {
+  Future<void> createFolder(String name, {String? rootPath}) async {
     try {
-      await repository.createDirectory(workspace.rootPath, name);
+      await repository.createDirectory(rootPath ?? workspace.rootPath, name);
       await refreshFiles();
       error = null;
     } catch (exception) {
@@ -168,10 +190,16 @@ class EditorController extends ChangeNotifier {
   Future<void> delete(String path) async {
     try {
       await repository.delete(path);
-      final index = workspace.documents.indexWhere(
-        (document) => document.path == path,
-      );
-      if (index >= 0) workspace = workspace.close(index);
+      final separator = Platform.pathSeparator;
+      final indexes = [
+        for (var index = workspace.documents.length - 1; index >= 0; index--)
+          if (workspace.documents[index].path == path ||
+              workspace.documents[index].path.startsWith('$path$separator'))
+            index,
+      ];
+      for (final index in indexes) {
+        workspace = workspace.close(index);
+      }
       await refreshFiles();
       error = null;
     } catch (exception) {
@@ -187,6 +215,18 @@ class EditorController extends ChangeNotifier {
   }
 
   bool get hasCutPath => cutPath != null;
+
+  void selectExplorerPath(String path, {required bool isDirectory}) {
+    selectedExplorerPath = path;
+    selectedDirectoryPath = isDirectory ? path : _parentDirectory(path);
+    notifyListeners();
+  }
+
+  String _parentDirectory(String path) {
+    final separatorIndex = path.lastIndexOf(Platform.pathSeparator);
+    if (separatorIndex <= 0) return workspace.rootPath;
+    return path.substring(0, separatorIndex);
+  }
 
   Future<void> paste(String targetDirectory) async {
     final sourcePath = cutPath;
@@ -245,7 +285,50 @@ class EditorController extends ChangeNotifier {
     searchMatches = active == null
         ? const []
         : findText(active.text, query, caseSensitive: caseSensitive);
+    currentMatchIndex = searchMatches.isEmpty ? -1 : 0;
     notifyListeners();
+  }
+
+  SearchMatch? get currentMatch =>
+      currentMatchIndex >= 0 && currentMatchIndex < searchMatches.length
+      ? searchMatches[currentMatchIndex]
+      : null;
+
+  void firstMatch() {
+    if (searchMatches.isEmpty) return;
+    currentMatchIndex = 0;
+    notifyListeners();
+  }
+
+  void previousMatch() {
+    if (searchMatches.isEmpty) return;
+    currentMatchIndex =
+        (currentMatchIndex - 1 + searchMatches.length) % searchMatches.length;
+    notifyListeners();
+  }
+
+  void nextMatch() {
+    if (searchMatches.isEmpty) return;
+    currentMatchIndex = (currentMatchIndex + 1) % searchMatches.length;
+    notifyListeners();
+  }
+
+  int replaceCurrent(String query, String replacement) {
+    final active = workspace.activeDocument;
+    final match = currentMatch;
+    if (active == null || match == null) return 0;
+    edit(
+      TextEdit(
+        offset: match.offset,
+        before: active.text.substring(
+          match.offset,
+          match.offset + match.length,
+        ),
+        after: replacement,
+      ),
+    );
+    search(query);
+    return 1;
   }
 
   int replaceAll(
@@ -264,18 +347,45 @@ class EditorController extends ChangeNotifier {
     if (result.count == 0) return 0;
     edit(TextEdit(offset: 0, before: active.text, after: result.text));
     searchMatches = const [];
+    currentMatchIndex = -1;
     return result.count;
   }
 
   void edit(TextEdit change) {
     workspace = applyEdit(workspace, change);
     searchMatches = const [];
+    diagnostics = const [];
     assistance = null;
     notifyListeners();
   }
 
+  Future<void> analyze() => compile();
+
+  EditorDiagnostic? diagnosticAt(int offset) {
+    for (final diagnostic in diagnostics) {
+      if (diagnostic.containsOffset(offset)) return diagnostic;
+    }
+    return null;
+  }
+
+  void applyCodeAction(EditorCodeAction action) {
+    final document = activeDocument;
+    if (document == null) return;
+    final offset = action.offset.clamp(0, document.text.length).toInt();
+    final end = (offset + action.length)
+        .clamp(offset, document.text.length)
+        .toInt();
+    edit(
+      TextEdit(
+        offset: offset,
+        before: document.text.substring(offset, end),
+        after: action.replacement,
+      ),
+    );
+  }
+
   Future<void> complete(int offset) async {
-    final service = assistant;
+    final service = languageServer;
     final active = workspace.activeDocument;
     if (service == null || active == null) return;
     try {
@@ -300,7 +410,7 @@ class EditorController extends ChangeNotifier {
   }
 
   Future<void> help(int offset) async {
-    final service = assistant;
+    final service = languageServer;
     final active = workspace.activeDocument;
     if (service == null || active == null) return;
     try {
@@ -337,19 +447,21 @@ class EditorController extends ChangeNotifier {
   }
 
   Future<void> compile() async {
-    final service = compiler;
-    if (service == null) return;
+    final service = languageServer;
     final active = workspace.activeDocument;
-    if (active == null) return;
-    final response = await service.compile(
-      rootPath: workspace.rootPath,
-      sourcePath: active.path,
-      documents: workspace.documents,
-    );
-    compilation = CompilationResult(
-      success: response['success'] == true,
-      payload: response,
-    );
+    if (service == null || active == null) return;
+    try {
+      final analysis = await service.analyze(
+        rootPath: workspace.rootPath,
+        sourcePath: active.path,
+        documents: workspace.documents,
+      );
+      compilation = analysis.compilation;
+      diagnostics = analysis.diagnostics;
+      error = null;
+    } catch (exception) {
+      error = exception;
+    }
     notifyListeners();
   }
 }
