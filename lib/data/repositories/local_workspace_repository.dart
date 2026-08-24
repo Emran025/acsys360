@@ -24,6 +24,18 @@ class LocalWorkspaceRepository implements WorkspaceRepository {
       Document(path: path, text: await File(path).readAsString());
 
   @override
+  Future<Document> create(String rootPath, String name) async {
+    final normalized = name.endsWith(sourceExtension)
+        ? name
+        : '$name$sourceExtension';
+    final file = File(
+      '${Directory(rootPath).path}${Platform.pathSeparator}$normalized',
+    );
+    await file.create(recursive: true, exclusive: true);
+    return Document(path: file.path, text: '');
+  }
+
+  @override
   Future<void> write(Document document) =>
       File(document.path).writeAsString(document.text);
 }

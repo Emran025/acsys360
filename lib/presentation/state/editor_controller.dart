@@ -64,6 +64,19 @@ class EditorController extends ChangeNotifier {
     return true;
   }
 
+  Future<void> create(String name) async {
+    try {
+      final document = await repository.create(workspace.rootPath, name);
+      workspace = workspace.open(document);
+      await refreshFiles();
+      error = null;
+    } catch (exception) {
+      error = exception;
+      notifyListeners();
+    }
+    notifyListeners();
+  }
+
   Future<void> open(String path) async {
     try {
       workspace = await openDocument(workspace, path);
