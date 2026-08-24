@@ -5,7 +5,7 @@ import '../theme/app_theme.dart';
 
 class ArabicCodeController extends TextEditingController {
   static final _tokenPattern = RegExp(
-    r'//[^\r\n]*|"(?:\\.|[^"\\])*"|[‘’][^‘’]*[‘’]|[0-9]+(?:\.[0-9]+)?|[ء-يً-ٟۑ-ے]+(?:_[ء-يً-ٟۑ-ے]+)*|[A-Za-z_][A-Za-z0-9_]*|==|!=|=<|=>|&&|\|\||[+\-*\/%\\^!<>=]|[{}()[\],.:;]',
+    r'//[^\r\n]*|"(?:\\.|[^"\\])*"|[‘’][^‘’]*[‘’]|[0-9]+(?:\.[0-9]+)?|[ء-يً-ٟۑ-ے]+(?:_[ء-يً-ٟۑ-ے]+)*|[A-Za-z_][A-Za-z0-9_]*|==|!=|=<|=>|&&|\|\||[+\-*\/%\\^!<>=]|[{}()[\],.:;؛،]',
   );
   static const _keywords = {
     'برنامج',
@@ -216,7 +216,12 @@ class ArabicCodeController extends TextEditingController {
     if (_types.contains(value)) return colors.tertiary;
     if (_keywords.contains(value)) return AppTheme.brandOrange;
     if (_operators.contains(value)) return colors.error;
-    if (_punctuation.contains(value)) return colors.outline;
+    if (_punctuation.contains(value) || value == '؛' || value == '،') {
+      return colors.outline;
+    }
+    if (RegExp(r'^[ء-يA-Za-z_]').hasMatch(value)) {
+      return colors.onSurfaceVariant;
+    }
     return null;
   }
 }

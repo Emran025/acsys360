@@ -31,7 +31,7 @@ void main() {
         repository: repository,
         compiler: compiler,
         assistant: compiler,
-        rootPath: Directory.current.path,
+        rootPath: '',
       ),
     ),
   );
@@ -288,18 +288,19 @@ class _EditorShellState extends State<EditorShell> {
     final end = (start + response.replaceLength)
         .clamp(start, document.text.length)
         .toInt();
-    final text = document.text.replaceRange(start, end, item.insertText);
+    final edit = TextEdit(
+      offset: start,
+      before: document.text.substring(start, end),
+      after: item.insertText,
+    );
+    widget.controller.edit(edit);
+    final text =
+        widget.controller.activeDocument?.text ??
+        document.text.replaceRange(start, end, item.insertText);
     textController.value = TextEditingValue(
       text: text,
       selection: TextSelection.collapsed(
         offset: start + item.insertText.length,
-      ),
-    );
-    widget.controller.edit(
-      TextEdit(
-        offset: start,
-        before: document.text.substring(start, end),
-        after: item.insertText,
       ),
     );
     widget.controller.clearAssist();
@@ -581,6 +582,7 @@ class _EditorShellState extends State<EditorShell> {
   Widget build(BuildContext context) {
     final controller = widget.controller;
     final active = controller.activeDocument;
+    final hasWorkspace = controller.workspace.rootPath.trim().isNotEmpty;
     return Shortcuts(
       shortcuts: const {
         SingleActivator(LogicalKeyboardKey.keyS, control: true, shift: true):
@@ -645,33 +647,41 @@ class _EditorShellState extends State<EditorShell> {
                 ),
                 Expanded(
                   child: Row(
-                    textDirection: TextDirection.rtl,
+                    textDirection: hasWorkspace
+                        ? TextDirection.rtl
+                        : TextDirection.ltr,
                     children: [
                       SizedBox(
                         width: 300,
-                        child: Directionality(
-                          textDirection: TextDirection.rtl,
-                          child: WorkspaceExplorer(
-                            rootPath: controller.workspace.rootPath,
-                            nodes: controller.tree,
-                            isLoading: isRefreshing,
-                            hasCutPath: controller.hasCutPath,
-                            selectedPath: controller.selectedExplorerPath,
-                            selectedDirectoryPath:
-                                controller.selectedDirectoryPath,
-                            onSelect: controller.selectExplorerPath,
-                            onChooseFolder: _pickWorkspace,
-                            onOpenFile: _openFile,
-                            onRefresh: _refreshFiles,
-                            onNewFile: _newFileAt,
-                            onNewFolder: _newFolderAt,
-                            onOpen: controller.open,
-                            onDelete: _deletePath,
-                            onRename: _renamePath,
-                            onCut: controller.cut,
-                            onPaste: controller.paste,
-                          ),
-                        ),
+                        child: hasWorkspace
+                            ? Directionality(
+                                textDirection: TextDirection.rtl,
+                                child: WorkspaceExplorer(
+                                  rootPath: controller.workspace.rootPath,
+                                  nodes: controller.tree,
+                                  isLoading: isRefreshing,
+                                  hasCutPath: controller.hasCutPath,
+                                  selectedPath: controller.selectedExplorerPath,
+                                  selectedDirectoryPath:
+                                      controller.selectedDirectoryPath,
+                                  onSelect: controller.selectExplorerPath,
+                                  onChooseFolder: _pickWorkspace,
+                                  onOpenFile: _openFile,
+                                  onRefresh: _refreshFiles,
+                                  onNewFile: _newFileAt,
+                                  onNewFolder: _newFolderAt,
+                                  onOpen: controller.open,
+                                  onDelete: _deletePath,
+                                  onRename: _renamePath,
+                                  onCut: controller.cut,
+                                  onPaste: controller.paste,
+                                ),
+                              )
+                            : _NoFolderExplorer(
+                                controller: controller,
+                                onChooseFolder: _pickWorkspace,
+                                onOpenFile: _openFile,
+                              ),
                       ),
                       const VerticalDivider(width: 1),
                       Expanded(
@@ -679,11 +689,16 @@ class _EditorShellState extends State<EditorShell> {
                           textDirection: TextDirection.rtl,
                           child: Column(
                             children: [
-                              _Tabs(controller: controller, onClose: _closeTab),
-                              _Breadcrumb(
-                                rootPath: controller.workspace.rootPath,
-                                activePath: active?.path,
+                              _Tabs(
+                                controller: controller,
+                                onClose: _closeTab,
+                                showWelcome: !hasWorkspace,
                               ),
+                              if (hasWorkspace)
+                                _Breadcrumb(
+                                  rootPath: controller.workspace.rootPath,
+                                  activePath: active?.path,
+                                ),
                               if (showFindReplace)
                                 FindReplaceBar(
                                   findController: findController,
@@ -991,7 +1006,12 @@ String _prettyJson(Object? value) {
 class _Tabs extends StatefulWidget {
   final EditorController controller;
   final Future<void> Function(int index) onClose;
-  const _Tabs({required this.controller, required this.onClose});
+  final bool showWelcome;
+  const _Tabs({
+    required this.controller,
+    required this.onClose,
+    this.showWelcome = false,
+  });
 
   @override
   State<_Tabs> createState() => _TabsState();
@@ -1009,6 +1029,7 @@ class _TabsState extends State<_Tabs> {
   @override
   Widget build(BuildContext context) {
     final documents = widget.controller.workspace.documents;
+    final welcomeOffset = widget.showWelcome ? 1 : 0;
     return SizedBox(
       height: 38,
       child: Row(
@@ -1023,15 +1044,19 @@ class _TabsState extends State<_Tabs> {
             child: ListView.separated(
               controller: _scrollController,
               scrollDirection: Axis.horizontal,
-              itemCount: documents.length,
+              itemCount: documents.length + welcomeOffset,
               separatorBuilder: (_, _) => const SizedBox(width: 1),
               itemBuilder: (context, index) {
-                final document = documents[index];
+                if (widget.showWelcome && index == 0) {
+                  return _WelcomeTab();
+                }
+                final documentIndex = index - welcomeOffset;
+                final document = documents[documentIndex];
                 final active =
                     document.path == widget.controller.activeDocument?.path;
                 final name = document.path.split(Platform.pathSeparator).last;
                 return InkWell(
-                  onTap: () => widget.controller.selectTab(index),
+                  onTap: () => widget.controller.selectTab(documentIndex),
                   child: Container(
                     constraints: const BoxConstraints(
                       minWidth: 118,
@@ -1078,7 +1103,7 @@ class _TabsState extends State<_Tabs> {
                         ),
                         IconButton(
                           tooltip: 'إغلاق الملف',
-                          onPressed: () => widget.onClose(index),
+                          onPressed: () => widget.onClose(documentIndex),
                           icon: const Icon(Icons.close_rounded, size: 15),
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(
@@ -1164,6 +1189,194 @@ IconData _tabFileIcon(String path) {
     'png' || 'jpg' || 'jpeg' || 'svg' => Icons.image_outlined,
     _ => Icons.insert_drive_file_outlined,
   };
+}
+
+class _WelcomeTab extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Container(
+    constraints: const BoxConstraints(minWidth: 118),
+    padding: const EdgeInsets.symmetric(horizontal: 10),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      border: Border(
+        bottom: BorderSide(
+          color: Theme.of(context).colorScheme.primary,
+          width: 2,
+        ),
+      ),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      textDirection: TextDirection.ltr,
+      children: [
+        Icon(
+          Icons.home_outlined,
+          size: 16,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+        const SizedBox(width: 7),
+        const Text('Welcome'),
+        const SizedBox(width: 8),
+        const Icon(Icons.close_rounded, size: 15),
+      ],
+    ),
+  );
+}
+
+class _NoFolderExplorer extends StatelessWidget {
+  final EditorController controller;
+  final Future<void> Function() onChooseFolder;
+  final Future<void> Function() onOpenFile;
+
+  const _NoFolderExplorer({
+    required this.controller,
+    required this.onChooseFolder,
+    required this.onOpenFile,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Material(
+      color: colors.surfaceContainerLow,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 8, 4),
+            child: Row(
+              children: [
+                Text(
+                  'Explorer',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const Spacer(),
+                IconButton(
+                  tooltip: 'فتح ملف',
+                  onPressed: onOpenFile,
+                  icon: const Icon(Icons.note_add_outlined, size: 18),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 30,
+                    minHeight: 30,
+                  ),
+                  style: IconButton.styleFrom(
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.zero,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          _NoFolderSectionTitle(
+            icon: Icons.keyboard_arrow_down_rounded,
+            title: 'Open Editors',
+          ),
+          if (controller.workspace.documents.isEmpty)
+            const _OpenEditorRow()
+          else
+            for (
+              var index = 0;
+              index < controller.workspace.documents.length;
+              index++
+            )
+              ListTile(
+                dense: true,
+                visualDensity: VisualDensity.compact,
+                contentPadding: const EdgeInsetsDirectional.only(
+                  start: 10,
+                  end: 8,
+                ),
+                leading: Icon(
+                  _tabFileIcon(controller.workspace.documents[index].path),
+                  size: 17,
+                ),
+                title: Text(
+                  controller.workspace.documents[index].path
+                      .split(Platform.pathSeparator)
+                      .last,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                onTap: () => controller.selectTab(index),
+              ),
+          const Divider(height: 1),
+          const _NoFolderSectionTitle(
+            icon: Icons.keyboard_arrow_down_rounded,
+            title: 'No Folder Opened',
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(22, 18, 22, 18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'لم يتم فتح مجلد بعد.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 14),
+                  FilledButton.icon(
+                    onPressed: onChooseFolder,
+                    icon: const Icon(Icons.folder_open_outlined, size: 18),
+                    label: const Text('فتح مجلد'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.zero,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'فتح مجلد سيعرض شجرة المشروع هنا، بينما تبقى الملفات المفتوحة مستقلة عن Workspace.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NoFolderSectionTitle extends StatelessWidget {
+  final IconData icon;
+  final String title;
+
+  const _NoFolderSectionTitle({required this.icon, required this.title});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+    child: Row(
+      children: [
+        Icon(icon, size: 17),
+        const SizedBox(width: 4),
+        Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+      ],
+    ),
+  );
+}
+
+class _OpenEditorRow extends StatelessWidget {
+  const _OpenEditorRow();
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+    dense: true,
+    visualDensity: VisualDensity.compact,
+    contentPadding: const EdgeInsetsDirectional.only(start: 10, end: 8),
+    leading: const Icon(Icons.home_outlined, size: 17),
+    title: const Text('Welcome'),
+  );
 }
 
 class _Breadcrumb extends StatelessWidget {
