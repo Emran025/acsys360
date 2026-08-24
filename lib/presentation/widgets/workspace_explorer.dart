@@ -330,45 +330,48 @@ class _WorkspaceTreeNode extends StatelessWidget {
               : null,
           borderRadius: BorderRadius.circular(8),
         ),
-        child: ExpansionTile(
-          initiallyExpanded: false,
-          onExpansionChanged: (_) => onSelect(node.path, isDirectory: true),
-          tilePadding: const EdgeInsets.symmetric(horizontal: 8),
-          childrenPadding: const EdgeInsetsDirectional.only(start: 14),
-          leading: const Icon(Icons.folder_outlined, size: 19),
-          title: Text(node.name, overflow: TextOverflow.ellipsis),
-          children: [
-            Padding(
-              padding: const EdgeInsetsDirectional.only(start: 14),
-              child: Row(
-                children: [
-                  _TreeAction(
-                    tooltip: 'ملف جديد داخل ${node.name}',
-                    icon: Icons.note_add_outlined,
-                    onPressed: () => onNewFile(node.path),
-                  ),
-                  _TreeAction(
-                    tooltip: 'مجلد جديد داخل ${node.name}',
-                    icon: Icons.create_new_folder_outlined,
-                    onPressed: () => onNewFolder(node.path),
-                  ),
-                ],
+        child: Material(
+          color: Colors.transparent,
+          child: ExpansionTile(
+            initiallyExpanded: false,
+            onExpansionChanged: (_) => onSelect(node.path, isDirectory: true),
+            tilePadding: const EdgeInsets.symmetric(horizontal: 8),
+            childrenPadding: const EdgeInsetsDirectional.only(start: 14),
+            leading: const Icon(Icons.folder_outlined, size: 19),
+            title: Text(node.name, overflow: TextOverflow.ellipsis),
+            children: [
+              Padding(
+                padding: const EdgeInsetsDirectional.only(start: 14),
+                child: Row(
+                  children: [
+                    _TreeAction(
+                      tooltip: 'ملف جديد داخل ${node.name}',
+                      icon: Icons.note_add_outlined,
+                      onPressed: () => onNewFile(node.path),
+                    ),
+                    _TreeAction(
+                      tooltip: 'مجلد جديد داخل ${node.name}',
+                      icon: Icons.create_new_folder_outlined,
+                      onPressed: () => onNewFolder(node.path),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            for (final child in node.children)
-              _WorkspaceTreeNode(
-                node: child,
-                hasCutPath: hasCutPath,
-                selectedPath: selectedPath,
-                onSelect: onSelect,
-                onOpen: onOpen,
-                onDelete: onDelete,
-                onCut: onCut,
-                onPaste: onPaste,
-                onNewFile: onNewFile,
-                onNewFolder: onNewFolder,
-              ),
-          ],
+              for (final child in node.children)
+                _WorkspaceTreeNode(
+                  node: child,
+                  hasCutPath: hasCutPath,
+                  selectedPath: selectedPath,
+                  onSelect: onSelect,
+                  onOpen: onOpen,
+                  onDelete: onDelete,
+                  onCut: onCut,
+                  onPaste: onPaste,
+                  onNewFile: onNewFile,
+                  onNewFolder: onNewFolder,
+                ),
+            ],
+          ),
         ),
       ),
     );
