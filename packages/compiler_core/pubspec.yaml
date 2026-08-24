@@ -2,4 +2,11 @@ name: compiler_core
 description: Arabic teaching-language compiler core.
 publish_to: none
 environment:
-  sdk: '>=3.12.0 <4.0.0'
+  sdk: '>=3.12.2 <4.0.0'
+
+dependencies:
+  compiler_contracts:
+    path: ../compiler_contracts
+
+dev_dependencies:
+  test: ^1.26.2
