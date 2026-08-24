@@ -75,7 +75,9 @@ class WorkspaceExplorer extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
+            child: Wrap(
+              spacing: 2,
+              runSpacing: 2,
               children: [
                 _ExplorerAction(
                   key: const ValueKey('workspace-new-file'),
@@ -98,7 +100,6 @@ class WorkspaceExplorer extends StatelessWidget {
                   tooltip: 'فتح ملف عربي',
                   onPressed: onOpenFile,
                 ),
-                const Spacer(),
                 IconButton(
                   onPressed: onChooseFolder,
                   tooltip: 'اختيار مجلد Workspace',
