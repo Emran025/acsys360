@@ -5,11 +5,13 @@ import '../theme/app_theme.dart';
 class LineNumberedEditor extends StatefulWidget {
   final TextEditingController controller;
   final ValueChanged<String>? onChanged;
+  final VoidCallback? onTap;
 
   const LineNumberedEditor({
     super.key,
     required this.controller,
     this.onChanged,
+    this.onTap,
   });
 
   @override
@@ -118,6 +120,7 @@ class _LineNumberedEditorState extends State<LineNumberedEditor> {
                 controller: widget.controller,
                 scrollController: editorScrollController,
                 onChanged: widget.onChanged,
+                onTap: widget.onTap,
                 expands: true,
                 maxLines: null,
                 minLines: null,
