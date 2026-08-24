@@ -224,9 +224,14 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        home: SizedBox(
-          height: 180,
-          child: LineNumberedEditor(controller: controller),
+        home: Material(
+          child: SizedBox(
+            height: 180,
+            child: LineNumberedEditor(
+              controller: controller,
+              diagnostics: controller.diagnostics,
+            ),
+          ),
         ),
       ),
     );
