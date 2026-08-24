@@ -23,6 +23,8 @@ void main() {
       },
       mode: CompilationMode.project,
       entryPath: '/workspace/project/main.arb',
+      target: 'dart-native',
+      artifactDirectory: '/workspace/project/build',
     );
 
     final decoded = CompilationRequest.fromJson(
@@ -34,6 +36,8 @@ void main() {
     expect(decoded.sourceTexts, request.sourceTexts);
     expect(decoded.mode, CompilationMode.project);
     expect(decoded.entryPath, request.entryPath);
+    expect(decoded.target, 'dart-native');
+    expect(decoded.artifactDirectory, '/workspace/project/build');
   });
 
   test('round-trips response stages and typed diagnostics', () {

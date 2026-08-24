@@ -34,6 +34,8 @@ class ProcessCompilerRepository
     required String rootPath,
     required String sourcePath,
     required List<Document> documents,
+    String target = 'none',
+    String? artifactDirectory,
   }) async {
     if (sourcePath.isEmpty) {
       return _processFailure('لا يوجد ملف للترجمة', -1);
@@ -52,6 +54,8 @@ class ProcessCompilerRepository
       sourceTexts: sourceTexts,
       mode: mode,
       entryPath: sourcePath,
+      target: target,
+      artifactDirectory: artifactDirectory,
     );
 
     try {
