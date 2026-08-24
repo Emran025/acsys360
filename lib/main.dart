@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import 'data/repositories/local_workspace_repository.dart';
@@ -76,6 +77,13 @@ class _EditorShellState extends State<EditorShell> {
     }
   }
 
+  Future<void> _pickWorkspace() async {
+    final path = await FilePicker.getDirectoryPath(
+      dialogTitle: 'اختر مجلد المشروع',
+    );
+    if (path != null && mounted) await widget.controller.changeRoot(path);
+  }
+
   void _onTextChanged(String value) {
     final document = widget.controller.activeDocument;
     if (document == null || value == document.text) return;
@@ -94,6 +102,11 @@ class _EditorShellState extends State<EditorShell> {
         appBar: AppBar(
           title: const Text('محرر اللغة العربية'),
           actions: [
+            IconButton(
+              onPressed: _pickWorkspace,
+              icon: const Icon(Icons.folder_open),
+              tooltip: 'فتح مجلد',
+            ),
             IconButton(
               onPressed: controller.refreshFiles,
               icon: const Icon(Icons.refresh),

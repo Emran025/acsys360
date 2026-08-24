@@ -33,6 +33,13 @@ class EditorController extends ChangeNotifier {
 
   Document? get activeDocument => workspace.activeDocument;
 
+  Future<void> changeRoot(String rootPath) async {
+    workspace = Workspace(rootPath: rootPath);
+    files = const [];
+    compilation = null;
+    await refreshFiles();
+  }
+
   Future<void> refreshFiles() async {
     try {
       files = await repository.listFiles(workspace.rootPath);
