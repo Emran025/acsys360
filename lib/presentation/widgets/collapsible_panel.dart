@@ -50,6 +50,7 @@ class CollapsiblePanel extends StatelessWidget {
                     ),
                     const Spacer(),
                     IconButton(
+                      key: ValueKey('collapse-$title'),
                       onPressed: onToggle,
                       tooltip: expanded ? 'طي اللوحة' : 'توسيع اللوحة',
                       icon: Icon(

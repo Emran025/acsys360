@@ -4,6 +4,7 @@ import 'package:acsys360/domain/repositories/workspace_repository.dart';
 import 'package:acsys360/main.dart';
 import 'package:acsys360/presentation/state/editor_controller.dart';
 import 'package:acsys360/presentation/widgets/line_numbered_editor.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class FakeWorkspaceRepository implements WorkspaceRepository {
@@ -70,8 +71,11 @@ void main() {
     await tester.pump();
     expect(find.byTooltip('الوضع الداكن'), findsOneWidget);
     expect(find.byTooltip('ألوان الثيم'), findsOneWidget);
-    expect(find.byTooltip('طي الشريط العلوي'), findsOneWidget);
-    expect(find.byTooltip('طي اللوحة'), findsOneWidget);
+    expect(find.byKey(const ValueKey('topbar-toggle')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('collapse-نتائج الترجمة')),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byTooltip('ألوان الثيم'));
     await tester.pump();
@@ -79,12 +83,15 @@ void main() {
     await tester.tap(find.text('زمردي'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('طي الشريط العلوي'));
+    await tester.tap(find.byKey(const ValueKey('topbar-toggle')));
     await tester.pumpAndSettle();
-    expect(find.byTooltip('توسيع الشريط العلوي'), findsOneWidget);
+    expect(find.byKey(const ValueKey('topbar-toggle')), findsOneWidget);
 
-    await tester.tap(find.byTooltip('طي اللوحة'));
+    await tester.tap(find.byKey(const ValueKey('collapse-نتائج الترجمة')));
     await tester.pumpAndSettle();
-    expect(find.byTooltip('توسيع اللوحة'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('collapse-نتائج الترجمة')),
+      findsOneWidget,
+    );
   });
 }

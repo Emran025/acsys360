@@ -162,6 +162,7 @@ class EditorTopBar extends StatelessWidget {
               ),
             ],
             IconButton(
+              key: const ValueKey('topbar-toggle'),
               onPressed: onToggleExpanded,
               tooltip: expanded ? 'طي الشريط العلوي' : 'توسيع الشريط العلوي',
               icon: Icon(
