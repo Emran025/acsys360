@@ -145,12 +145,14 @@ class SymbolRecord {
 class CompilationRequest {
   final String rootPath;
   final List<String> sourcePaths;
+  final Map<String, String> sourceTexts;
   final CompilationMode mode;
   final String? entryPath;
 
   const CompilationRequest({
     required this.rootPath,
     required this.sourcePaths,
+    this.sourceTexts = const {},
     this.mode = CompilationMode.project,
     this.entryPath,
   });
@@ -159,6 +161,7 @@ class CompilationRequest {
     'protocolVersion': protocolVersion,
     'rootPath': rootPath,
     'sourcePaths': sourcePaths,
+    'sourceTexts': sourceTexts,
     'mode': mode.value,
     'entryPath': entryPath,
   };
@@ -166,12 +169,14 @@ class CompilationRequest {
   factory CompilationRequest.fromJson(Map<String, dynamic> json) {
     _checkProtocolVersion(json);
     final sourcePaths = _requiredStringList(json, 'sourcePaths');
+    final sourceTexts = _optionalStringMap(json['sourceTexts']);
     if (sourcePaths.isEmpty) {
       throw const FormatException('يجب تمرير ملف مصدر واحد على الأقل');
     }
     return CompilationRequest(
       rootPath: _requiredString(json, 'rootPath'),
       sourcePaths: sourcePaths,
+      sourceTexts: sourceTexts,
       mode: CompilationModeJson.parse(json['mode'] ?? 'project'),
       entryPath: _optionalString(json['entryPath']),
     );
@@ -279,6 +284,19 @@ List<String> _requiredStringList(Map<String, dynamic> json, String key) {
     return [for (final item in value) item as String];
   }
   throw FormatException('الحقل $key يجب أن يكون قائمة نصوص');
+}
+
+Map<String, String> _optionalStringMap(Object? value) {
+  if (value == null) return const {};
+  if (value is Map &&
+      value.keys.every((key) => key is String) &&
+      value.values.every((item) => item is String)) {
+    return {
+      for (final entry in value.entries)
+        entry.key as String: entry.value as String,
+    };
+  }
+  throw const FormatException('الحقل sourceTexts يجب أن يكون خريطة نصوص');
 }
 
 List<Map<String, dynamic>> _requiredMapList(
