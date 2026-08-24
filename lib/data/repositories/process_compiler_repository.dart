@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:compiler_contracts/compiler_contracts.dart';
 
-import '../../domain/entities/compilation_result.dart';
 import '../../domain/entities/document.dart';
 import '../../domain/repositories/workspace_repository.dart';
 
@@ -36,10 +35,7 @@ class ProcessCompilerRepository implements CompilerRepository {
     required List<Document> documents,
   }) async {
     if (sourcePath.isEmpty) {
-      return const CompilationResult(
-        success: false,
-        payload: {'diagnostics': [], 'message': 'لا يوجد ملف للترجمة'},
-      ).payload;
+      return _processFailure('لا يوجد ملف للترجمة', -1);
     }
 
     final sourcePaths = <String>{
