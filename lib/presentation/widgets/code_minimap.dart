@@ -111,13 +111,7 @@ class _CodeMinimapState extends State<CodeMinimap> {
 class _MinimapSection {
   final int line;
   final String label;
-  final int depth;
-
-  const _MinimapSection({
-    required this.line,
-    required this.label,
-    this.depth = 0,
-  });
+  const _MinimapSection({required this.line, required this.label});
 }
 
 List<_MinimapSection> _sections(List<String> lines) {
