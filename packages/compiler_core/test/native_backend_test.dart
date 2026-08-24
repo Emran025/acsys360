@@ -24,6 +24,19 @@ void main() {
     },
   );
 
+  test('matches interpreter for typed input and arithmetic', () async {
+    await _expectNativeParity(
+      '''
+برنامج ادخال؛ {
+متغير س: صحيح;
+اقرا(س);
+اطبع(س * 2);
+}.
+''',
+      input: const ['7'],
+    );
+  });
+
   test(
     'matches interpreter for if, repeat, and repeat-until control flow',
     () async {
@@ -31,6 +44,7 @@ void main() {
 برنامج تحكم؛ {
 متغير س: صحيح;
 س = 0;
+اذا(س == 0) فان { س = 1; } والا { س = 99; };
 كرر(س = 1 الى 5 اضف 2) {
 اطبع(س);
 }
@@ -101,9 +115,12 @@ void main() {
   );
 }
 
-Future<void> _expectNativeParity(String source) async {
+Future<void> _expectNativeParity(
+  String source, {
+  List<String> input = const [],
+}) async {
   final program = _parse(source);
-  final interpreted = const Interpreter().execute(program);
+  final interpreted = const Interpreter().execute(program, input: input);
   expect(
     interpreted.success,
     isTrue,
@@ -121,9 +138,20 @@ Future<void> _expectNativeParity(String source) async {
   );
   expect(native.success, isTrue, reason: native.diagnostics.join('\n'));
 
-  final process = await Process.run(native.executablePath!, []);
-  expect(process.exitCode, 0, reason: '${process.stdout}\n${process.stderr}');
-  expect(process.stdout.toString().trim(), interpreted.output.join('\n'));
+  final process = await Process.start(native.executablePath!, []);
+  if (input.isNotEmpty) {
+    process.stdin.write('${input.join('\n')}\n');
+  }
+  await process.stdin.close();
+  final stdout = await process.stdout
+      .transform(SystemEncoding().decoder)
+      .join();
+  final stderr = await process.stderr
+      .transform(SystemEncoding().decoder)
+      .join();
+  final exitCode = await process.exitCode;
+  expect(exitCode, 0, reason: '$stdout\n$stderr');
+  expect(stdout.trim(), interpreted.output.join('\n'));
 }
 
 ProgramNode _parse(String source) {
@@ -131,13 +159,13 @@ ProgramNode _parse(String source) {
   expect(
     lexical.diagnostics,
     isEmpty,
-    reason: lexical.diagnostics.map((item) => item.message).join('\\n'),
+    reason: lexical.diagnostics.map((item) => item.message).join('\n'),
   );
   final parsed = Parser(lexical.tokens).parse();
   expect(
     parsed.diagnostics,
     isEmpty,
-    reason: parsed.diagnostics.map((item) => item.message).join('\\n'),
+    reason: parsed.diagnostics.map((item) => item.message).join('\n'),
   );
   return parsed.program!;
 }
