@@ -31,14 +31,19 @@ class Workspace {
     return copyWith(documents: next);
   }
 
-  Workspace closeActive() {
-    if (activeIndex < 0) return this;
-    final next = [...documents]..removeAt(activeIndex);
-    final nextIndex = next.isEmpty
-        ? -1
-        : (activeIndex >= next.length ? next.length - 1 : activeIndex);
+  Workspace close(int index) {
+    if (index < 0 || index >= documents.length) return this;
+    final next = [...documents]..removeAt(index);
+    if (next.isEmpty) return copyWith(documents: next, activeIndex: -1);
+    final nextIndex = activeIndex > index
+        ? activeIndex - 1
+        : (activeIndex == index
+              ? (index >= next.length ? next.length - 1 : index)
+              : activeIndex);
     return copyWith(documents: next, activeIndex: nextIndex);
   }
+
+  Workspace closeActive() => close(activeIndex);
 
   Workspace select(int index) => index >= 0 && index < documents.length
       ? copyWith(activeIndex: index)

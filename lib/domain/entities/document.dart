@@ -38,6 +38,7 @@ class Document {
       text: nextText,
       savedText: savedText,
       undoStack: [...undoStack, change],
+      redoStack: const [],
     );
   }
 
