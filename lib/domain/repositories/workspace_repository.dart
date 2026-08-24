@@ -3,6 +3,7 @@ import '../entities/document.dart';
 abstract interface class WorkspaceRepository {
   Future<List<String>> listFiles(String rootPath);
   Future<Document> read(String path);
+  Future<Document> create(String rootPath, String name);
   Future<void> write(Document document);
 }
 

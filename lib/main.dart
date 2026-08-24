@@ -77,6 +77,35 @@ class _EditorShellState extends State<EditorShell> {
     }
   }
 
+  Future<void> _newFile() async {
+    final nameController = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('ملف جديد'),
+        content: TextField(
+          controller: nameController,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'اسم الملف'),
+          onSubmitted: (value) => Navigator.pop(context, value),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, nameController.text),
+            child: const Text('إنشاء'),
+          ),
+        ],
+      ),
+    );
+    nameController.dispose();
+    if (name != null && name.trim().isNotEmpty)
+      await widget.controller.create(name.trim());
+  }
+
   Future<void> _pickWorkspace() async {
     final path = await FilePicker.getDirectoryPath(
       dialogTitle: 'اختر مجلد المشروع',
@@ -133,6 +162,11 @@ class _EditorShellState extends State<EditorShell> {
               onPressed: _pickWorkspace,
               icon: const Icon(Icons.folder_open),
               tooltip: 'فتح مجلد',
+            ),
+            IconButton(
+              onPressed: _newFile,
+              icon: const Icon(Icons.note_add),
+              tooltip: 'ملف جديد',
             ),
             IconButton(
               onPressed: controller.refreshFiles,
