@@ -8,9 +8,13 @@ import 'package:flutter/services.dart';
 import 'data/repositories/local_workspace_repository.dart';
 import 'data/repositories/process_compiler_repository.dart';
 import 'domain/entities/document.dart';
-import 'domain/entities/file_node.dart';
 import 'presentation/state/editor_controller.dart';
+import 'presentation/theme/app_theme.dart';
+import 'presentation/widgets/editor_dialogs.dart';
+import 'presentation/widgets/editor_top_bar.dart';
 import 'presentation/widgets/find_replace_bar.dart';
+import 'presentation/widgets/line_numbered_editor.dart';
+import 'presentation/widgets/workspace_explorer.dart';
 
 void main() {
   final repository = LocalWorkspaceRepository();
@@ -79,16 +83,8 @@ class _ArabicEditorAppState extends State<ArabicEditorApp> {
       debugShowCheckedModeBanner: false,
       title: 'محرر اللغة العربية',
       themeMode: themeMode,
-      theme: ThemeData(
-        colorSchemeSeed: Colors.indigo,
-        brightness: Brightness.light,
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData(
-        colorSchemeSeed: Colors.indigo,
-        brightness: Brightness.dark,
-        useMaterial3: true,
-      ),
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
       home: EditorShell(
         controller: widget.controller,
         onToggleTheme: _toggleTheme,
@@ -120,6 +116,7 @@ class _EditorShellState extends State<EditorShell> {
   final replaceController = TextEditingController();
   String? boundPath;
   bool showFindReplace = false;
+  bool isRefreshing = false;
 
   @override
   void initState() {
@@ -135,6 +132,16 @@ class _EditorShellState extends State<EditorShell> {
     findController.dispose();
     replaceController.dispose();
     super.dispose();
+  }
+
+  Future<void> _refreshFiles() async {
+    if (isRefreshing) return;
+    setState(() => isRefreshing = true);
+    try {
+      await widget.controller.refreshFiles();
+    } finally {
+      if (mounted) setState(() => isRefreshing = false);
+    }
   }
 
   void _syncDocument() {
@@ -167,50 +174,18 @@ class _EditorShellState extends State<EditorShell> {
       ),
     );
     widget.controller.edit(
-      TextEdit(offset: start, before: document.text, after: text),
+      TextEdit(
+        offset: start,
+        before: document.text.substring(start, end),
+        after: item.insertText,
+      ),
     );
     widget.controller.clearAssist();
   }
 
   Future<void> _newFile() async {
-    final nameController = TextEditingController();
-    final name = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('ملف جديد'),
-        content: TextField(
-          controller: nameController,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'اسم الملف'),
-          onSubmitted: (value) => Navigator.pop(context, value),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('إلغاء'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, nameController.text),
-            child: const Text('إنشاء'),
-          ),
-        ],
-      ),
-    );
-    nameController.dispose();
-    if (name != null && name.trim().isNotEmpty) {
-      await widget.controller.create(name.trim());
-    }
-  }
-
-  Future<void> _pickFile() async {
-    final file = await FilePicker.pickFile(
-      type: FileType.custom,
-      allowedExtensions: ['arb'],
-    );
-    final path = file?.path;
-    if (path != null && mounted) {
-      await widget.controller.open(path);
-    }
+    final name = await showNewFileDialog(context);
+    if (name != null && mounted) await widget.controller.create(name);
   }
 
   Future<void> _pickWorkspace() async {
@@ -224,29 +199,9 @@ class _EditorShellState extends State<EditorShell> {
 
   Future<void> _closeTab(int index) async {
     final document = widget.controller.workspace.documents[index];
-    if (document.isDirty) {
-      final discard = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('تغييرات غير محفوظة'),
-          content: Text(
-            'هل تريد إغلاق ${document.path.split(Platform.pathSeparator).last} دون حفظ؟',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('إلغاء'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('إغلاق دون حفظ'),
-            ),
-          ],
-        ),
-      );
-      if (discard != true) {
-        return;
-      }
+    if (document.isDirty &&
+        !await confirmDiscardDialog(context, path: document.path)) {
+      return;
     }
     widget.controller.closeTab(index, discard: document.isDirty);
   }
@@ -279,8 +234,27 @@ class _EditorShellState extends State<EditorShell> {
   void _onTextChanged(String value) {
     final document = widget.controller.activeDocument;
     if (document == null || value == document.text) return;
+    final before = document.text;
+    var start = 0;
+    while (start < before.length &&
+        start < value.length &&
+        before.codeUnitAt(start) == value.codeUnitAt(start)) {
+      start++;
+    }
+    var beforeEnd = before.length;
+    var valueEnd = value.length;
+    while (beforeEnd > start &&
+        valueEnd > start &&
+        before.codeUnitAt(beforeEnd - 1) == value.codeUnitAt(valueEnd - 1)) {
+      beforeEnd--;
+      valueEnd--;
+    }
     widget.controller.edit(
-      TextEdit(offset: 0, before: document.text, after: value),
+      TextEdit(
+        offset: start,
+        before: before.substring(start, beforeEnd),
+        after: value.substring(start, valueEnd),
+      ),
     );
   }
 
@@ -332,129 +306,79 @@ class _EditorShellState extends State<EditorShell> {
         child: Directionality(
           textDirection: TextDirection.rtl,
           child: Scaffold(
-            appBar: AppBar(
-              title: const Text('محرر اللغة العربية'),
-              actions: [
-                IconButton(
-                  onPressed: _pickWorkspace,
-                  icon: const Icon(Icons.folder_open),
-                  tooltip: 'فتح مجلد',
-                ),
-                IconButton(
-                  onPressed: _newFile,
-                  icon: const Icon(Icons.note_add),
-                  tooltip: 'ملف جديد',
-                ),
-                IconButton(
-                  onPressed: _pickFile,
-                  icon: const Icon(Icons.description),
-                  tooltip: 'فتح ملف',
-                ),
-                IconButton(
-                  onPressed: controller.refreshFiles,
-                  icon: const Icon(Icons.refresh),
-                  tooltip: 'تحديث',
-                ),
-                IconButton(
-                  onPressed: controller.undo,
-                  icon: const Icon(Icons.undo),
-                  tooltip: 'تراجع',
-                ),
-                IconButton(
-                  onPressed: controller.redo,
-                  icon: const Icon(Icons.redo),
-                  tooltip: 'إعادة',
-                ),
-                IconButton(
-                  onPressed: controller.save,
-                  icon: const Icon(Icons.save),
-                  tooltip: 'حفظ',
-                ),
-                IconButton(
-                  onPressed: controller.saveAll,
-                  icon: const Icon(Icons.save_as),
-                  tooltip: 'حفظ الكل',
-                ),
-                IconButton(
-                  onPressed: widget.onToggleTheme,
-                  icon: Icon(
-                    widget.isDark ? Icons.light_mode : Icons.dark_mode,
-                  ),
-                  tooltip: widget.isDark ? 'الوضع الفاتح' : 'الوضع الداكن',
-                ),
-                IconButton(
-                  onPressed: _toggleFindReplace,
-                  icon: const Icon(Icons.search),
-                  tooltip: 'بحث واستبدال',
-                ),
-                IconButton(
-                  onPressed: () => controller.complete(_cursorOffset),
-                  icon: const Icon(Icons.auto_awesome),
-                  tooltip: 'إكمال Ctrl+Space',
-                ),
-                IconButton(
-                  onPressed: () => controller.help(_cursorOffset),
-                  icon: const Icon(Icons.lightbulb_outline),
-                  tooltip: 'مساعدة F1',
-                ),
-                IconButton(
-                  onPressed: controller.compile,
-                  icon: const Icon(Icons.play_arrow),
-                  tooltip: 'ترجمة',
-                ),
-              ],
-            ),
-            body: Row(
+            body: Column(
               children: [
-                SizedBox(width: 260, child: _Explorer(controller: controller)),
-                const VerticalDivider(width: 1),
+                EditorTopBar(
+                  rootPath: controller.workspace.rootPath,
+                  activePath: active?.path,
+                  isDark: widget.isDark,
+                  onChooseFolder: _pickWorkspace,
+                  onSave: controller.save,
+                  onSaveAll: controller.saveAll,
+                  onUndo: controller.undo,
+                  onRedo: controller.redo,
+                  onFind: _toggleFindReplace,
+                  onComplete: () => controller.complete(_cursorOffset),
+                  onHelp: () => controller.help(_cursorOffset),
+                  onCompile: controller.compile,
+                  onToggleTheme: widget.onToggleTheme ?? () {},
+                ),
                 Expanded(
-                  child: Column(
+                  child: Row(
                     children: [
-                      _Tabs(controller: controller, onClose: _closeTab),
-                      if (showFindReplace)
-                        FindReplaceBar(
-                          findController: findController,
-                          replaceController: replaceController,
-                          matches: controller.searchMatches.length,
-                          onSearch: _search,
-                          onReplaceAll: _replaceAll,
-                          onClose: _toggleFindReplace,
-                        ),
-                      if (controller.assistance != null)
-                        _AssistPanel(
-                          response: controller.assistance!,
-                          onSelect: _applyCompletion,
-                          onClose: controller.clearAssist,
-                        ),
-                      Expanded(
-                        child: active == null
-                            ? const Center(
-                                child: Text('افتح ملفًا من مستكشف المشروع'),
-                              )
-                            : TextField(
-                                controller: textController,
-                                onChanged: _onTextChanged,
-                                expands: true,
-                                maxLines: null,
-                                textDirection: TextDirection.rtl,
-                                style: const TextStyle(
-                                  fontFamily: 'monospace',
-                                  fontSize: 15,
-                                ),
-                                decoration: const InputDecoration(
-                                  contentPadding: EdgeInsets.all(16),
-                                  border: InputBorder.none,
-                                ),
-                              ),
-                      ),
-                      const Divider(height: 1),
                       SizedBox(
-                        height: 120,
-                        child: _DiagnosticsPanel(controller: controller),
+                        width: 300,
+                        child: WorkspaceExplorer(
+                          rootPath: controller.workspace.rootPath,
+                          nodes: controller.tree,
+                          isLoading: isRefreshing,
+                          onChooseFolder: _pickWorkspace,
+                          onRefresh: _refreshFiles,
+                          onNewFile: _newFile,
+                          onOpen: controller.open,
+                        ),
                       ),
-                      const Divider(height: 1),
-                      _StatusBar(controller: controller),
+                      const VerticalDivider(width: 1),
+                      Expanded(
+                        child: Column(
+                          children: [
+                            _Tabs(controller: controller, onClose: _closeTab),
+                            if (showFindReplace)
+                              FindReplaceBar(
+                                findController: findController,
+                                replaceController: replaceController,
+                                matches: controller.searchMatches.length,
+                                onSearch: _search,
+                                onReplaceAll: _replaceAll,
+                                onClose: _toggleFindReplace,
+                              ),
+                            if (controller.assistance != null)
+                              _AssistPanel(
+                                response: controller.assistance!,
+                                onSelect: _applyCompletion,
+                                onClose: controller.clearAssist,
+                              ),
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.all(14),
+                                child: active == null
+                                    ? const _EmptyEditor()
+                                    : LineNumberedEditor(
+                                        controller: textController,
+                                        onChanged: _onTextChanged,
+                                      ),
+                              ),
+                            ),
+                            const Divider(height: 1),
+                            SizedBox(
+                              height: 120,
+                              child: _DiagnosticsPanel(controller: controller),
+                            ),
+                            const Divider(height: 1),
+                            _StatusBar(controller: controller),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -487,55 +411,31 @@ class FindIntent extends Intent {
   const FindIntent();
 }
 
-class _Explorer extends StatelessWidget {
-  final EditorController controller;
-  const _Explorer({required this.controller});
-
-  @override
-  Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.all(8),
-    children: [
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-        child: Text('المشروع', style: Theme.of(context).textTheme.titleMedium),
-      ),
-      const SizedBox(height: 4),
-      for (final node in controller.tree)
-        _TreeNode(node: node, onOpen: controller.open),
-      if (controller.tree.isEmpty)
-        const Padding(
-          padding: EdgeInsets.all(4),
-          child: Text('لا توجد ملفات .arb'),
-        ),
-    ],
-  );
-}
-
-class _TreeNode extends StatelessWidget {
-  final FileNode node;
-  final Future<void> Function(String path) onOpen;
-  const _TreeNode({required this.node, required this.onOpen});
+class _EmptyEditor extends StatelessWidget {
+  const _EmptyEditor();
 
   @override
   Widget build(BuildContext context) {
-    if (!node.isDirectory) {
-      return ListTile(
-        dense: true,
-        contentPadding: const EdgeInsets.only(left: 8, right: 4),
-        leading: const Icon(Icons.description_outlined, size: 18),
-        title: Text(node.name, overflow: TextOverflow.ellipsis),
-        onTap: () => onOpen(node.path),
-      );
-    }
-    return ExpansionTile(
-      tilePadding: const EdgeInsets.symmetric(horizontal: 4),
-      childrenPadding: const EdgeInsets.only(left: 16),
-      leading: const Icon(Icons.folder_outlined, size: 18),
-      title: Text(node.name, overflow: TextOverflow.ellipsis),
-      children: [
-        for (final child in node.children)
-          _TreeNode(node: child, onOpen: onOpen),
-      ],
+    final colors = Theme.of(context).colorScheme;
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.code_off_rounded, size: 48, color: colors.primary),
+          const SizedBox(height: 14),
+          Text(
+            'اختر ملفًا من مستكشف المشروع',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'ابدأ باختيار مجلد Workspace ثم افتح ملف .arb',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: colors.onSurfaceVariant),
+          ),
+        ],
+      ),
     );
   }
 }

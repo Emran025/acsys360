@@ -3,6 +3,7 @@ import 'package:acsys360/domain/entities/file_node.dart';
 import 'package:acsys360/domain/repositories/workspace_repository.dart';
 import 'package:acsys360/main.dart';
 import 'package:acsys360/presentation/state/editor_controller.dart';
+import 'package:acsys360/presentation/widgets/line_numbered_editor.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -44,7 +45,9 @@ void main() {
 
     await tester.pumpWidget(ArabicEditorApp(controller: controller));
     await tester.pump();
+    expect(find.text('مستكشف المشروع'), findsOneWidget);
     expect(find.text('src'), findsOneWidget);
+
     expect(find.text('main.arb'), findsNothing);
 
     await tester.tap(find.text('src'));
@@ -53,7 +56,8 @@ void main() {
 
     await tester.tap(find.text('main.arb'));
     await tester.pump();
-    expect(find.byType(TextField), findsOneWidget);
+    expect(find.byType(LineNumberedEditor), findsOneWidget);
+    expect(find.text('1'), findsOneWidget);
     expect(controller.activeDocument?.text, 'برنامج اختبار {}.');
   });
 
