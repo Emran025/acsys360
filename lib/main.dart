@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'data/repositories/local_workspace_repository.dart';
 import 'data/repositories/process_compiler_repository.dart';
 import 'domain/entities/document.dart';
+import 'domain/entities/file_node.dart';
 import 'presentation/state/editor_controller.dart';
 
 void main() {
@@ -317,20 +318,51 @@ class _Explorer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.all(12),
+    padding: const EdgeInsets.all(8),
     children: [
-      Text('المشروع', style: Theme.of(context).textTheme.titleMedium),
-      const SizedBox(height: 8),
-      for (final path in controller.files)
-        ListTile(
-          dense: true,
-          leading: const Icon(Icons.description_outlined, size: 18),
-          title: Text(path.split(Platform.pathSeparator).last),
-          onTap: () => controller.open(path),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        child: Text('المشروع', style: Theme.of(context).textTheme.titleMedium),
+      ),
+      const SizedBox(height: 4),
+      for (final node in controller.tree)
+        _TreeNode(node: node, onOpen: controller.open),
+      if (controller.tree.isEmpty)
+        const Padding(
+          padding: EdgeInsets.all(4),
+          child: Text('لا توجد ملفات .arb'),
         ),
-      if (controller.files.isEmpty) const Text('لا توجد ملفات .arb'),
     ],
   );
+}
+
+class _TreeNode extends StatelessWidget {
+  final FileNode node;
+  final Future<void> Function(String path) onOpen;
+  const _TreeNode({required this.node, required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    if (!node.isDirectory) {
+      return ListTile(
+        dense: true,
+        contentPadding: const EdgeInsets.only(left: 8, right: 4),
+        leading: const Icon(Icons.description_outlined, size: 18),
+        title: Text(node.name, overflow: TextOverflow.ellipsis),
+        onTap: () => onOpen(node.path),
+      );
+    }
+    return ExpansionTile(
+      tilePadding: const EdgeInsets.symmetric(horizontal: 4),
+      childrenPadding: const EdgeInsets.only(left: 16),
+      leading: const Icon(Icons.folder_outlined, size: 18),
+      title: Text(node.name, overflow: TextOverflow.ellipsis),
+      children: [
+        for (final child in node.children)
+          _TreeNode(node: child, onOpen: onOpen),
+      ],
+    );
+  }
 }
 
 class _StatusBar extends StatelessWidget {
