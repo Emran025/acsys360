@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../theme/app_theme.dart';
 
@@ -9,13 +10,9 @@ class EditorTopBar extends StatelessWidget {
   final String? activePath;
   final bool isDark;
   final bool expanded;
-  final AppAccent accent;
-  final ValueChanged<AppAccent> onSelectAccent;
   final VoidCallback onChooseFolder;
   final VoidCallback onSave;
   final VoidCallback onSaveAll;
-  final VoidCallback onUndo;
-  final VoidCallback onRedo;
   final VoidCallback onFind;
   final VoidCallback onComplete;
   final VoidCallback onHelp;
@@ -29,13 +26,9 @@ class EditorTopBar extends StatelessWidget {
     required this.activePath,
     required this.isDark,
     required this.expanded,
-    required this.accent,
-    required this.onSelectAccent,
     required this.onChooseFolder,
     required this.onSave,
     required this.onSaveAll,
-    required this.onUndo,
-    required this.onRedo,
     required this.onFind,
     required this.onComplete,
     required this.onHelp,
@@ -80,16 +73,6 @@ class EditorTopBar extends StatelessWidget {
                           _ToolbarGroup(
                             label: 'تحرير',
                             children: [
-                              _ToolbarButton(
-                                tooltip: 'تراجع Ctrl+Z',
-                                icon: Icons.undo_rounded,
-                                onPressed: onUndo,
-                              ),
-                              _ToolbarButton(
-                                tooltip: 'إعادة Ctrl+Y',
-                                icon: Icons.redo_rounded,
-                                onPressed: onRedo,
-                              ),
                               _ToolbarButton(
                                 tooltip: 'بحث واستبدال Ctrl+F',
                                 icon: Icons.search_rounded,
@@ -152,7 +135,6 @@ class EditorTopBar extends StatelessWidget {
                     ),
             ),
             if (expanded) ...[
-              _AccentPicker(accent: accent, onSelected: onSelectAccent),
               _ToolbarButton(
                 tooltip: isDark ? 'الوضع الفاتح' : 'الوضع الداكن',
                 icon: isDark
@@ -194,10 +176,19 @@ class _BrandBlock extends StatelessWidget {
           width: 38,
           height: 38,
           decoration: BoxDecoration(
-            color: colors.primary,
-            borderRadius: BorderRadius.circular(11),
+            color: AppTheme.brandBlack,
+            borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(Icons.translate_rounded, color: colors.onPrimary),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Transform.scale(
+              scale: 2.1,
+              child: SvgPicture.asset(
+                'assets/branding/arabic360.svg',
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
         ),
         const SizedBox(width: 12),
         Column(
@@ -278,37 +269,5 @@ class _ToolbarButton extends StatelessWidget {
             )
           : null,
     ),
-  );
-}
-
-class _AccentPicker extends StatelessWidget {
-  final AppAccent accent;
-  final ValueChanged<AppAccent> onSelected;
-
-  const _AccentPicker({required this.accent, required this.onSelected});
-
-  @override
-  Widget build(BuildContext context) => PopupMenuButton<AppAccent>(
-    tooltip: 'ألوان الثيم',
-    initialValue: accent,
-    onSelected: onSelected,
-    itemBuilder: (context) => [
-      for (final option in AppAccent.values)
-        PopupMenuItem(
-          value: option,
-          child: Row(
-            children: [
-              CircleAvatar(radius: 8, backgroundColor: option.color),
-              const SizedBox(width: 10),
-              Text(option.label),
-              if (option == accent) ...[
-                const Spacer(),
-                const Icon(Icons.check, size: 18),
-              ],
-            ],
-          ),
-        ),
-    ],
-    child: Icon(Icons.palette_outlined, color: accent.color, size: 22),
   );
 }

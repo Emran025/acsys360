@@ -80,7 +80,7 @@ class _LineNumberedEditorState extends State<LineNumberedEditor> {
       decoration: BoxDecoration(
         color: colors.surface,
         border: Border.all(color: colors.outlineVariant.withValues(alpha: .55)),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
