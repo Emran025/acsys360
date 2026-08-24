@@ -814,6 +814,10 @@ class _EditorShellState extends State<EditorShell> {
         SingleActivator(LogicalKeyboardKey.keyY, control: true): RedoIntent(),
         SingleActivator(LogicalKeyboardKey.keyY, meta: true): RedoIntent(),
         SingleActivator(LogicalKeyboardKey.f5): CompileIntent(),
+        SingleActivator(LogicalKeyboardKey.f5, control: true):
+            BuildArtifactIntent(),
+        SingleActivator(LogicalKeyboardKey.f5, meta: true):
+            BuildArtifactIntent(),
         SingleActivator(LogicalKeyboardKey.keyF, control: true): FindIntent(),
         SingleActivator(LogicalKeyboardKey.keyF, meta: true): FindIntent(),
         SingleActivator(LogicalKeyboardKey.keyN, control: true):
@@ -897,6 +901,9 @@ class _EditorShellState extends State<EditorShell> {
           ),
           CompileIntent: CallbackAction<CompileIntent>(
             onInvoke: (_) => controller.compile(),
+          ),
+          BuildArtifactIntent: CallbackAction<BuildArtifactIntent>(
+            onInvoke: (_) => controller.buildNative(),
           ),
           FindIntent: CallbackAction<FindIntent>(
             onInvoke: (_) => _toggleFindReplace(),
@@ -1136,6 +1143,10 @@ class RedoIntent extends Intent {
 
 class CompileIntent extends Intent {
   const CompileIntent();
+}
+
+class BuildArtifactIntent extends Intent {
+  const BuildArtifactIntent();
 }
 
 class FindIntent extends Intent {

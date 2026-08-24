@@ -8,7 +8,7 @@ void main() {
     final root = await Directory.systemTemp.createTemp('arabicc-protocol-');
     addTearDown(() => root.delete(recursive: true));
     final request = jsonEncode({
-      'protocolVersion': '0.3.0',
+      'protocolVersion': '0.4.0',
       'rootPath': root.path,
       'sourcePaths': ['main.arb', 'lib.arb'],
       'sourceTexts': {
@@ -30,7 +30,7 @@ void main() {
 
     expect(exitCode, 0, reason: stderr);
     final response = jsonDecode(stdout) as Map<String, dynamic>;
-    expect(response['protocolVersion'], '0.3.0');
+    expect(response['protocolVersion'], '0.4.0');
     expect(response['success'], isTrue);
     expect((response['syntaxTree'] as Map)['kind'], 'project');
     expect((response['tokens'] as List), isNotEmpty);
@@ -47,7 +47,7 @@ void main() {
     ], workingDirectory: Directory.current.path);
     process.stdin.writeln(
       jsonEncode({
-        'protocolVersion': '0.3.0',
+        'protocolVersion': '0.4.0',
         'rootPath': root.path,
         'sourcePaths': ['main.arb', 'lib.arb'],
         'sourceTexts': {
@@ -76,6 +76,55 @@ void main() {
     expect(response['diagnostics'], isEmpty);
   });
 
+  test('CLI builds a dart-native artifact when requested', () async {
+    final root = await Directory.systemTemp.createTemp('arabicc-artifact-');
+    addTearDown(() => root.delete(recursive: true));
+    final artifactDirectory = Directory(
+      '${root.path}${Platform.pathSeparator}build',
+    );
+    final process = await Process.start(
+      Platform.resolvedExecutable,
+      ['run', 'bin/arabicc.dart', '--protocol'],
+      workingDirectory: Directory.current.path,
+      environment: {
+        ...Platform.environment,
+        'DART_EXECUTABLE': Platform.resolvedExecutable,
+      },
+    );
+    process.stdin.writeln(
+      jsonEncode({
+        'protocolVersion': '0.4.0',
+        'rootPath': root.path,
+        'sourcePaths': ['main.arb'],
+        'sourceTexts': {
+          'main.arb': '''برنامج رئيسي {
+متغير س: صحيح;
+س = 2 + 3;
+اطبع(س);
+}.''',
+        },
+        'mode': 'active',
+        'entryPath': 'main.arb',
+        'target': 'dart-native',
+        'artifactDirectory': artifactDirectory.path,
+      }),
+    );
+    await process.stdin.close();
+    final stdout = await process.stdout.transform(utf8.decoder).join();
+    final stderr = await process.stderr.transform(utf8.decoder).join();
+    final exitCode = await process.exitCode;
+
+    expect(exitCode, 0, reason: stderr);
+    final response = jsonDecode(stdout) as Map<String, dynamic>;
+    expect(response['success'], isTrue);
+    final artifacts = response['artifacts'] as List;
+    expect(artifacts, hasLength(1));
+    expect(File(artifacts.single as String).existsSync(), isTrue);
+    final artifactProcess = await Process.run(artifacts.single as String, []);
+    expect(artifactProcess.exitCode, 0);
+    expect(artifactProcess.stdout.toString().trim(), '5');
+  });
+
   test('CLI returns a protocol diagnostic for malformed JSON', () async {
     final process = await Process.start(Platform.resolvedExecutable, [
       'run',
@@ -102,7 +151,7 @@ void main() {
     ], workingDirectory: Directory.current.path);
     process.stdin.writeln(
       jsonEncode({
-        'protocolVersion': '0.3.0',
+        'protocolVersion': '0.4.0',
         'requestType': 'assist',
         'sourcePath': 'main.arb',
         'sourceText': 'مت',
@@ -133,7 +182,7 @@ void main() {
     ], workingDirectory: Directory.current.path);
     process.stdin.writeln(
       jsonEncode({
-        'protocolVersion': '0.3.0',
+        'protocolVersion': '0.4.0',
         'requestType': 'assist',
         'sourcePath': 'main.arb',
         'sourceText': 'برنامج ',

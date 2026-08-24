@@ -6,7 +6,7 @@
 
 ## الإصدار الحالي
 
-الإصدار الحالي هو `0.3.0`. يجب أن يظهر الحقل `protocolVersion` في كل طلب واستجابة. يرفض الطرف المستقبل الإصدار غير المدعوم برسالة خطأ واضحة بدل تفسير payload مختلف بصمت.
+الإصدار الحالي هو `0.4.0`. يجب أن يظهر الحقل `protocolVersion` في كل طلب واستجابة. يرفض الطرف المستقبل الإصدار غير المدعوم برسالة خطأ واضحة بدل تفسير payload مختلف بصمت.
 
 ## طلب الترجمة
 
@@ -20,6 +20,8 @@
 | `sourceTexts` | `Map<String, String>` | لا | محتوى snapshots؛ له الأولوية على القراءة من القرص |
 | `mode` | `String` | لا | `active` أو `project`، والافتراضي `project` |
 | `entryPath` | `String?` | لا | ملف الدخول عند الحاجة |
+| `target` | `String` | لا | الهدف؛ `none` أو `dart-native` |
+| `artifactDirectory` | `String?` | لا | مجلد إخراج artifact عند طلب target تنفيذي |
 
 ## الاستجابة
 
@@ -57,4 +59,4 @@
 
 ## ما لم ينفذ بعد
 
-العقد يعرّف شكل النقل، وCLI الحالي يمرر كل ملف إلى lexer/parser/semantic ثم يجمع النتائج في استجابة project، مع فحص project-level محدود لتعارض أسماء المتغيرات. لا يدعي ذلك تحليل dependencies أو import resolution عابرًا للملفات بعد، كما أن target backend لإنتاج EXE من برنامج اللغة نفسه لم يُنفذ بعد؛ لذلك تبقى `artifacts` فارغة حاليًا. المرحلة التالية هي إضافة تحليل dependencies وsymbol resolution عابر للملفات، ثم backend target موثق ومختبر لا يعيد artifact إلا بعد إنشائه والتحقق منه. أما مسار stdin/stdout والـ adapter واختبار smoke الأساسي وبناء compiler executable المضمّن في release فقد نُفذت واختُبرت في workflow.
+العقد يعرّف شكل النقل، وCLI يمرر كل ملف إلى lexer/parser/semantic ثم يجمع النتائج في استجابة project، مع تحليل project-level للإجراءات والأنواع المصدرة. لا تُسرّب المتغيرات بين الملفات دون import syntax. يدعم الإصدار `dart-native` طلب بناء artifact في `artifactDirectory` عندما تتوفر Dart toolchain، ولا يعيد المسار إلا بعد إنشاء executable والتحقق من وجوده. أما `target: none` فيبقى السلوك الافتراضي المتوافق مع الترجمة والتحليل والتنفيذ الداخلي.

@@ -135,6 +135,7 @@ Future<CompilationResponse> _compileRequest(CompilationRequest request) async {
   final tac = <String>[];
   final assembly = <String>[];
   final executionOutput = <String>[];
+  final artifacts = <String>[];
   final trees = <Map<String, Object?>>[];
   final sources = <String, String>{};
 
@@ -205,6 +206,90 @@ Future<CompilationResponse> _compileRequest(CompilationRequest request) async {
       executionOutput.addAll(result.executionOutput);
     }
   }
+  if (request.target != 'none' && request.target != 'dart-native') {
+    diagnostics.add(
+      Diagnostic(
+        severity: DiagnosticSeverity.error,
+        phase: 'backend',
+        code: 'B001',
+        message: 'الهدف التنفيذي غير مدعوم: ${request.target}',
+        span: SourceSpan(
+          sourcePath: request.entryPath ?? paths.first,
+          offset: 0,
+          line: 1,
+          column: 1,
+          length: 0,
+        ),
+      ),
+    );
+  }
+  if (request.target == 'dart-native' && diagnostics.isEmpty) {
+    if (paths.length != 1 || project.files.length != 1) {
+      diagnostics.add(
+        Diagnostic(
+          severity: DiagnosticSeverity.error,
+          phase: 'backend',
+          code: 'B002',
+          message: 'هدف dart-native يحتاج ملف دخول واحدًا؛ لم يُنشأ artifact',
+          span: SourceSpan(
+            sourcePath: request.entryPath ?? paths.first,
+            offset: 0,
+            line: 1,
+            column: 1,
+            length: 0,
+          ),
+        ),
+      );
+    } else {
+      final fileResult = project.files.single;
+      final program = fileResult.result.program;
+      if (program == null || !fileResult.result.success) {
+        diagnostics.add(
+          Diagnostic(
+            severity: DiagnosticSeverity.error,
+            phase: 'backend',
+            code: 'B003',
+            message: 'لا يمكن بناء artifact من مصدر غير صالح',
+            span: SourceSpan(
+              sourcePath: fileResult.sourcePath,
+              offset: 0,
+              line: 1,
+              column: 1,
+              length: 0,
+            ),
+          ),
+        );
+      } else {
+        final outputDirectory =
+            request.artifactDirectory ??
+            '${request.rootPath}${Platform.pathSeparator}.arabic360${Platform.pathSeparator}build';
+        final artifact = await const DartNativeArtifactBuilder().build(
+          program,
+          outputDirectory: outputDirectory,
+          dartExecutable: Platform.environment['DART_EXECUTABLE'] ?? 'dart',
+        );
+        if (artifact.success) {
+          artifacts.add(artifact.executablePath!);
+        } else {
+          diagnostics.add(
+            Diagnostic(
+              severity: DiagnosticSeverity.error,
+              phase: 'backend',
+              code: 'B004',
+              message: artifact.diagnostics.join('\n'),
+              span: SourceSpan(
+                sourcePath: fileResult.sourcePath,
+                offset: 0,
+                line: 1,
+                column: 1,
+                length: 0,
+              ),
+            ),
+          );
+        }
+      }
+    }
+  }
   diagnostics.addAll(
     project.projectDiagnostics.map(
       (item) => Diagnostic(
@@ -229,7 +314,7 @@ Future<CompilationResponse> _compileRequest(CompilationRequest request) async {
     threeAddressCode: tac,
     assembly: assembly.join('\n'),
     executionOutput: executionOutput,
-    artifacts: const [],
+    artifacts: artifacts,
   );
 }
 
