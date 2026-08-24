@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:compiler_contracts/compiler_contracts.dart';
 import 'package:flutter/foundation.dart';
 
@@ -7,6 +9,7 @@ import '../../domain/entities/file_node.dart';
 import '../../domain/entities/workspace.dart';
 import '../../domain/repositories/workspace_repository.dart';
 import '../../domain/usecases/find_replace.dart';
+import '../../domain/usecases/format_arabic_source.dart';
 import '../../domain/usecases/workspace_actions.dart';
 
 class EditorController extends ChangeNotifier {
@@ -28,6 +31,7 @@ class EditorController extends ChangeNotifier {
   CompilationResult? compilation;
   AssistResponse? assistance;
   List<SearchMatch> searchMatches = const [];
+  String? cutPath;
 
   EditorController({
     required this.repository,
@@ -94,6 +98,18 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> createFolder(String name) async {
+    try {
+      await repository.createDirectory(workspace.rootPath, name);
+      await refreshFiles();
+      error = null;
+    } catch (exception) {
+      error = exception;
+      notifyListeners();
+    }
+    notifyListeners();
+  }
+
   List<String> _flattenFiles(List<FileNode> nodes) => [
     for (final node in nodes)
       if (node.isDirectory) ..._flattenFiles(node.children) else node.path,
@@ -111,7 +127,95 @@ class EditorController extends ChangeNotifier {
 
   Future<void> save() async {
     try {
+      formatActive();
       workspace = await saveDocument(workspace);
+      error = null;
+    } catch (exception) {
+      error = exception;
+    }
+    notifyListeners();
+  }
+
+  Future<void> saveAs(String path) async {
+    final active = workspace.activeDocument;
+    if (active == null) return;
+    try {
+      final formatted = formatArabicSource(active.text);
+      final document = Document(
+        path: path,
+        text: formatted,
+        savedText: formatted,
+        undoStack: active.undoStack,
+        redoStack: active.redoStack,
+      );
+      await repository.write(document);
+      workspace = workspace.open(document);
+      error = null;
+    } catch (exception) {
+      error = exception;
+    }
+    notifyListeners();
+  }
+
+  void formatActive() {
+    final active = workspace.activeDocument;
+    if (active == null) return;
+    final formatted = formatArabicSource(active.text);
+    if (formatted == active.text) return;
+    edit(TextEdit(offset: 0, before: active.text, after: formatted));
+  }
+
+  Future<void> delete(String path) async {
+    try {
+      await repository.delete(path);
+      final index = workspace.documents.indexWhere(
+        (document) => document.path == path,
+      );
+      if (index >= 0) workspace = workspace.close(index);
+      await refreshFiles();
+      error = null;
+    } catch (exception) {
+      error = exception;
+      notifyListeners();
+    }
+    notifyListeners();
+  }
+
+  void cut(String path) {
+    cutPath = path;
+    notifyListeners();
+  }
+
+  bool get hasCutPath => cutPath != null;
+
+  Future<void> paste(String targetDirectory) async {
+    final sourcePath = cutPath;
+    if (sourcePath == null) return;
+    try {
+      final targetName = sourcePath.split(Platform.pathSeparator).last;
+      final separator = Platform.pathSeparator;
+      final targetPath =
+          '$targetDirectory${targetDirectory.endsWith(separator) ? '' : separator}$targetName';
+      await repository.move(sourcePath, targetDirectory);
+      final index = workspace.documents.indexWhere(
+        (document) => document.path == sourcePath,
+      );
+      if (index >= 0) {
+        final document = workspace.documents[index];
+        workspace = workspace
+            .close(index)
+            .open(
+              Document(
+                path: targetPath,
+                text: document.text,
+                savedText: document.savedText,
+                undoStack: document.undoStack,
+                redoStack: document.redoStack,
+              ),
+            );
+      }
+      cutPath = null;
+      await refreshFiles();
       error = null;
     } catch (exception) {
       error = exception;

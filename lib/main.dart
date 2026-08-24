@@ -14,6 +14,7 @@ import 'presentation/widgets/editor_dialogs.dart';
 import 'presentation/widgets/collapsible_panel.dart';
 import 'presentation/widgets/editor_top_bar.dart';
 import 'presentation/widgets/find_replace_bar.dart';
+import 'presentation/widgets/arabic_code_controller.dart';
 import 'presentation/widgets/line_numbered_editor.dart';
 import 'presentation/widgets/workspace_explorer.dart';
 
@@ -112,7 +113,7 @@ class EditorShell extends StatefulWidget {
 }
 
 class _EditorShellState extends State<EditorShell> {
-  final textController = TextEditingController();
+  final textController = ArabicCodeController();
   final findController = TextEditingController();
   final replaceController = TextEditingController();
   String? boundPath;
@@ -191,6 +192,48 @@ class _EditorShellState extends State<EditorShell> {
     if (name != null && mounted) await widget.controller.create(name);
   }
 
+  Future<void> _newFolder() async {
+    final name = await showNewFolderDialog(context);
+    if (name != null && mounted) await widget.controller.createFolder(name);
+  }
+
+  Future<void> _openFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      dialogTitle: 'فتح ملف عربي',
+      type: FileType.custom,
+      allowedExtensions: [
+        LocalWorkspaceRepository.sourceExtension.substring(1),
+      ],
+    );
+    final path = result?.files.single.path;
+    if (path != null && mounted) await widget.controller.open(path);
+  }
+
+  Future<void> _deletePath(String path) async {
+    if (!await confirmDeleteDialog(context, path: path) || !mounted) return;
+    await widget.controller.delete(path);
+  }
+
+  Future<void> _saveAs() async {
+    final active = widget.controller.activeDocument;
+    if (active == null) return;
+    final currentName = active.path.split(Platform.pathSeparator).last;
+    final path = await FilePicker.platform.saveFile(
+      dialogTitle: 'حفظ الملف باسم',
+      fileName: currentName,
+      type: FileType.custom,
+      allowedExtensions: [
+        LocalWorkspaceRepository.sourceExtension.substring(1),
+      ],
+    );
+    if (path == null || !mounted) return;
+    final normalized =
+        path.toLowerCase().endsWith(LocalWorkspaceRepository.sourceExtension)
+        ? path
+        : '$path${LocalWorkspaceRepository.sourceExtension}';
+    await widget.controller.saveAs(normalized);
+  }
+
   Future<void> _pickWorkspace() async {
     final path = await FilePicker.getDirectoryPath(
       dialogTitle: 'اختر مجلد المشروع',
@@ -234,6 +277,27 @@ class _EditorShellState extends State<EditorShell> {
     ).showSnackBar(SnackBar(content: Text('تم استبدال $count تطابقات')));
   }
 
+  Future<void> _showEditorMenu(Offset position) async {
+    final action = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        position.dx,
+        position.dy,
+        MediaQuery.of(context).size.width - position.dx,
+        MediaQuery.of(context).size.height - position.dy,
+      ),
+      items: const [
+        PopupMenuItem(value: 'format', child: Text('تنسيق المستند')),
+        PopupMenuItem(value: 'save', child: Text('حفظ Ctrl+S')),
+        PopupMenuItem(value: 'saveAs', child: Text('حفظ باسم Ctrl+Shift+S')),
+      ],
+    );
+    if (!mounted) return;
+    if (action == 'format') widget.controller.formatActive();
+    if (action == 'save') await widget.controller.save();
+    if (action == 'saveAs') await _saveAs();
+  }
+
   void _onTextChanged(String value) {
     final document = widget.controller.activeDocument;
     if (document == null || value == document.text) return;
@@ -267,6 +331,10 @@ class _EditorShellState extends State<EditorShell> {
     final active = controller.activeDocument;
     return Shortcuts(
       shortcuts: const {
+        SingleActivator(LogicalKeyboardKey.keyS, control: true, shift: true):
+            SaveAsIntent(),
+        SingleActivator(LogicalKeyboardKey.keyS, meta: true, shift: true):
+            SaveAsIntent(),
         SingleActivator(LogicalKeyboardKey.keyS, control: true): SaveIntent(),
         SingleActivator(LogicalKeyboardKey.keyS, meta: true): SaveIntent(),
         SingleActivator(LogicalKeyboardKey.keyZ, control: true): UndoIntent(),
@@ -286,6 +354,9 @@ class _EditorShellState extends State<EditorShell> {
         actions: {
           SaveIntent: CallbackAction<SaveIntent>(
             onInvoke: (_) => controller.save(),
+          ),
+          SaveAsIntent: CallbackAction<SaveAsIntent>(
+            onInvoke: (_) => _saveAs(),
           ),
           UndoIntent: CallbackAction<UndoIntent>(
             onInvoke: (_) => controller.undo(),
@@ -336,10 +407,16 @@ class _EditorShellState extends State<EditorShell> {
                           rootPath: controller.workspace.rootPath,
                           nodes: controller.tree,
                           isLoading: isRefreshing,
+                          hasCutPath: controller.hasCutPath,
                           onChooseFolder: _pickWorkspace,
+                          onOpenFile: _openFile,
                           onRefresh: _refreshFiles,
                           onNewFile: _newFile,
+                          onNewFolder: _newFolder,
                           onOpen: controller.open,
+                          onDelete: _deletePath,
+                          onCut: controller.cut,
+                          onPaste: controller.paste,
                         ),
                       ),
                       const VerticalDivider(width: 1),
@@ -363,14 +440,19 @@ class _EditorShellState extends State<EditorShell> {
                                 onClose: controller.clearAssist,
                               ),
                             Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.all(14),
-                                child: active == null
-                                    ? const _EmptyEditor()
-                                    : LineNumberedEditor(
-                                        controller: textController,
-                                        onChanged: _onTextChanged,
-                                      ),
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.translucent,
+                                onSecondaryTapUp: (details) =>
+                                    _showEditorMenu(details.globalPosition),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(14),
+                                  child: active == null
+                                      ? const _EmptyEditor()
+                                      : LineNumberedEditor(
+                                          controller: textController,
+                                          onChanged: _onTextChanged,
+                                        ),
+                                ),
                               ),
                             ),
                             CollapsiblePanel(
@@ -401,6 +483,10 @@ class _EditorShellState extends State<EditorShell> {
 
 class SaveIntent extends Intent {
   const SaveIntent();
+}
+
+class SaveAsIntent extends Intent {
+  const SaveAsIntent();
 }
 
 class UndoIntent extends Intent {
@@ -507,26 +593,33 @@ class _Tabs extends StatelessWidget {
   const _Tabs({required this.controller, required this.onClose});
 
   @override
-  Widget build(BuildContext context) => SingleChildScrollView(
-    scrollDirection: Axis.horizontal,
-    child: Row(
-      children: [
-        for (
-          var index = 0;
-          index < controller.workspace.documents.length;
-          index++
-        )
-          InputChip(
-            label: Text(
-              '${controller.workspace.documents[index].path.split(Platform.pathSeparator).last}${controller.workspace.documents[index].isDirty ? ' *' : ''}',
+  Widget build(BuildContext context) => Directionality(
+    textDirection: TextDirection.rtl,
+    child: SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (
+            var index = 0;
+            index < controller.workspace.documents.length;
+            index++
+          )
+            InputChip(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              label: Text(
+                '${controller.workspace.documents[index].path.split(Platform.pathSeparator).last}${controller.workspace.documents[index].isDirty ? ' *' : ''}',
+              ),
+              selected:
+                  controller.workspace.documents[index].path ==
+                  controller.activeDocument?.path,
+              onPressed: () => controller.selectTab(index),
+              onDeleted: () => onClose(index),
             ),
-            selected:
-                controller.workspace.documents[index].path ==
-                controller.activeDocument?.path,
-            onPressed: () => controller.selectTab(index),
-            onDeleted: () => onClose(index),
-          ),
-      ],
+        ],
+      ),
     ),
   );
 }
