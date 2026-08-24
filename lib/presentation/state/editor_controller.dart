@@ -445,6 +445,30 @@ class EditorController extends ChangeNotifier {
 
   Future<void> analyze() => compile();
 
+  Future<void> buildNative() async {
+    final service = languageServer;
+    final active = workspace.activeDocument;
+    final root = workspace.rootPath.trim();
+    if (service == null || active == null || root.isEmpty) return;
+    try {
+      final artifactDirectory =
+          '$root${Platform.pathSeparator}.arabic360${Platform.pathSeparator}build';
+      final analysis = await service.analyze(
+        rootPath: root,
+        sourcePath: active.path,
+        documents: workspace.documents,
+        target: 'dart-native',
+        artifactDirectory: artifactDirectory,
+      );
+      compilation = analysis.compilation;
+      diagnostics = analysis.diagnostics;
+      error = null;
+    } catch (exception) {
+      error = exception;
+    }
+    notifyListeners();
+  }
+
   EditorDiagnostic? diagnosticAt(int offset) {
     for (final diagnostic in diagnostics) {
       if (diagnostic.containsOffset(offset)) return diagnostic;

@@ -1,4 +1,4 @@
-const protocolVersion = '0.3.0';
+const protocolVersion = '0.4.0';
 
 enum CompilationMode { active, project }
 
@@ -161,6 +161,8 @@ class CompilationRequest {
   final Map<String, String> sourceTexts;
   final CompilationMode mode;
   final String? entryPath;
+  final String target;
+  final String? artifactDirectory;
 
   const CompilationRequest({
     required this.rootPath,
@@ -168,6 +170,8 @@ class CompilationRequest {
     this.sourceTexts = const {},
     this.mode = CompilationMode.project,
     this.entryPath,
+    this.target = 'none',
+    this.artifactDirectory,
   });
 
   Map<String, Object?> toJson() => {
@@ -177,6 +181,8 @@ class CompilationRequest {
     'sourceTexts': sourceTexts,
     'mode': mode.value,
     'entryPath': entryPath,
+    'target': target,
+    'artifactDirectory': artifactDirectory,
   };
 
   factory CompilationRequest.fromJson(Map<String, dynamic> json) {
@@ -192,6 +198,8 @@ class CompilationRequest {
       sourceTexts: sourceTexts,
       mode: CompilationModeJson.parse(json['mode'] ?? 'project'),
       entryPath: _optionalString(json['entryPath']),
+      target: _optionalString(json['target']) ?? 'none',
+      artifactDirectory: _optionalString(json['artifactDirectory']),
     );
   }
 }
