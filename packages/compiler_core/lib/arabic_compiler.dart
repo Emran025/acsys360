@@ -10,3 +10,4 @@ export 'src/parser/parser.dart';
 export 'src/project/project_compiler.dart';
 export 'src/runtime/interpreter.dart';
 export 'src/semantic/semantic.dart';
+export 'src/ir/typed_ir.dart';
