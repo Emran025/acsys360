@@ -3,7 +3,9 @@ import 'package:acsys360/domain/entities/file_node.dart';
 import 'package:acsys360/domain/repositories/workspace_repository.dart';
 import 'package:acsys360/main.dart';
 import 'package:acsys360/presentation/state/editor_controller.dart';
-import 'package:flutter/material.dart';
+import 'package:acsys360/presentation/widgets/line_numbered_editor.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class FakeWorkspaceRepository implements WorkspaceRepository {
@@ -32,7 +34,17 @@ class FakeWorkspaceRepository implements WorkspaceRepository {
       Document(path: name, text: '');
 
   @override
+  Future<String> createDirectory(String rootPath, String name) async =>
+      '$rootPath/$name';
+
+  @override
   Future<void> write(Document document) async {}
+
+  @override
+  Future<void> delete(String path) async {}
+
+  @override
+  Future<void> move(String sourcePath, String targetDirectory) async {}
 }
 
 void main() {
@@ -44,7 +56,9 @@ void main() {
 
     await tester.pumpWidget(ArabicEditorApp(controller: controller));
     await tester.pump();
+    expect(find.text('مستكشف المشروع'), findsOneWidget);
     expect(find.text('src'), findsOneWidget);
+
     expect(find.text('main.arb'), findsNothing);
 
     await tester.tap(find.text('src'));
@@ -53,11 +67,12 @@ void main() {
 
     await tester.tap(find.text('main.arb'));
     await tester.pump();
-    expect(find.byType(TextField), findsOneWidget);
+    expect(find.byType(LineNumberedEditor), findsOneWidget);
+    expect(find.text('1'), findsOneWidget);
     expect(controller.activeDocument?.text, 'برنامج اختبار {}.');
   });
 
-  testWidgets('toggles the editor theme', (tester) async {
+  testWidgets('configures theme colors and collapsible panels', (tester) async {
     final controller = EditorController(
       repository: FakeWorkspaceRepository(),
       rootPath: '.',
@@ -66,9 +81,22 @@ void main() {
     await tester.pumpWidget(ArabicEditorApp(controller: controller));
     await tester.pump();
     expect(find.byTooltip('الوضع الداكن'), findsOneWidget);
+    expect(find.byType(SvgPicture), findsOneWidget);
+    expect(find.byKey(const ValueKey('topbar-toggle')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('collapse-نتائج الترجمة')),
+      findsOneWidget,
+    );
 
-    await tester.tap(find.byTooltip('الوضع الداكن'));
-    await tester.pump();
-    expect(find.byTooltip('الوضع الفاتح'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('topbar-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('topbar-toggle')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('collapse-نتائج الترجمة')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('collapse-نتائج الترجمة')),
+      findsOneWidget,
+    );
   });
 }

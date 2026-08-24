@@ -86,6 +86,46 @@ class LocalWorkspaceRepository implements WorkspaceRepository {
   }
 
   @override
+  Future<String> createDirectory(String rootPath, String name) async {
+    if (name.isEmpty ||
+        name.contains('/') ||
+        name.contains('\\') ||
+        name == '.' ||
+        name == '..') {
+      throw ArgumentError.value(name, 'name', 'اسم المجلد غير صالح');
+    }
+    final directory = Directory(
+      '${Directory(rootPath).path}${Platform.pathSeparator}$name',
+    );
+    await directory.create();
+    return directory.path;
+  }
+
+  @override
   Future<void> write(Document document) =>
       File(document.path).writeAsString(document.text);
+
+  @override
+  Future<void> delete(String path) async {
+    final file = File(path);
+    if (await file.exists()) {
+      await file.delete();
+      return;
+    }
+    final directory = Directory(path);
+    if (await directory.exists()) await directory.delete(recursive: true);
+  }
+
+  @override
+  Future<void> move(String sourcePath, String targetDirectory) async {
+    final source = File(sourcePath);
+    final targetName = sourcePath.split(Platform.pathSeparator).last;
+    final target = File(
+      '${Directory(targetDirectory).path}${Platform.pathSeparator}$targetName',
+    );
+    if (await target.exists()) {
+      throw StateError('يوجد ملف بهذا الاسم في المجلد الهدف');
+    }
+    await source.rename(target.path);
+  }
 }
