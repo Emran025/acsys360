@@ -117,6 +117,7 @@ class EditorShell extends StatefulWidget {
 
 class _EditorShellState extends State<EditorShell> {
   final textController = ArabicCodeController();
+  final editorFocusNode = FocusNode();
   final findController = TextEditingController();
   final replaceController = TextEditingController();
   String? boundPath;
@@ -138,6 +139,7 @@ class _EditorShellState extends State<EditorShell> {
     widget.controller.removeListener(_syncDocument);
     analysisTimer?.cancel();
     textController.dispose();
+    editorFocusNode.dispose();
     findController.dispose();
     replaceController.dispose();
     super.dispose();
@@ -226,14 +228,18 @@ class _EditorShellState extends State<EditorShell> {
     widget.controller.clearAssist();
   }
 
-  Future<void> _newFile() async {
+  Future<void> _newFileAt(String rootPath) async {
     final name = await showNewFileDialog(context);
-    if (name != null && mounted) await widget.controller.create(name);
+    if (name != null && mounted) {
+      await widget.controller.create(name, rootPath: rootPath);
+    }
   }
 
-  Future<void> _newFolder() async {
+  Future<void> _newFolderAt(String rootPath) async {
     final name = await showNewFolderDialog(context);
-    if (name != null && mounted) await widget.controller.createFolder(name);
+    if (name != null && mounted) {
+      await widget.controller.createFolder(name, rootPath: rootPath);
+    }
   }
 
   Future<void> _openFile() async {
@@ -305,6 +311,40 @@ class _EditorShellState extends State<EditorShell> {
 
   void _search(String value) {
     widget.controller.search(value);
+    _selectCurrentMatch();
+  }
+
+  void _selectCurrentMatch() {
+    final match = widget.controller.currentMatch;
+    if (match == null) return;
+    textController.selection = TextSelection(
+      baseOffset: match.offset,
+      extentOffset: match.offset + match.length,
+    );
+    editorFocusNode.requestFocus();
+  }
+
+  void _firstMatch() {
+    widget.controller.firstMatch();
+    _selectCurrentMatch();
+  }
+
+  void _previousMatch() {
+    widget.controller.previousMatch();
+    _selectCurrentMatch();
+  }
+
+  void _nextMatch() {
+    widget.controller.nextMatch();
+    _selectCurrentMatch();
+  }
+
+  void _replaceCurrent() {
+    final count = widget.controller.replaceCurrent(
+      findController.text,
+      replaceController.text,
+    );
+    if (count > 0) _selectCurrentMatch();
   }
 
   void _replaceAll() {
@@ -429,13 +469,6 @@ class _EditorShellState extends State<EditorShell> {
                   activePath: active?.path,
                   isDark: widget.isDark,
                   expanded: topBarExpanded,
-                  onChooseFolder: _pickWorkspace,
-                  onSave: controller.save,
-                  onSaveAll: controller.saveAll,
-                  onFind: _toggleFindReplace,
-                  onComplete: () => controller.complete(_cursorOffset),
-                  onHelp: () => controller.help(_cursorOffset),
-                  onCompile: controller.compile,
                   onToggleTheme: widget.onToggleTheme ?? () {},
                   onToggleExpanded: () =>
                       setState(() => topBarExpanded = !topBarExpanded),
@@ -450,11 +483,15 @@ class _EditorShellState extends State<EditorShell> {
                           nodes: controller.tree,
                           isLoading: isRefreshing,
                           hasCutPath: controller.hasCutPath,
+                          selectedPath: controller.selectedExplorerPath,
+                          selectedDirectoryPath:
+                              controller.selectedDirectoryPath,
+                          onSelect: controller.selectExplorerPath,
                           onChooseFolder: _pickWorkspace,
                           onOpenFile: _openFile,
                           onRefresh: _refreshFiles,
-                          onNewFile: _newFile,
-                          onNewFolder: _newFolder,
+                          onNewFile: _newFileAt,
+                          onNewFolder: _newFolderAt,
                           onOpen: controller.open,
                           onDelete: _deletePath,
                           onCut: controller.cut,
@@ -471,7 +508,12 @@ class _EditorShellState extends State<EditorShell> {
                                 findController: findController,
                                 replaceController: replaceController,
                                 matches: controller.searchMatches.length,
+                                currentMatch: controller.currentMatchIndex,
                                 onSearch: _search,
+                                onFirst: _firstMatch,
+                                onPrevious: _previousMatch,
+                                onNext: _nextMatch,
+                                onReplaceCurrent: _replaceCurrent,
                                 onReplaceAll: _replaceAll,
                                 onClose: _toggleFindReplace,
                               ),
@@ -488,6 +530,7 @@ class _EditorShellState extends State<EditorShell> {
                                           ? const _EmptyEditor()
                                           : LineNumberedEditor(
                                               controller: textController,
+                                              focusNode: editorFocusNode,
                                               onChanged: _onTextChanged,
                                               onTap: _showDiagnosticLamp,
                                             ),

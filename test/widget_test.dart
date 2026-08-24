@@ -3,13 +3,14 @@ import 'package:acsys360/domain/entities/file_node.dart';
 import 'package:acsys360/domain/repositories/workspace_repository.dart';
 import 'package:acsys360/main.dart';
 import 'package:acsys360/presentation/state/editor_controller.dart';
+import 'package:acsys360/presentation/widgets/arabic_code_controller.dart';
 import 'package:acsys360/presentation/widgets/line_numbered_editor.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class FakeWorkspaceRepository implements WorkspaceRepository {
   final document = const Document(path: 'main.arb', text: 'برنامج اختبار {}.');
+  String? lastCreateRoot;
+  String? lastCreateDirectoryRoot;
 
   @override
   Future<List<String>> listFiles(String rootPath) async => [document.path];
@@ -30,12 +31,16 @@ class FakeWorkspaceRepository implements WorkspaceRepository {
   Future<Document> read(String path) async => document;
 
   @override
-  Future<Document> create(String rootPath, String name) async =>
-      Document(path: name, text: '');
+  Future<Document> create(String rootPath, String name) async {
+    lastCreateRoot = rootPath;
+    return Document(path: '$rootPath/$name', text: '');
+  }
 
   @override
-  Future<String> createDirectory(String rootPath, String name) async =>
-      '$rootPath/$name';
+  Future<String> createDirectory(String rootPath, String name) async {
+    lastCreateDirectoryRoot = rootPath;
+    return '$rootPath/$name';
+  }
 
   @override
   Future<void> write(Document document) async {}
@@ -81,7 +86,11 @@ void main() {
     await tester.pumpWidget(ArabicEditorApp(controller: controller));
     await tester.pump();
     expect(find.byTooltip('الوضع الداكن'), findsOneWidget);
-    expect(find.byType(SvgPicture), findsOneWidget);
+    expect(find.byType(TextButton), findsNothing);
+    expect(find.byKey(const ValueKey('workspace-new-file')), findsOneWidget);
+    expect(find.byKey(const ValueKey('workspace-new-folder')), findsOneWidget);
+    expect(find.byKey(const ValueKey('workspace-open-file')), findsOneWidget);
+    expect(find.byKey(const ValueKey('workspace-open-folder')), findsOneWidget);
     expect(find.byKey(const ValueKey('topbar-toggle')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('collapse-نتائج الترجمة')),
@@ -98,5 +107,68 @@ void main() {
       find.byKey(const ValueKey('collapse-نتائج الترجمة')),
       findsOneWidget,
     );
+  });
+
+  test('creates files and folders inside the requested directory', () async {
+    final repository = FakeWorkspaceRepository();
+    final controller = EditorController(repository: repository, rootPath: '.');
+
+    await controller.create('child.arb', rootPath: 'src');
+    await controller.createFolder('nested', rootPath: 'src');
+
+    expect(repository.lastCreateRoot, 'src');
+    expect(repository.lastCreateDirectoryRoot, 'src');
+  });
+
+  test('navigates and replaces the current search match', () async {
+    final controller = EditorController(
+      repository: FakeWorkspaceRepository(),
+      rootPath: '.',
+    );
+    await controller.open('main.arb');
+    controller.edit(
+      const TextEdit(
+        offset: 0,
+        before: 'برنامج اختبار {}.',
+        after: 'اكتب اكتب',
+      ),
+    );
+
+    controller.search('اكتب');
+    expect(controller.currentMatch?.offset, 0);
+    controller.nextMatch();
+    expect(controller.currentMatch?.offset, 5);
+
+    expect(controller.replaceCurrent('اكتب', 'نفذ'), 1);
+    expect(controller.activeDocument?.text, 'اكتب نفذ');
+    expect(controller.currentMatch?.offset, 0);
+  });
+
+  testWidgets('highlights compiler-backed lexical categories', (tester) async {
+    final controller = ArabicCodeController(
+      text: 'برنامج صحيح صح 12 1.5 "نص" + // تعليق',
+    );
+    late TextSpan span;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) {
+            span = controller.buildTextSpan(
+              context: context,
+              style: const TextStyle(color: Colors.white),
+              withComposing: false,
+            );
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
+
+    final colors = [
+      for (final child in span.children!.whereType<TextSpan>())
+        if (child.style?.color != null) child.style!.color,
+    ].toSet();
+    expect(colors.length, greaterThanOrEqualTo(5));
   });
 }

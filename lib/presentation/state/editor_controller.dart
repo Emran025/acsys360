@@ -33,8 +33,11 @@ class EditorController extends ChangeNotifier {
   CompilationResult? compilation;
   AssistResponse? assistance;
   List<SearchMatch> searchMatches = const [];
+  int currentMatchIndex = -1;
   List<EditorDiagnostic> diagnostics = const [];
   String? cutPath;
+  String? selectedExplorerPath;
+  String? selectedDirectoryPath;
 
   EditorLanguageServer? get languageServer {
     final compilerService = compiler;
@@ -69,6 +72,8 @@ class EditorController extends ChangeNotifier {
     compilation = null;
     diagnostics = const [];
     assistance = null;
+    selectedExplorerPath = null;
+    selectedDirectoryPath = null;
     await refreshFiles();
   }
 
@@ -99,9 +104,12 @@ class EditorController extends ChangeNotifier {
     return true;
   }
 
-  Future<void> create(String name) async {
+  Future<void> create(String name, {String? rootPath}) async {
     try {
-      final document = await repository.create(workspace.rootPath, name);
+      final document = await repository.create(
+        rootPath ?? workspace.rootPath,
+        name,
+      );
       workspace = workspace.open(document);
       await refreshFiles();
       error = null;
@@ -112,9 +120,9 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> createFolder(String name) async {
+  Future<void> createFolder(String name, {String? rootPath}) async {
     try {
-      await repository.createDirectory(workspace.rootPath, name);
+      await repository.createDirectory(rootPath ?? workspace.rootPath, name);
       await refreshFiles();
       error = null;
     } catch (exception) {
@@ -182,10 +190,16 @@ class EditorController extends ChangeNotifier {
   Future<void> delete(String path) async {
     try {
       await repository.delete(path);
-      final index = workspace.documents.indexWhere(
-        (document) => document.path == path,
-      );
-      if (index >= 0) workspace = workspace.close(index);
+      final separator = Platform.pathSeparator;
+      final indexes = [
+        for (var index = workspace.documents.length - 1; index >= 0; index--)
+          if (workspace.documents[index].path == path ||
+              workspace.documents[index].path.startsWith('$path$separator'))
+            index,
+      ];
+      for (final index in indexes) {
+        workspace = workspace.close(index);
+      }
       await refreshFiles();
       error = null;
     } catch (exception) {
@@ -201,6 +215,18 @@ class EditorController extends ChangeNotifier {
   }
 
   bool get hasCutPath => cutPath != null;
+
+  void selectExplorerPath(String path, {required bool isDirectory}) {
+    selectedExplorerPath = path;
+    selectedDirectoryPath = isDirectory ? path : _parentDirectory(path);
+    notifyListeners();
+  }
+
+  String _parentDirectory(String path) {
+    final separatorIndex = path.lastIndexOf(Platform.pathSeparator);
+    if (separatorIndex <= 0) return workspace.rootPath;
+    return path.substring(0, separatorIndex);
+  }
 
   Future<void> paste(String targetDirectory) async {
     final sourcePath = cutPath;
@@ -259,7 +285,50 @@ class EditorController extends ChangeNotifier {
     searchMatches = active == null
         ? const []
         : findText(active.text, query, caseSensitive: caseSensitive);
+    currentMatchIndex = searchMatches.isEmpty ? -1 : 0;
     notifyListeners();
+  }
+
+  SearchMatch? get currentMatch =>
+      currentMatchIndex >= 0 && currentMatchIndex < searchMatches.length
+      ? searchMatches[currentMatchIndex]
+      : null;
+
+  void firstMatch() {
+    if (searchMatches.isEmpty) return;
+    currentMatchIndex = 0;
+    notifyListeners();
+  }
+
+  void previousMatch() {
+    if (searchMatches.isEmpty) return;
+    currentMatchIndex =
+        (currentMatchIndex - 1 + searchMatches.length) % searchMatches.length;
+    notifyListeners();
+  }
+
+  void nextMatch() {
+    if (searchMatches.isEmpty) return;
+    currentMatchIndex = (currentMatchIndex + 1) % searchMatches.length;
+    notifyListeners();
+  }
+
+  int replaceCurrent(String query, String replacement) {
+    final active = workspace.activeDocument;
+    final match = currentMatch;
+    if (active == null || match == null) return 0;
+    edit(
+      TextEdit(
+        offset: match.offset,
+        before: active.text.substring(
+          match.offset,
+          match.offset + match.length,
+        ),
+        after: replacement,
+      ),
+    );
+    search(query);
+    return 1;
   }
 
   int replaceAll(
@@ -278,6 +347,7 @@ class EditorController extends ChangeNotifier {
     if (result.count == 0) return 0;
     edit(TextEdit(offset: 0, before: active.text, after: result.text));
     searchMatches = const [];
+    currentMatchIndex = -1;
     return result.count;
   }
 
