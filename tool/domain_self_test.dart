@@ -11,8 +11,13 @@ void main() {
   assert(edited.undo().text == 'abc');
   assert(edited.undo().redo().text == 'aXYZc');
 
-  final workspace = Workspace(rootPath: '.').open(original);
-  assert(workspace.activeDocument?.path == 'main.arb');
-  assert(workspace.closeActive().activeDocument == null);
+  final second = const Document(path: 'second.arb', text: 'second');
+  final workspace = Workspace(rootPath: '.')
+      .open(original)
+      .replaceActive(edited)
+      .open(second);
+  assert(workspace.activeDocument?.path == 'second.arb');
+  assert(workspace.select(0).activeDocument?.text == 'aXYZc');
+  assert(workspace.closeActive().activeDocument?.path == 'main.arb');
   print('Domain self-tests passed');
 }

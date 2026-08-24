@@ -234,13 +234,19 @@ class _Tabs extends StatelessWidget {
     scrollDirection: Axis.horizontal,
     child: Row(
       children: [
-        for (final document in controller.workspace.documents)
+        for (
+          var index = 0;
+          index < controller.workspace.documents.length;
+          index++
+        )
           InputChip(
             label: Text(
-              '${document.path.split(Platform.pathSeparator).last}${document.isDirty ? ' *' : ''}',
+              '${controller.workspace.documents[index].path.split(Platform.pathSeparator).last}${controller.workspace.documents[index].isDirty ? ' *' : ''}',
             ),
-            selected: document.path == controller.activeDocument?.path,
-            onPressed: () => controller.open(document.path),
+            selected:
+                controller.workspace.documents[index].path ==
+                controller.activeDocument?.path,
+            onPressed: () => controller.selectTab(index),
           ),
       ],
     ),
