@@ -152,18 +152,18 @@ class _EditorShellState extends State<EditorShell> {
   }
 
   Future<void> _pickFile() async {
-    final file = await FilePicker.pickFile(
+    final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['arb'],
     );
-    final path = file?.path;
+    final path = result?.files.single.path;
     if (path != null && mounted) {
       await widget.controller.open(path);
     }
   }
 
   Future<void> _pickWorkspace() async {
-    final path = await FilePicker.getDirectoryPath(
+    final path = await FilePicker.platform.getDirectoryPath(
       dialogTitle: 'اختر مجلد المشروع',
     );
     if (path != null && mounted) {
