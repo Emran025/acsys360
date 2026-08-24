@@ -69,7 +69,7 @@ Future<CompilationResponse> _compileRequest(CompilationRequest request) async {
   final symbols = <SymbolRecord>[];
   final tac = <String>[];
   final trees = <Map<String, Object?>>[];
-  var compiledFiles = 0;
+  final sources = <String, String>{};
 
   for (final sourcePath in paths) {
     final file = _resolveFile(request.rootPath, sourcePath);
@@ -92,10 +92,13 @@ Future<CompilationResponse> _compileRequest(CompilationRequest request) async {
       );
       continue;
     }
+    sources[sourcePath] = inlineSource ?? await file.readAsString();
+  }
 
-    final source = inlineSource ?? await file.readAsString();
-    final result = Compiler().compile(source);
-    compiledFiles++;
+  final project = ProjectCompiler().compile(sources);
+  for (final fileResult in project.files) {
+    final sourcePath = fileResult.sourcePath;
+    final result = fileResult.result;
     tokens.addAll(
       result.tokens.map(
         (token) => ProtocolToken(
@@ -131,12 +134,23 @@ Future<CompilationResponse> _compileRequest(CompilationRequest request) async {
     }
     tac.addAll(result.threeAddressCode);
   }
+  diagnostics.addAll(
+    project.projectDiagnostics.map(
+      (item) => Diagnostic(
+        severity: DiagnosticSeverity.error,
+        phase: item.diagnostic.phase,
+        code: 'M002',
+        message: item.diagnostic.message,
+        span: _span(item.sourcePath, item.diagnostic.position, 1),
+      ),
+    ),
+  );
 
   final syntaxTree = paths.length == 1
       ? (trees.isEmpty ? null : trees.single['tree'] as Map<String, Object?>?)
       : <String, Object?>{'kind': 'project', 'files': trees};
   return CompilationResponse(
-    success: compiledFiles == paths.length && diagnostics.isEmpty,
+    success: sources.length == paths.length && diagnostics.isEmpty,
     diagnostics: diagnostics,
     tokens: tokens,
     syntaxTree: syntaxTree,

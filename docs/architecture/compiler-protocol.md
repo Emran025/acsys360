@@ -48,4 +48,4 @@
 
 ## ما لم ينفذ بعد
 
-العقد يعرّف شكل النقل، وCLI الحالي يترجم كل ملف مصدر مستقلًا ويجمع النتائج في استجابة project؛ لا يدعي ذلك تحليل dependencies أو symbol resolution عابرًا للملفات بعد. المرحلة التالية هي إضافة تحليل dependencies وsymbol resolution عابر للملفات، ثم تجهيز executable مستقل داخل app bundle بدل الاعتماد على `dart run` في بيئة التطوير. أما مسار stdin/stdout والـ adapter واختبار smoke الأساسي فقد نُفذت واختُبرت.
+العقد يعرّف شكل النقل، وCLI الحالي يمرر كل ملف إلى lexer/parser/semantic ثم يجمع النتائج في استجابة project، مع فحص project-level محدود لتعارض أسماء المتغيرات. لا يدعي ذلك تحليل dependencies أو import resolution عابرًا للملفات بعد. المرحلة التالية هي إضافة تحليل dependencies وsymbol resolution عابر للملفات، ثم تجهيز executable مستقل داخل app bundle بدل الاعتماد على `dart run` في بيئة التطوير. أما مسار stdin/stdout والـ adapter واختبار smoke الأساسي فقد نُفذت واختُبرت.
