@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../domain/entities/compilation_result.dart';
 import '../../domain/entities/document.dart';
 import '../../domain/entities/workspace.dart';
 import '../../domain/repositories/workspace_repository.dart';
@@ -12,18 +13,23 @@ class EditorController extends ChangeNotifier {
   final ApplyEdit applyEdit;
   final UndoEdit undoEdit;
   final RedoEdit redoEdit;
+  final CompilerRepository? compiler;
 
   Workspace workspace;
   List<String> files = const [];
   Object? error;
+  CompilationResult? compilation;
 
-  EditorController({required this.repository, required String rootPath})
-    : workspace = Workspace(rootPath: rootPath),
-      openDocument = OpenDocument(repository),
-      saveDocument = SaveDocument(repository),
-      applyEdit = const ApplyEdit(),
-      undoEdit = const UndoEdit(),
-      redoEdit = const RedoEdit();
+  EditorController({
+    required this.repository,
+    required String rootPath,
+    this.compiler,
+  }) : workspace = Workspace(rootPath: rootPath),
+       openDocument = OpenDocument(repository),
+       saveDocument = SaveDocument(repository),
+       applyEdit = const ApplyEdit(),
+       undoEdit = const UndoEdit(),
+       redoEdit = const RedoEdit();
 
   Document? get activeDocument => workspace.activeDocument;
 
@@ -69,6 +75,20 @@ class EditorController extends ChangeNotifier {
 
   void redo() {
     workspace = redoEdit(workspace);
+    notifyListeners();
+  }
+
+  Future<void> compile() async {
+    final service = compiler;
+    if (service == null) return;
+    final response = await service.compile(
+      rootPath: workspace.rootPath,
+      documents: workspace.documents,
+    );
+    compilation = CompilationResult(
+      success: response['success'] == true,
+      payload: response,
+    );
     notifyListeners();
   }
 }
