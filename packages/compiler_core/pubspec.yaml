@@ -1,0 +1,5 @@
+name: compiler_core
+description: Arabic teaching-language compiler core.
+publish_to: none
+environment:
+  sdk: '>=3.12.0 <4.0.0'
