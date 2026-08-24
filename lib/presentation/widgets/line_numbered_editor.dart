@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../domain/entities/editor_diagnostic.dart';
 import '../theme/app_theme.dart';
@@ -34,35 +33,42 @@ class _LineNumberedEditorState extends State<LineNumberedEditor> {
   final editorScrollController = ScrollController();
   final gutterScrollController = ScrollController();
   late int lineCount;
+  late TextSelection lastSelection;
 
   @override
   void initState() {
     super.initState();
     lineCount = _lineCount(widget.controller.text);
-    widget.controller.addListener(_updateLineCount);
+    lastSelection = widget.controller.selection;
+    widget.controller.addListener(_handleControllerChange);
   }
 
   @override
   void didUpdateWidget(covariant LineNumberedEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.controller != widget.controller) {
-      oldWidget.controller.removeListener(_updateLineCount);
-      widget.controller.addListener(_updateLineCount);
-      _updateLineCount();
+      oldWidget.controller.removeListener(_handleControllerChange);
+      widget.controller.addListener(_handleControllerChange);
+      _handleControllerChange();
     }
   }
 
   @override
   void dispose() {
-    widget.controller.removeListener(_updateLineCount);
+    widget.controller.removeListener(_handleControllerChange);
     editorScrollController.dispose();
     gutterScrollController.dispose();
     super.dispose();
   }
 
-  void _updateLineCount() {
+  void _handleControllerChange() {
     final next = _lineCount(widget.controller.text);
     if (next != lineCount && mounted) setState(() => lineCount = next);
+    final selection = widget.controller.selection;
+    if (selection != lastSelection) {
+      lastSelection = selection;
+      widget.onSelectionChanged?.call(selection);
+    }
   }
 
   int _lineCount(String text) =>
@@ -171,7 +177,6 @@ class _LineNumberedEditorState extends State<LineNumberedEditor> {
                   focusNode: widget.focusNode,
                   scrollController: editorScrollController,
                   onChanged: widget.onChanged,
-                  onSelectionChanged: widget.onSelectionChanged,
                   onTap: widget.onTap,
                   expands: true,
                   maxLines: null,
