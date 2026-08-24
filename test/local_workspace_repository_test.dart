@@ -39,20 +39,31 @@ void main() {
     () async {
       final root = await Directory.systemTemp.createTemp('acsys360-move-');
       addTearDown(() => root.delete(recursive: true));
-      final source = Directory('${root.path}/source');
-      final target = Directory('${root.path}/target');
-      final child = Directory('${source.path}/child');
+      final separator = Platform.pathSeparator;
+      final source = Directory('${root.path}${separator}source');
+      final target = Directory('${root.path}${separator}target');
+      final child = Directory('${source.path}${separator}child');
       await child.create(recursive: true);
       await target.create();
 
       final repository = LocalWorkspaceRepository();
       await repository.move(source.path, target.path);
-      expect(await Directory('${target.path}/source/child').exists(), isTrue);
+      expect(
+        await Directory(
+          '${target.path}${separator}source${separator}child',
+        ).exists(),
+        isTrue,
+      );
 
-      final nestedTarget = Directory('${target.path}/source/nested');
+      final nestedTarget = Directory(
+        '${target.path}${separator}source${separator}nested',
+      );
       await nestedTarget.create();
       expect(
-        () => repository.move('${target.path}/source', nestedTarget.path),
+        () => repository.move(
+          '${target.path}${separator}source',
+          nestedTarget.path,
+        ),
         throwsStateError,
       );
     },

@@ -69,6 +69,8 @@ class ArabicCodeController extends TextEditingController {
   };
 
   List<EditorDiagnostic> diagnostics = const [];
+  String ghostText = '';
+  int ghostOffset = -1;
 
   ArabicCodeController({super.text});
 
@@ -76,6 +78,15 @@ class ArabicCodeController extends TextEditingController {
     diagnostics = List.unmodifiable(next);
     notifyListeners();
   }
+
+  void setGhostText(String value, int offset) {
+    if (ghostText == value && ghostOffset == offset) return;
+    ghostText = value;
+    ghostOffset = value.isEmpty ? -1 : offset.clamp(0, text.length);
+    notifyListeners();
+  }
+
+  void clearGhostText() => setGhostText('', -1);
 
   @override
   TextSpan buildTextSpan({
@@ -91,6 +102,11 @@ class ArabicCodeController extends TextEditingController {
       boundaries.add(token.start);
       boundaries.add(token.end);
     }
+    if (ghostText.isNotEmpty &&
+        ghostOffset >= 0 &&
+        ghostOffset <= text.length) {
+      boundaries.add(ghostOffset);
+    }
     for (final diagnostic in diagnostics) {
       final start = diagnostic.offset.clamp(0, text.length);
       final end = (diagnostic.offset + diagnostic.length).clamp(
@@ -102,6 +118,17 @@ class ArabicCodeController extends TextEditingController {
     }
     final sorted = boundaries.toList()..sort();
     final children = <TextSpan>[];
+    if (ghostOffset == 0 && ghostText.isNotEmpty) {
+      children.add(
+        TextSpan(
+          text: ghostText,
+          style: baseStyle.copyWith(
+            color: colors.onSurfaceVariant.withValues(alpha: .52),
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+      );
+    }
     for (var index = 0; index < sorted.length - 1; index++) {
       final start = sorted[index];
       final end = sorted[index + 1];
@@ -127,6 +154,28 @@ class ArabicCodeController extends TextEditingController {
             decorationStyle: diagnostic == null
                 ? null
                 : TextDecorationStyle.wavy,
+          ),
+        ),
+      );
+      if (end == ghostOffset && ghostText.isNotEmpty) {
+        children.add(
+          TextSpan(
+            text: ghostText,
+            style: baseStyle.copyWith(
+              color: colors.onSurfaceVariant.withValues(alpha: .52),
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        );
+      }
+    }
+    if (sorted.length == 1 && ghostOffset != 0 && ghostText.isNotEmpty) {
+      children.add(
+        TextSpan(
+          text: ghostText,
+          style: baseStyle.copyWith(
+            color: colors.onSurfaceVariant.withValues(alpha: .52),
+            fontStyle: FontStyle.italic,
           ),
         ),
       );

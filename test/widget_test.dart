@@ -1,4 +1,6 @@
 import 'package:acsys360/domain/entities/document.dart';
+import 'package:compiler_contracts/compiler_contracts.dart';
+import 'package:acsys360/domain/entities/editor_diagnostic.dart';
 import 'package:acsys360/domain/entities/file_node.dart';
 import 'package:acsys360/domain/repositories/workspace_repository.dart';
 import 'package:acsys360/main.dart';
@@ -146,6 +148,90 @@ void main() {
     expect(controller.replaceCurrent('اكتب', 'نفذ'), 1);
     expect(controller.activeDocument?.text, 'اكتب نفذ');
     expect(controller.currentMatch?.offset, 0);
+  });
+
+  test('cycles through inline completion items', () {
+    final controller = EditorController(
+      repository: FakeWorkspaceRepository(),
+      rootPath: '.',
+    );
+    controller.assistance = const AssistResponse(
+      action: AssistAction.completion,
+      items: [
+        AssistCompletionItem(
+          label: 'برنامج',
+          insertText: 'برنامج',
+          kind: 'keyword',
+          detail: 'كلمة محجوزة',
+        ),
+        AssistCompletionItem(
+          label: 'برنامج_آخر',
+          insertText: 'برنامج_آخر',
+          kind: 'symbol',
+          detail: 'رمز',
+        ),
+      ],
+    );
+
+    expect(controller.currentCompletion?.label, 'برنامج');
+    controller.nextCompletion();
+    expect(controller.currentCompletion?.label, 'برنامج_آخر');
+    controller.previousCompletion();
+    expect(controller.currentCompletion?.label, 'برنامج');
+  });
+
+  testWidgets('renders ghost completion without changing source text', (
+    tester,
+  ) async {
+    final controller = ArabicCodeController(text: 'بر');
+    controller.setGhostText('نامج', 2);
+    late TextSpan span;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) {
+            span = controller.buildTextSpan(
+              context: context,
+              style: const TextStyle(color: Colors.white),
+              withComposing: false,
+            );
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
+
+    expect(controller.text, 'بر');
+    expect(span.toPlainText(), 'برنامج');
+  });
+
+  testWidgets('shows a diagnostic lamp in the editor gutter', (tester) async {
+    final controller = ArabicCodeController(text: 'برنامج');
+    controller.setDiagnostics([
+      const EditorDiagnostic(
+        severity: EditorDiagnosticSeverity.error,
+        phase: 'lexer',
+        code: 'L001',
+        message: 'رمز غير معروف',
+        sourcePath: 'main.arb',
+        offset: 0,
+        length: 1,
+        line: 1,
+        column: 1,
+      ),
+    ]);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SizedBox(
+          height: 180,
+          child: LineNumberedEditor(controller: controller),
+        ),
+      ),
+    );
+
+    expect(find.byIcon(Icons.lightbulb_outline_rounded), findsOneWidget);
   });
 
   testWidgets('highlights compiler-backed lexical categories', (tester) async {
