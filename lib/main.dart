@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 
 import 'data/repositories/local_workspace_repository.dart';
 import 'data/repositories/process_compiler_repository.dart';
+import 'domain/entities/compilation_result.dart';
 import 'domain/entities/document.dart';
 import 'domain/entities/editor_diagnostic.dart';
 import 'presentation/state/editor_controller.dart';
