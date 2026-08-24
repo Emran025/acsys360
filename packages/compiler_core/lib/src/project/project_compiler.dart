@@ -44,11 +44,31 @@ class ProjectCompiler {
   const ProjectCompiler({this.compiler = const Compiler()});
 
   ProjectCompilationResult compile(Map<String, String> sources) {
-    final files = [
+    final initialFiles = [
       for (final entry in sources.entries)
         ProjectFileResult(
           sourcePath: entry.key,
           result: compiler.compile(entry.value),
+        ),
+    ];
+    final externalSymbols = <String, Symbol>{};
+    for (final file in initialFiles) {
+      for (final symbol
+          in file.result.semantic?.symbols.values ?? const <Symbol>[]) {
+        if (symbol.kind == 'procedure' || symbol.kind == 'type') {
+          externalSymbols.putIfAbsent(symbol.name, () => symbol);
+        }
+      }
+    }
+    final files = [
+      for (final entry in sources.entries)
+        ProjectFileResult(
+          sourcePath: entry.key,
+          result: compiler.compile(
+            entry.value,
+            externalSymbols: externalSymbols.values,
+            execute: sources.length == 1,
+          ),
         ),
     ];
     final projectDiagnostics = <ProjectDiagnostic>[];
