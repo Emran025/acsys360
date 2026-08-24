@@ -869,9 +869,11 @@ class _EditorShellState extends State<EditorShell> {
             ToggleResultsIntent(),
         SingleActivator(LogicalKeyboardKey.keyJ, meta: true):
             ToggleResultsIntent(),
-        SingleActivator(LogicalKeyboardKey.keyF, control: true, shift: true):
+        SingleActivator(LogicalKeyboardKey.keyF, alt: true, shift: true):
             FormatDocumentIntent(),
-        SingleActivator(LogicalKeyboardKey.keyF, meta: true, shift: true):
+        SingleActivator(LogicalKeyboardKey.keyF, meta: true, alt: true):
+            FormatDocumentIntent(),
+        SingleActivator(LogicalKeyboardKey.keyI, control: true, shift: true):
             FormatDocumentIntent(),
         SingleActivator(LogicalKeyboardKey.space, control: true):
             CompletionIntent(),
