@@ -7,14 +7,17 @@ class CompilationRequest {
   const CompilationRequest({required this.rootPath, required this.sourcePaths});
 
   Map<String, Object> toJson() => {
-        'protocolVersion': protocolVersion,
-        'rootPath': rootPath,
-        'sourcePaths': sourcePaths,
-      };
+    'protocolVersion': protocolVersion,
+    'rootPath': rootPath,
+    'sourcePaths': sourcePaths,
+  };
 
-  factory CompilationRequest.fromJson(Map<String, dynamic> json) => CompilationRequest(
+  factory CompilationRequest.fromJson(Map<String, dynamic> json) =>
+      CompilationRequest(
         rootPath: json['rootPath'] as String,
-        sourcePaths: [for (final path in json['sourcePaths'] as List) path as String],
+        sourcePaths: [
+          for (final path in json['sourcePaths'] as List) path as String,
+        ],
       );
 }
 
@@ -40,14 +43,14 @@ class CompilationResponse {
   });
 
   Map<String, Object?> toJson() => {
-        'protocolVersion': protocolVersion,
-        'success': success,
-        'diagnostics': diagnostics,
-        'tokens': tokens,
-        'syntaxTree': syntaxTree,
-        'symbolTable': symbols,
-        'threeAddressCode': threeAddressCode,
-        'assembly': assembly,
-        'artifacts': artifacts,
-      };
+    'protocolVersion': protocolVersion,
+    'success': success,
+    'diagnostics': diagnostics,
+    'tokens': tokens,
+    'syntaxTree': syntaxTree,
+    'symbolTable': symbols,
+    'threeAddressCode': threeAddressCode,
+    'assembly': assembly,
+    'artifacts': artifacts,
+  };
 }
