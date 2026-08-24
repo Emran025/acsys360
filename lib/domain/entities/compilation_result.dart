@@ -10,4 +10,10 @@ class CompilationResult {
   List<dynamic> get threeAddressCode =>
       payload['threeAddressCode'] as List<dynamic>? ?? const [];
   String get assembly => payload['assembly'] as String? ?? '';
+  List<dynamic> get executionOutput =>
+      payload['executionOutput'] as List<dynamic>? ?? const [];
+  List<dynamic> get symbols =>
+      payload['symbolTable'] as List<dynamic>? ?? const [];
+  Map<String, dynamic>? get syntaxTree =>
+      payload['syntaxTree'] as Map<String, dynamic>?;
 }

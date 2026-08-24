@@ -75,10 +75,17 @@ class EditorController extends ChangeNotifier {
     assistance = null;
     selectedExplorerPath = null;
     selectedDirectoryPath = null;
+    notifyListeners();
     await refreshFiles();
   }
 
   Future<void> refreshFiles() async {
+    if (workspace.rootPath.trim().isEmpty) {
+      tree = const [];
+      files = const [];
+      error = null;
+      return;
+    }
     try {
       tree = await repository.listTree(workspace.rootPath);
       files = _flattenFiles(tree);
