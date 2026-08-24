@@ -75,6 +75,7 @@ class EditorController extends ChangeNotifier {
     assistance = null;
     selectedExplorerPath = null;
     selectedDirectoryPath = null;
+    notifyListeners();
     await refreshFiles();
   }
 
@@ -83,7 +84,6 @@ class EditorController extends ChangeNotifier {
       tree = const [];
       files = const [];
       error = null;
-      notifyListeners();
       return;
     }
     try {
