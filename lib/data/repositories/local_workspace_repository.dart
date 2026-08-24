@@ -28,35 +28,63 @@ class LocalWorkspaceRepository implements WorkspaceRepository {
   }
 
   Future<List<FileNode>> _readDirectory(Directory directory) async {
-    final entries = await directory.list(followLinks: false).toList();
+    List<FileSystemEntity> entries;
+    try {
+      entries = await directory.list(followLinks: false).toList();
+    } on FileSystemException {
+      return const [];
+    }
     entries.sort((a, b) {
       final aDirectory = a is Directory;
       final bDirectory = b is Directory;
       if (aDirectory != bDirectory) return aDirectory ? -1 : 1;
-      return a.path.toLowerCase().compareTo(b.path.toLowerCase());
+      return _baseName(
+        a.path,
+      ).toLowerCase().compareTo(_baseName(b.path).toLowerCase());
     });
+
     final result = <FileNode>[];
     for (final entry in entries) {
-      final name = entry.path.split(Platform.pathSeparator).last;
-      if (name.startsWith('.')) continue;
+      final name = _baseName(entry.path);
       if (entry is Directory) {
-        final children = await _readDirectory(entry);
-        if (children.isNotEmpty) {
-          result.add(
-            FileNode(
-              path: entry.path,
-              name: name,
-              isDirectory: true,
-              children: children,
-            ),
-          );
-        }
-      } else if (entry is File && entry.path.endsWith(sourceExtension)) {
+        if (name == '.git') continue;
+        result.add(
+          FileNode(
+            path: entry.path,
+            name: name,
+            isDirectory: true,
+            children: await _readDirectory(entry),
+          ),
+        );
+      } else if (entry is File) {
         result.add(FileNode(path: entry.path, name: name, isDirectory: false));
       }
     }
     return result;
   }
+
+  String _baseName(String path) {
+    final separator = Platform.pathSeparator;
+    final normalized = path.endsWith(separator)
+        ? path.substring(0, path.length - separator.length)
+        : path;
+    return normalized.split(separator).last;
+  }
+
+  String _validateName(String name, String message) {
+    final value = name.trim();
+    if (value.isEmpty ||
+        value.contains('/') ||
+        value.contains('\\') ||
+        value == '.' ||
+        value == '..') {
+      throw ArgumentError.value(name, 'name', message);
+    }
+    return value;
+  }
+
+  String _join(String directory, String name) =>
+      '${Directory(directory).path}${Platform.pathSeparator}$name';
 
   @override
   Future<Document> read(String path) async =>
@@ -64,38 +92,22 @@ class LocalWorkspaceRepository implements WorkspaceRepository {
 
   @override
   Future<Document> create(String rootPath, String name) async {
-    if (name.isEmpty ||
-        name.contains('/') ||
-        name.contains('\\') ||
-        name == '.' ||
-        name == '..') {
-      throw ArgumentError.value(
-        name,
-        'name',
-        'اسم الملف يجب أن يكون اسمًا محليًا صالحًا',
-      );
-    }
-    final normalized = name.endsWith(sourceExtension)
-        ? name
-        : '$name$sourceExtension';
-    final file = File(
-      '${Directory(rootPath).path}${Platform.pathSeparator}$normalized',
+    final value = _validateName(
+      name,
+      'اسم الملف يجب أن يكون اسمًا محليًا صالحًا',
     );
+    final normalized = value.endsWith(sourceExtension)
+        ? value
+        : '$value$sourceExtension';
+    final file = File(_join(rootPath, normalized));
     await file.create(recursive: true, exclusive: true);
     return Document(path: file.path, text: '');
   }
 
   @override
   Future<String> createDirectory(String rootPath, String name) async {
-    if (name.isEmpty ||
-        name.contains('/') ||
-        name.contains('\\') ||
-        name == '.' ||
-        name == '..') {
-      throw ArgumentError.value(name, 'name', 'اسم المجلد غير صالح');
-    }
     final directory = Directory(
-      '${Directory(rootPath).path}${Platform.pathSeparator}$name',
+      _join(rootPath, _validateName(name, 'اسم المجلد غير صالح')),
     );
     await directory.create();
     return directory.path;
@@ -118,14 +130,58 @@ class LocalWorkspaceRepository implements WorkspaceRepository {
 
   @override
   Future<void> move(String sourcePath, String targetDirectory) async {
-    final source = File(sourcePath);
-    final targetName = sourcePath.split(Platform.pathSeparator).last;
-    final target = File(
-      '${Directory(targetDirectory).path}${Platform.pathSeparator}$targetName',
+    final sourceType = await FileSystemEntity.type(
+      sourcePath,
+      followLinks: false,
     );
-    if (await target.exists()) {
-      throw StateError('يوجد ملف بهذا الاسم في المجلد الهدف');
+    if (sourceType == FileSystemEntityType.notFound ||
+        sourceType == FileSystemEntityType.link) {
+      throw StateError('العنصر المصدر غير صالح للنقل');
     }
-    await source.rename(target.path);
+    final target = Directory(targetDirectory);
+    if (!await target.exists()) throw StateError('المجلد الهدف غير موجود');
+
+    final source = FileSystemEntity.typeSync(sourcePath, followLinks: false);
+    final sourceAbsolute = File(sourcePath).absolute.path;
+    final targetAbsolute = target.absolute.path;
+    final separator = Platform.pathSeparator;
+    if (sourceType == FileSystemEntityType.directory &&
+        (targetAbsolute == sourceAbsolute ||
+            targetAbsolute.startsWith('$sourceAbsolute$separator'))) {
+      throw StateError('لا يمكن نقل المجلد إلى داخله');
+    }
+
+    final targetPath = _join(targetDirectory, _baseName(sourcePath));
+    if (await FileSystemEntity.type(targetPath, followLinks: false) !=
+        FileSystemEntityType.notFound) {
+      throw StateError('يوجد عنصر بهذا الاسم في المجلد الهدف');
+    }
+    if (source == FileSystemEntityType.directory) {
+      await Directory(sourcePath).rename(targetPath);
+    } else {
+      await File(sourcePath).rename(targetPath);
+    }
+  }
+
+  @override
+  Future<void> rename(String path, String newName) async {
+    final value = _validateName(newName, 'الاسم الجديد غير صالح');
+    final type = await FileSystemEntity.type(path, followLinks: false);
+    if (type == FileSystemEntityType.notFound ||
+        type == FileSystemEntityType.link) {
+      throw StateError('العنصر المطلوب غير موجود');
+    }
+    final parent = File(path).absolute.parent.path;
+    final targetPath = _join(parent, value);
+    if (targetPath == File(path).absolute.path) return;
+    if (await FileSystemEntity.type(targetPath, followLinks: false) !=
+        FileSystemEntityType.notFound) {
+      throw StateError('يوجد عنصر بهذا الاسم في المجلد نفسه');
+    }
+    if (type == FileSystemEntityType.directory) {
+      await Directory(path).rename(targetPath);
+    } else {
+      await File(path).rename(targetPath);
+    }
   }
 }

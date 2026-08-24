@@ -12,6 +12,7 @@ abstract interface class WorkspaceRepository {
   Future<void> write(Document document);
   Future<void> delete(String path);
   Future<void> move(String sourcePath, String targetDirectory);
+  Future<void> rename(String path, String newName);
 }
 
 abstract interface class CompilerRepository {
