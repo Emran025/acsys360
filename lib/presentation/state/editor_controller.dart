@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../domain/entities/compilation_result.dart';
 import '../../domain/entities/document.dart';
+import '../../domain/entities/file_node.dart';
 import '../../domain/entities/workspace.dart';
 import '../../domain/repositories/workspace_repository.dart';
 import '../../domain/usecases/workspace_actions.dart';
@@ -17,6 +18,7 @@ class EditorController extends ChangeNotifier {
 
   Workspace workspace;
   List<String> files = const [];
+  List<FileNode> tree = const [];
   Object? error;
   CompilationResult? compilation;
 
@@ -36,13 +38,15 @@ class EditorController extends ChangeNotifier {
   Future<void> changeRoot(String rootPath) async {
     workspace = Workspace(rootPath: rootPath);
     files = const [];
+    tree = const [];
     compilation = null;
     await refreshFiles();
   }
 
   Future<void> refreshFiles() async {
     try {
-      files = await repository.listFiles(workspace.rootPath);
+      tree = await repository.listTree(workspace.rootPath);
+      files = _flattenFiles(tree);
       error = null;
     } catch (exception) {
       error = exception;
@@ -76,6 +80,11 @@ class EditorController extends ChangeNotifier {
     }
     notifyListeners();
   }
+
+  List<String> _flattenFiles(List<FileNode> nodes) => [
+    for (final node in nodes)
+      if (node.isDirectory) ..._flattenFiles(node.children) else node.path,
+  ];
 
   Future<void> open(String path) async {
     try {
