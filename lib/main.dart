@@ -177,7 +177,7 @@ class _EditorShellState extends State<EditorShell> {
         SingleActivator(LogicalKeyboardKey.keyZ, meta: true): UndoIntent(),
         SingleActivator(LogicalKeyboardKey.keyY, control: true): RedoIntent(),
         SingleActivator(LogicalKeyboardKey.keyY, meta: true): RedoIntent(),
-        SingleActivator(LogicalKeyboardKey.keyF5): CompileIntent(),
+        SingleActivator(LogicalKeyboardKey.f5): CompileIntent(),
       },
       child: Actions(
         actions: {
