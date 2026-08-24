@@ -77,14 +77,14 @@ void main() {
     await tester.pump();
     expect(find.text('زمردي'), findsOneWidget);
     await tester.tap(find.text('زمردي'));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byTooltip('طي الشريط العلوي'));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.byTooltip('توسيع الشريط العلوي'), findsOneWidget);
 
     await tester.tap(find.byTooltip('طي اللوحة'));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.byTooltip('توسيع اللوحة'), findsOneWidget);
   });
 }
