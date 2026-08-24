@@ -102,15 +102,29 @@ class _EditorShellState extends State<EditorShell> {
       ),
     );
     nameController.dispose();
-    if (name != null && name.trim().isNotEmpty)
+    if (name != null && name.trim().isNotEmpty) {
       await widget.controller.create(name.trim());
+    }
+  }
+
+  Future<void> _pickFile() async {
+    final file = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: ['arb'],
+    );
+    final path = file?.path;
+    if (path != null && mounted) {
+      await widget.controller.open(path);
+    }
   }
 
   Future<void> _pickWorkspace() async {
     final path = await FilePicker.getDirectoryPath(
       dialogTitle: 'اختر مجلد المشروع',
     );
-    if (path != null && mounted) await widget.controller.changeRoot(path);
+    if (path != null && mounted) {
+      await widget.controller.changeRoot(path);
+    }
   }
 
   Future<void> _closeTab(int index) async {
@@ -169,6 +183,11 @@ class _EditorShellState extends State<EditorShell> {
               onPressed: _newFile,
               icon: const Icon(Icons.note_add),
               tooltip: 'ملف جديد',
+            ),
+            IconButton(
+              onPressed: _pickFile,
+              icon: const Icon(Icons.description),
+              tooltip: 'فتح ملف',
             ),
             IconButton(
               onPressed: controller.refreshFiles,
