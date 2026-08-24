@@ -402,9 +402,13 @@ class _EditorShellState extends State<EditorShell> {
     var start = selection.start;
     var end = selection.end;
     if (start == end) {
-      while (start > 0 && _isWordCharacter(text[start - 1])) start--;
+      while (start > 0 && _isWordCharacter(text[start - 1])) {
+        start--;
+      }
       end = selection.end;
-      while (end < text.length && _isWordCharacter(text[end])) end++;
+      while (end < text.length && _isWordCharacter(text[end])) {
+        end++;
+      }
       if (start == end) return;
       textController.selection = TextSelection(
         baseOffset: start,
@@ -461,7 +465,6 @@ class _EditorShellState extends State<EditorShell> {
   void _insertLine({required bool above}) {
     final selection = textController.selection;
     if (!selection.isValid) return;
-    final text = textController.text;
     final line = _currentLineBounds(selection);
     final insertAt = above ? line.start : line.end;
     final insertion = '\n';
@@ -909,13 +912,13 @@ class _EditorShellState extends State<EditorShell> {
             onInvoke: (_) => _deleteCurrentLine(),
           ),
           InsertLineIntent: CallbackAction<InsertLineIntent>(
-            onInvoke: (intent) => _insertLine(above: intent!.above),
+            onInvoke: (intent) => _insertLine(above: intent.above),
           ),
           MoveLineIntent: CallbackAction<MoveLineIntent>(
-            onInvoke: (intent) => _moveLine(intent!.direction),
+            onInvoke: (intent) => _moveLine(intent.direction),
           ),
           CopyLineIntent: CallbackAction<CopyLineIntent>(
-            onInvoke: (intent) => _copyLine(intent!.direction),
+            onInvoke: (intent) => _copyLine(intent.direction),
           ),
           SelectLineIntent: CallbackAction<SelectLineIntent>(
             onInvoke: (_) => _selectCurrentLine(),
@@ -927,7 +930,7 @@ class _EditorShellState extends State<EditorShell> {
             onInvoke: (_) => _selectAdjacentTab(1),
           ),
           NextDiagnosticIntent: CallbackAction<NextDiagnosticIntent>(
-            onInvoke: (intent) => _selectAdjacentDiagnostic(intent!.direction),
+            onInvoke: (intent) => _selectAdjacentDiagnostic(intent.direction),
           ),
           ToggleResultsIntent: CallbackAction<ToggleResultsIntent>(
             onInvoke: (_) => setState(() => resultsExpanded = !resultsExpanded),
