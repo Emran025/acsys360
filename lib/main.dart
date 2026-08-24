@@ -135,7 +135,9 @@ class _EditorShellState extends State<EditorShell> {
           ],
         ),
       );
-      if (discard != true) return;
+      if (discard != true) {
+        return;
+      }
     }
     widget.controller.closeTab(index, discard: document.isDirty);
   }
