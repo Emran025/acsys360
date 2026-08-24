@@ -5,22 +5,67 @@ import '../theme/app_theme.dart';
 
 class ArabicCodeController extends TextEditingController {
   static final _tokenPattern = RegExp(
-    r'"(?:\\.|[^"\\])*"|[0-9]+|[ء-ي]+|[A-Za-z_][A-Za-z0-9_]*',
+    r'//[^\r\n]*|"(?:\\.|[^"\\])*"|[‘’][^‘’]*[‘’]|[0-9]+(?:\.[0-9]+)?|[ء-يً-ٟۑ-ے]+(?:_[ء-يً-ٟۑ-ے]+)*|[A-Za-z_][A-Za-z0-9_]*|==|!=|=<|=>|&&|\|\||[+\-*\/%\\^!<>=]|[{}()[\],.:;]',
   );
   static const _keywords = {
     'برنامج',
-    'دالة',
+    'ثابت',
+    'نوع',
     'متغير',
-    'اذا',
-    'وإلا',
-    'طالما',
-    'لكل',
-    'ارجع',
+    'اجراء',
+    'بالقيمة',
+    'بالمرجع',
     'اطبع',
+    'اقرا',
+    'اذا',
+    'فان',
+    'والا',
+    'كرر',
+    'طالما',
+    'استمر',
+    'اعد',
+    'حتى',
+  };
+  static const _types = {
     'صحيح',
-    'خطأ',
-    'نص',
-    'عدد',
+    'حقيقي',
+    'منطقي',
+    'حرفي',
+    'خيط_رمزي',
+    'قائمة',
+    'سجل',
+  };
+  static const _booleans = {'صح', 'خطأ'};
+  static const _operators = {
+    '+',
+    '-',
+    '*',
+    '/',
+    '%',
+    r'\',
+    '^',
+    '&&',
+    '||',
+    '!',
+    '=',
+    '==',
+    '!=',
+    '=<',
+    '=>',
+    '<',
+    '>',
+  };
+  static const _punctuation = {
+    '{',
+    '}',
+    '(',
+    ')',
+    '[',
+    ']',
+    ';',
+    ',',
+    '.',
+    ':',
   };
 
   List<EditorDiagnostic> diagnostics = const [];
@@ -111,8 +156,18 @@ class ArabicCodeController extends TextEditingController {
 
   Color? _tokenColor(Match token, ColorScheme colors) {
     final value = token.group(0)!;
-    if (value.startsWith('"')) return colors.tertiary;
-    if (int.tryParse(value) != null) return colors.secondary;
-    return _keywords.contains(value) ? AppTheme.brandOrange : null;
+    if (value.startsWith('//')) return colors.onSurfaceVariant;
+    if (value.startsWith('"') ||
+        value.startsWith('‘') ||
+        value.startsWith('’')) {
+      return colors.tertiary;
+    }
+    if (RegExp(r'^\d').hasMatch(value)) return colors.secondary;
+    if (_booleans.contains(value)) return colors.primary;
+    if (_types.contains(value)) return colors.tertiary;
+    if (_keywords.contains(value)) return AppTheme.brandOrange;
+    if (_operators.contains(value)) return colors.error;
+    if (_punctuation.contains(value)) return colors.outline;
+    return null;
   }
 }

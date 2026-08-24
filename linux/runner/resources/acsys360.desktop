@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=acsys360
+Comment=Arabic programming language workspace
+Exec=acsys360
+Icon=resources/arabic360.png
+Terminal=false
+Categories=Development;IDE;

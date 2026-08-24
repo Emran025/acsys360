@@ -4,18 +4,21 @@ import 'package:flutter/material.dart';
 
 import '../../domain/entities/file_node.dart';
 
-enum _WorkspaceAction { open, cut, delete, paste }
+enum _WorkspaceAction { open, cut, delete, paste, newFile, newFolder }
 
 class WorkspaceExplorer extends StatelessWidget {
   final String rootPath;
   final List<FileNode> nodes;
   final bool isLoading;
   final bool hasCutPath;
+  final String? selectedPath;
+  final String? selectedDirectoryPath;
+  final void Function(String path, {required bool isDirectory}) onSelect;
   final Future<void> Function() onChooseFolder;
   final Future<void> Function() onOpenFile;
   final Future<void> Function() onRefresh;
-  final Future<void> Function() onNewFile;
-  final Future<void> Function() onNewFolder;
+  final Future<void> Function(String rootPath) onNewFile;
+  final Future<void> Function(String rootPath) onNewFolder;
   final Future<void> Function(String path) onOpen;
   final Future<void> Function(String path) onDelete;
   final void Function(String path) onCut;
@@ -27,6 +30,9 @@ class WorkspaceExplorer extends StatelessWidget {
     required this.nodes,
     required this.isLoading,
     required this.hasCutPath,
+    required this.selectedPath,
+    required this.selectedDirectoryPath,
+    required this.onSelect,
     required this.onChooseFolder,
     required this.onOpenFile,
     required this.onRefresh,
@@ -74,36 +80,33 @@ class WorkspaceExplorer extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Wrap(
-              spacing: 2,
-              runSpacing: 2,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
               children: [
-                _ExplorerAction(
+                _ExplorerIcon(
                   key: const ValueKey('workspace-new-file'),
                   icon: Icons.note_add_outlined,
-                  label: 'ملف',
-                  tooltip: 'إنشاء ملف عربي',
-                  onPressed: onNewFile,
+                  tooltip: 'ملف عربي جديد داخل المجلد المحدد',
+                  onPressed: () => onNewFile(selectedDirectoryPath ?? rootPath),
                 ),
-                _ExplorerAction(
+                _ExplorerIcon(
                   key: const ValueKey('workspace-new-folder'),
                   icon: Icons.create_new_folder_outlined,
-                  label: 'مجلد',
-                  tooltip: 'إنشاء مجلد',
-                  onPressed: onNewFolder,
+                  tooltip: 'مجلد جديد داخل المجلد المحدد',
+                  onPressed: () =>
+                      onNewFolder(selectedDirectoryPath ?? rootPath),
                 ),
-                _ExplorerAction(
+                _ExplorerIcon(
                   key: const ValueKey('workspace-open-file'),
                   icon: Icons.file_open_outlined,
-                  label: 'فتح',
                   tooltip: 'فتح ملف عربي',
                   onPressed: onOpenFile,
                 ),
-                IconButton(
+                _ExplorerIcon(
+                  key: const ValueKey('workspace-open-folder'),
+                  icon: Icons.drive_folder_upload_outlined,
+                  tooltip: 'فتح مجلد Workspace',
                   onPressed: onChooseFolder,
-                  tooltip: 'اختيار مجلد Workspace',
-                  icon: const Icon(Icons.drive_folder_upload_outlined),
                 ),
               ],
             ),
@@ -113,12 +116,8 @@ class WorkspaceExplorer extends StatelessWidget {
             child: InkWell(
               borderRadius: BorderRadius.circular(8),
               onTap: onChooseFolder,
-              onSecondaryTapUp: (details) => _showMenu(
-                context,
-                details.globalPosition,
-                targetDirectory: rootPath,
-                includePaste: hasCutPath,
-              ),
+              onSecondaryTapUp: (details) =>
+                  _showRootMenu(context, details.globalPosition),
               child: Ink(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
@@ -159,12 +158,8 @@ class WorkspaceExplorer extends StatelessWidget {
                 ? const Center(child: CircularProgressIndicator())
                 : GestureDetector(
                     behavior: HitTestBehavior.translucent,
-                    onSecondaryTapUp: (details) => _showMenu(
-                      context,
-                      details.globalPosition,
-                      targetDirectory: rootPath,
-                      includePaste: hasCutPath,
-                    ),
+                    onSecondaryTapUp: (details) =>
+                        _showRootMenu(context, details.globalPosition),
                     child: nodes.isEmpty
                         ? const _EmptyExplorer()
                         : ListView(
@@ -174,10 +169,14 @@ class WorkspaceExplorer extends StatelessWidget {
                                 _WorkspaceTreeNode(
                                   node: node,
                                   hasCutPath: hasCutPath,
+                                  selectedPath: selectedPath,
+                                  onSelect: onSelect,
                                   onOpen: onOpen,
                                   onDelete: onDelete,
                                   onCut: onCut,
                                   onPaste: onPaste,
+                                  onNewFile: onNewFile,
+                                  onNewFolder: onNewFolder,
                                 ),
                             ],
                           ),
@@ -188,47 +187,60 @@ class WorkspaceExplorer extends StatelessWidget {
     );
   }
 
-  Future<void> _showMenu(
-    BuildContext context,
-    Offset globalPosition, {
-    required String targetDirectory,
-    required bool includePaste,
-  }) async {
-    final action = await showMenu<_WorkspaceAction>(
-      context: context,
-      position: RelativeRect.fromLTRB(
-        globalPosition.dx,
-        globalPosition.dy,
-        MediaQuery.of(context).size.width - globalPosition.dx,
-        MediaQuery.of(context).size.height - globalPosition.dy,
-      ),
+  Future<void> _showRootMenu(BuildContext context, Offset position) async {
+    final action = await _showMenu(
+      context,
+      position,
       items: [
-        if (includePaste)
+        if (hasCutPath)
           const PopupMenuItem(
             value: _WorkspaceAction.paste,
             child: Text('لصق الملف هنا'),
           ),
+        const PopupMenuItem(
+          value: _WorkspaceAction.newFile,
+          child: Text('ملف عربي جديد'),
+        ),
+        const PopupMenuItem(
+          value: _WorkspaceAction.newFolder,
+          child: Text('مجلد جديد'),
+        ),
         const PopupMenuItem(
           value: _WorkspaceAction.open,
           child: Text('اختيار مجلد Workspace'),
         ),
       ],
     );
-    if (action == _WorkspaceAction.paste) await onPaste(targetDirectory);
+    if (action == _WorkspaceAction.paste) await onPaste(rootPath);
+    if (action == _WorkspaceAction.newFile) await onNewFile(rootPath);
+    if (action == _WorkspaceAction.newFolder) await onNewFolder(rootPath);
     if (action == _WorkspaceAction.open) await onChooseFolder();
   }
+
+  Future<_WorkspaceAction?> _showMenu(
+    BuildContext context,
+    Offset position, {
+    required List<PopupMenuEntry<_WorkspaceAction>> items,
+  }) => showMenu<_WorkspaceAction>(
+    context: context,
+    position: RelativeRect.fromLTRB(
+      position.dx,
+      position.dy,
+      MediaQuery.of(context).size.width - position.dx,
+      MediaQuery.of(context).size.height - position.dy,
+    ),
+    items: items,
+  );
 }
 
-class _ExplorerAction extends StatelessWidget {
+class _ExplorerIcon extends StatelessWidget {
   final IconData icon;
-  final String label;
   final String tooltip;
   final Future<void> Function() onPressed;
 
-  const _ExplorerAction({
+  const _ExplorerIcon({
     super.key,
     required this.icon,
-    required this.label,
     required this.tooltip,
     required this.onPressed,
   });
@@ -236,11 +248,7 @@ class _ExplorerAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Tooltip(
     message: tooltip,
-    child: TextButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 17),
-      label: Text(label),
-    ),
+    child: IconButton(onPressed: onPressed, icon: Icon(icon, size: 19)),
   );
 }
 
@@ -263,56 +271,105 @@ class _EmptyExplorer extends StatelessWidget {
 class _WorkspaceTreeNode extends StatelessWidget {
   final FileNode node;
   final bool hasCutPath;
+  final String? selectedPath;
+  final void Function(String path, {required bool isDirectory}) onSelect;
   final Future<void> Function(String path) onOpen;
   final Future<void> Function(String path) onDelete;
   final void Function(String path) onCut;
   final Future<void> Function(String targetDirectory) onPaste;
+  final Future<void> Function(String rootPath) onNewFile;
+  final Future<void> Function(String rootPath) onNewFolder;
 
   const _WorkspaceTreeNode({
     required this.node,
     required this.hasCutPath,
+    required this.selectedPath,
+    required this.onSelect,
     required this.onOpen,
     required this.onDelete,
     required this.onCut,
     required this.onPaste,
+    required this.onNewFile,
+    required this.onNewFolder,
   });
 
   @override
   Widget build(BuildContext context) {
     if (!node.isDirectory) {
+      final colors = Theme.of(context).colorScheme;
       return GestureDetector(
-        onSecondaryTapUp: (details) =>
-            _showFileMenu(context, details.globalPosition),
+        onSecondaryTapUp: (details) {
+          onSelect(node.path, isDirectory: false);
+          _showFileMenu(context, details.globalPosition);
+        },
         child: ListTile(
           dense: true,
           visualDensity: VisualDensity.compact,
           contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+          selected: node.path == selectedPath,
+          selectedTileColor: colors.primaryContainer.withValues(alpha: .36),
           leading: const Icon(Icons.code_rounded, size: 18),
           title: Text(node.name, overflow: TextOverflow.ellipsis),
-          onTap: () => onOpen(node.path),
+          onTap: () {
+            onSelect(node.path, isDirectory: false);
+            onOpen(node.path);
+          },
         ),
       );
     }
+    final colors = Theme.of(context).colorScheme;
     return GestureDetector(
-      onSecondaryTapUp: (details) =>
-          _showDirectoryMenu(context, details.globalPosition),
-      child: ExpansionTile(
-        initiallyExpanded: false,
-        tilePadding: const EdgeInsets.symmetric(horizontal: 8),
-        childrenPadding: const EdgeInsetsDirectional.only(start: 14),
-        leading: const Icon(Icons.folder_outlined, size: 19),
-        title: Text(node.name, overflow: TextOverflow.ellipsis),
-        children: [
-          for (final child in node.children)
-            _WorkspaceTreeNode(
-              node: child,
-              hasCutPath: hasCutPath,
-              onOpen: onOpen,
-              onDelete: onDelete,
-              onCut: onCut,
-              onPaste: onPaste,
+      onSecondaryTapUp: (details) {
+        onSelect(node.path, isDirectory: true);
+        _showDirectoryMenu(context, details.globalPosition);
+      },
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: node.path == selectedPath
+              ? colors.primaryContainer.withValues(alpha: .36)
+              : null,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: ExpansionTile(
+          initiallyExpanded: false,
+          onExpansionChanged: (_) => onSelect(node.path, isDirectory: true),
+          tilePadding: const EdgeInsets.symmetric(horizontal: 8),
+          childrenPadding: const EdgeInsetsDirectional.only(start: 14),
+          leading: const Icon(Icons.folder_outlined, size: 19),
+          title: Text(node.name, overflow: TextOverflow.ellipsis),
+          children: [
+            Padding(
+              padding: const EdgeInsetsDirectional.only(start: 14),
+              child: Row(
+                children: [
+                  _TreeAction(
+                    tooltip: 'ملف جديد داخل ${node.name}',
+                    icon: Icons.note_add_outlined,
+                    onPressed: () => onNewFile(node.path),
+                  ),
+                  _TreeAction(
+                    tooltip: 'مجلد جديد داخل ${node.name}',
+                    icon: Icons.create_new_folder_outlined,
+                    onPressed: () => onNewFolder(node.path),
+                  ),
+                ],
+              ),
             ),
-        ],
+            for (final child in node.children)
+              _WorkspaceTreeNode(
+                node: child,
+                hasCutPath: hasCutPath,
+                selectedPath: selectedPath,
+                onSelect: onSelect,
+                onOpen: onOpen,
+                onDelete: onDelete,
+                onCut: onCut,
+                onPaste: onPaste,
+                onNewFile: onNewFile,
+                onNewFolder: onNewFolder,
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -342,10 +399,20 @@ class _WorkspaceTreeNode extends StatelessWidget {
             value: _WorkspaceAction.paste,
             child: Text('لصق الملف هنا'),
           ),
+        const PopupMenuItem(
+          value: _WorkspaceAction.newFile,
+          child: Text('ملف جديد هنا'),
+        ),
+        const PopupMenuItem(
+          value: _WorkspaceAction.newFolder,
+          child: Text('مجلد جديد هنا'),
+        ),
         const PopupMenuItem(value: _WorkspaceAction.delete, child: Text('حذف')),
       ],
     );
     if (action == _WorkspaceAction.paste) await onPaste(node.path);
+    if (action == _WorkspaceAction.newFile) await onNewFile(node.path);
+    if (action == _WorkspaceAction.newFolder) await onNewFolder(node.path);
     if (action == _WorkspaceAction.delete) await onDelete(node.path);
   }
 
@@ -362,5 +429,23 @@ class _WorkspaceTreeNode extends StatelessWidget {
       MediaQuery.of(context).size.height - position.dy,
     ),
     items: items,
+  );
+}
+
+class _TreeAction extends StatelessWidget {
+  final String tooltip;
+  final IconData icon;
+  final Future<void> Function() onPressed;
+
+  const _TreeAction({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: tooltip,
+    child: IconButton(onPressed: onPressed, icon: Icon(icon, size: 17)),
   );
 }
