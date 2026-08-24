@@ -266,7 +266,7 @@ Future<CompilationResponse> _compileRequest(CompilationRequest request) async {
         final artifact = await const DartNativeArtifactBuilder().build(
           program,
           outputDirectory: outputDirectory,
-          dartExecutable: Platform.environment['DART_EXECUTABLE'] ?? 'dart',
+          dartExecutable: _resolveDartExecutable(),
         );
         if (artifact.success) {
           artifacts.add(artifact.executablePath!);
@@ -316,6 +316,23 @@ Future<CompilationResponse> _compileRequest(CompilationRequest request) async {
     executionOutput: executionOutput,
     artifacts: artifacts,
   );
+}
+
+String _resolveDartExecutable() {
+  final configured = Platform.environment['DART_EXECUTABLE']?.trim();
+  if (configured != null && configured.isNotEmpty) return configured;
+  final dartName = Platform.isWindows ? 'dart.exe' : 'dart';
+  final bundled = File(
+    '${File(Platform.resolvedExecutable).parent.path}${Platform.pathSeparator}dart-sdk${Platform.pathSeparator}bin${Platform.pathSeparator}$dartName',
+  );
+  if (bundled.existsSync()) return bundled.path;
+  final executableName = Platform.resolvedExecutable
+      .split(Platform.pathSeparator)
+      .last;
+  if (executableName == 'dart' || executableName == 'dart.exe') {
+    return Platform.resolvedExecutable;
+  }
+  return dartName;
 }
 
 File _resolveFile(String rootPath, String sourcePath) {

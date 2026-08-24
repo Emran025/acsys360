@@ -63,18 +63,21 @@ jobs:
         run: |
           mkdir -p build/linux/x64/release/bundle/compiler
           cp packages/compiler_core/build/arabicc build/linux/x64/release/bundle/compiler/arabicc
+          cp -R "$FLUTTER_ROOT/bin/cache/dart-sdk" build/linux/x64/release/bundle/compiler/dart-sdk
       - name: Bundle compiler on Windows
         if: matrix.target == 'windows'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force build/windows/x64/runner/Release/compiler | Out-Null
           Copy-Item packages/compiler_core/build/arabicc.exe build/windows/x64/runner/Release/compiler/arabicc.exe
+          Copy-Item "$env:FLUTTER_ROOT\bin\cache\dart-sdk" build/windows/x64/runner/Release/compiler/dart-sdk -Recurse -Force
       - name: Bundle compiler on macOS
         if: matrix.target == 'macos'
         shell: bash
         run: |
           mkdir -p build/macos/Build/Products/Release/acsys360.app/Contents/MacOS/compiler
           cp packages/compiler_core/build/arabicc build/macos/Build/Products/Release/acsys360.app/Contents/MacOS/compiler/arabicc
+          cp -R "$FLUTTER_ROOT/bin/cache/dart-sdk" build/macos/Build/Products/Release/acsys360.app/Contents/MacOS/compiler/dart-sdk
       - name: Smoke test bundled compiler on Unix
         if: matrix.target != 'windows'
         shell: bash
