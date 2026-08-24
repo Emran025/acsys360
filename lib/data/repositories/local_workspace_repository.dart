@@ -25,6 +25,17 @@ class LocalWorkspaceRepository implements WorkspaceRepository {
 
   @override
   Future<Document> create(String rootPath, String name) async {
+    if (name.isEmpty ||
+        name.contains('/') ||
+        name.contains('\\') ||
+        name == '.' ||
+        name == '..') {
+      throw ArgumentError.value(
+        name,
+        'name',
+        'اسم الملف يجب أن يكون اسمًا محليًا صالحًا',
+      );
+    }
     final normalized = name.endsWith(sourceExtension)
         ? name
         : '$name$sourceExtension';
