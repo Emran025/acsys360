@@ -1,0 +1,5 @@
+name: compiler_contracts
+description: Versioned protocol shared by the Arabic compiler and desktop editor.
+publish_to: none
+environment:
+  sdk: '>=3.12.0 <4.0.0'
