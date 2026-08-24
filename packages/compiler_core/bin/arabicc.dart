@@ -133,6 +133,8 @@ Future<CompilationResponse> _compileRequest(CompilationRequest request) async {
   final tokens = <ProtocolToken>[];
   final symbols = <SymbolRecord>[];
   final tac = <String>[];
+  final assembly = <String>[];
+  final executionOutput = <String>[];
   final trees = <Map<String, Object?>>[];
   final sources = <String, String>{};
 
@@ -191,13 +193,17 @@ Future<CompilationResponse> _compileRequest(CompilationRequest request) async {
       symbols.add(
         SymbolRecord(
           name: symbol.name,
-          kind: 'variable',
+          kind: symbol.kind,
           type: symbol.type,
           span: _span(sourcePath, symbol.position, symbol.name.length),
         ),
       );
     }
     tac.addAll(result.threeAddressCode);
+    if (result.assembly.isNotEmpty) {
+      assembly.add('; source: $sourcePath\n${result.assembly}');
+      executionOutput.addAll(result.executionOutput);
+    }
   }
   diagnostics.addAll(
     project.projectDiagnostics.map(
@@ -221,6 +227,8 @@ Future<CompilationResponse> _compileRequest(CompilationRequest request) async {
     syntaxTree: syntaxTree,
     symbols: symbols,
     threeAddressCode: tac,
+    assembly: assembly.join('\n'),
+    executionOutput: executionOutput,
     artifacts: const [],
   );
 }

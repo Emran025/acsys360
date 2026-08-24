@@ -177,6 +177,7 @@ class ProcessCompilerRepository
     'symbolTable': const [],
     'threeAddressCode': const [],
     'assembly': '',
+    'executionOutput': const [],
     'artifacts': const [],
   };
 }

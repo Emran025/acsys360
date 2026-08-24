@@ -1,4 +1,4 @@
-const protocolVersion = '0.2.0';
+const protocolVersion = '0.3.0';
 
 enum CompilationMode { active, project }
 
@@ -204,6 +204,7 @@ class CompilationResponse {
   final List<SymbolRecord> symbols;
   final List<String> threeAddressCode;
   final String assembly;
+  final List<String> executionOutput;
   final List<String> artifacts;
 
   const CompilationResponse({
@@ -214,6 +215,7 @@ class CompilationResponse {
     this.symbols = const [],
     this.threeAddressCode = const [],
     this.assembly = '',
+    this.executionOutput = const [],
     this.artifacts = const [],
   });
 
@@ -226,6 +228,7 @@ class CompilationResponse {
     'symbolTable': [for (final symbol in symbols) symbol.toJson()],
     'threeAddressCode': threeAddressCode,
     'assembly': assembly,
+    'executionOutput': executionOutput,
     'artifacts': artifacts,
   };
 
@@ -248,6 +251,7 @@ class CompilationResponse {
       ).map(SymbolRecord.fromJson).toList(),
       threeAddressCode: _requiredStringList(json, 'threeAddressCode'),
       assembly: _requiredString(json, 'assembly'),
+      executionOutput: _requiredStringList(json, 'executionOutput'),
       artifacts: _requiredStringList(json, 'artifacts'),
     );
   }
