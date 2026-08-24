@@ -1,30 +1,29 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:acsys360/data/repositories/local_workspace_repository.dart';
+import 'package:acsys360/main.dart';
+import 'package:acsys360/presentation/state/editor_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:acsys360/main.dart';
-
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('opens an Arabic source document', (tester) async {
+    final directory = await Directory.systemTemp.createTemp('acsys360_test_');
+    final file = File('${directory.path}/main.arb');
+    await file.writeAsString('برنامج اختبار {}.');
+    final controller = EditorController(
+      repository: LocalWorkspaceRepository(),
+      rootPath: directory.path,
+    );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    await tester.pumpWidget(ArabicEditorApp(controller: controller));
+    await tester.pumpAndSettle();
+    expect(find.text('main.arb'), findsOneWidget);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    await tester.tap(find.text('main.arb'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsOneWidget);
+    expect(controller.activeDocument?.text, 'برنامج اختبار {}.');
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    await directory.delete(recursive: true);
   });
 }
