@@ -27,27 +27,63 @@ void main() {
   );
 }
 
-class ArabicEditorApp extends StatelessWidget {
+class ArabicEditorApp extends StatefulWidget {
   final EditorController controller;
 
   const ArabicEditorApp({super.key, required this.controller});
 
   @override
+  State<ArabicEditorApp> createState() => _ArabicEditorAppState();
+}
+
+class _ArabicEditorAppState extends State<ArabicEditorApp> {
+  ThemeMode themeMode = ThemeMode.light;
+
+  void _toggleTheme() {
+    setState(() {
+      themeMode = themeMode == ThemeMode.light
+          ? ThemeMode.dark
+          : ThemeMode.light;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: controller,
+    animation: widget.controller,
     builder: (context, _) => MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'محرر اللغة العربية',
-      theme: ThemeData(colorSchemeSeed: Colors.indigo, useMaterial3: true),
-      home: EditorShell(controller: controller),
+      themeMode: themeMode,
+      theme: ThemeData(
+        colorSchemeSeed: Colors.indigo,
+        brightness: Brightness.light,
+        useMaterial3: true,
+      ),
+      darkTheme: ThemeData(
+        colorSchemeSeed: Colors.indigo,
+        brightness: Brightness.dark,
+        useMaterial3: true,
+      ),
+      home: EditorShell(
+        controller: widget.controller,
+        onToggleTheme: _toggleTheme,
+        isDark: themeMode == ThemeMode.dark,
+      ),
     ),
   );
 }
 
 class EditorShell extends StatefulWidget {
   final EditorController controller;
+  final VoidCallback? onToggleTheme;
+  final bool isDark;
 
-  const EditorShell({super.key, required this.controller});
+  const EditorShell({
+    super.key,
+    required this.controller,
+    this.onToggleTheme,
+    this.isDark = false,
+  });
 
   @override
   State<EditorShell> createState() => _EditorShellState();
@@ -275,6 +311,13 @@ class _EditorShellState extends State<EditorShell> {
                   onPressed: controller.saveAll,
                   icon: const Icon(Icons.save_as),
                   tooltip: 'حفظ الكل',
+                ),
+                IconButton(
+                  onPressed: widget.onToggleTheme,
+                  icon: Icon(
+                    widget.isDark ? Icons.light_mode : Icons.dark_mode,
+                  ),
+                  tooltip: widget.isDark ? 'الوضع الفاتح' : 'الوضع الداكن',
                 ),
                 IconButton(
                   onPressed: _toggleFindReplace,

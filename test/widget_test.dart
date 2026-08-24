@@ -56,4 +56,19 @@ void main() {
     expect(find.byType(TextField), findsOneWidget);
     expect(controller.activeDocument?.text, 'برنامج اختبار {}.');
   });
+
+  testWidgets('toggles the editor theme', (tester) async {
+    final controller = EditorController(
+      repository: FakeWorkspaceRepository(),
+      rootPath: '.',
+    );
+
+    await tester.pumpWidget(ArabicEditorApp(controller: controller));
+    await tester.pump();
+    expect(find.byTooltip('الوضع الداكن'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('الوضع الداكن'));
+    await tester.pump();
+    expect(find.byTooltip('الوضع الفاتح'), findsOneWidget);
+  });
 }
