@@ -1,30 +1,74 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
+import 'package:acsys360/domain/entities/document.dart';
+import 'package:acsys360/domain/entities/file_node.dart';
+import 'package:acsys360/domain/repositories/workspace_repository.dart';
+import 'package:acsys360/main.dart';
+import 'package:acsys360/presentation/state/editor_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:acsys360/main.dart';
+class FakeWorkspaceRepository implements WorkspaceRepository {
+  final document = const Document(path: 'main.arb', text: 'برنامج اختبار {}.');
+
+  @override
+  Future<List<String>> listFiles(String rootPath) async => [document.path];
+
+  @override
+  Future<List<FileNode>> listTree(String rootPath) async => [
+    const FileNode(
+      path: 'src',
+      name: 'src',
+      isDirectory: true,
+      children: [
+        FileNode(path: 'src/main.arb', name: 'main.arb', isDirectory: false),
+      ],
+    ),
+  ];
+
+  @override
+  Future<Document> read(String path) async => document;
+
+  @override
+  Future<Document> create(String rootPath, String name) async =>
+      Document(path: name, text: '');
+
+  @override
+  Future<void> write(Document document) async {}
+}
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('opens an Arabic source document', (tester) async {
+    final controller = EditorController(
+      repository: FakeWorkspaceRepository(),
+      rootPath: '.',
+    );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+    await tester.pumpWidget(ArabicEditorApp(controller: controller));
     await tester.pump();
+    expect(find.text('src'), findsOneWidget);
+    expect(find.text('main.arb'), findsNothing);
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    await tester.tap(find.text('src'));
+    await tester.pumpAndSettle();
+    expect(find.text('main.arb'), findsOneWidget);
+
+    await tester.tap(find.text('main.arb'));
+    await tester.pump();
+    expect(find.byType(TextField), findsOneWidget);
+    expect(controller.activeDocument?.text, 'برنامج اختبار {}.');
+  });
+
+  testWidgets('toggles the editor theme', (tester) async {
+    final controller = EditorController(
+      repository: FakeWorkspaceRepository(),
+      rootPath: '.',
+    );
+
+    await tester.pumpWidget(ArabicEditorApp(controller: controller));
+    await tester.pump();
+    expect(find.byTooltip('الوضع الداكن'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('الوضع الداكن'));
+    await tester.pump();
+    expect(find.byTooltip('الوضع الفاتح'), findsOneWidget);
   });
 }
