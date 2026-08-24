@@ -43,7 +43,11 @@ class CompilationResult {
 class Compiler {
   const Compiler();
 
-  CompilationResult compile(String source) {
+  CompilationResult compile(
+    String source, {
+    Iterable<Symbol> externalSymbols = const [],
+    bool execute = true,
+  }) {
     final lexical = Lexer(source).scan();
     final parsed = Parser(lexical.tokens).parse();
     if (parsed.program == null) {
@@ -52,7 +56,10 @@ class Compiler {
         ...parsed.diagnostics,
       ]);
     }
-    final semantic = SemanticAnalyzer().analyze(parsed.program!);
+    final semantic = SemanticAnalyzer().analyze(
+      parsed.program!,
+      externalSymbols: externalSymbols,
+    );
     final diagnostics = [
       ...lexical.diagnostics,
       ...parsed.diagnostics,
@@ -64,7 +71,7 @@ class Compiler {
     final assembly = diagnostics.isEmpty
         ? const AssemblyGenerator().generate(tac)
         : '';
-    final executionResult = diagnostics.isEmpty
+    final executionResult = diagnostics.isEmpty && execute
         ? const Interpreter().execute(parsed.program!)
         : const ExecutionResult();
     final allDiagnostics = [

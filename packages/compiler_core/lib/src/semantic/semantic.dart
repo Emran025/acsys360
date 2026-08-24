@@ -49,9 +49,13 @@ class SemanticAnalyzer {
   final diagnostics = <Diagnostic>[];
   final _types = <String, _SemanticType>{};
   final _typeSpecs = <String, TypeSpec>{};
+  final _externalSymbols = <String, Symbol>{};
   final _scopes = <Map<String, Symbol>>[];
 
-  SemanticResult analyze(ProgramNode program) {
+  SemanticResult analyze(
+    ProgramNode program, {
+    Iterable<Symbol> externalSymbols = const [],
+  }) {
     symbols.clear();
     diagnostics.clear();
     _types
@@ -64,6 +68,11 @@ class SemanticAnalyzer {
         'خيط_رمزي': _SemanticType.string(),
       });
     _typeSpecs.clear();
+    _externalSymbols
+      ..clear()
+      ..addEntries(
+        externalSymbols.map((symbol) => MapEntry(symbol.name, symbol)),
+      );
     _scopes
       ..clear()
       ..add(symbols);
@@ -440,7 +449,7 @@ class SemanticAnalyzer {
       final symbol = scope[name];
       if (symbol != null) return symbol;
     }
-    return null;
+    return _externalSymbols[name];
   }
 
   _SemanticType _fromSpec(
@@ -453,6 +462,10 @@ class SemanticAnalyzer {
       if (_types.containsKey(spec.name)) return _types[spec.name]!;
       if (_typeSpecs.containsKey(spec.name)) {
         return _resolveDeclaredType(spec.name, position, active);
+      }
+      final external = _externalSymbols[spec.name];
+      if (external?.kind == 'type' && external?.semanticType != null) {
+        return external!.semanticType!;
       }
       _error(position, 'النوع "${spec.name}" غير معرف');
       return _SemanticType.unknown();
