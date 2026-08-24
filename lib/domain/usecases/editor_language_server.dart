@@ -31,11 +31,15 @@ class EditorLanguageServer {
     required String rootPath,
     required String sourcePath,
     required List<Document> documents,
+    String target = 'none',
+    String? artifactDirectory,
   }) async {
     final response = await compiler.compile(
       rootPath: rootPath,
       sourcePath: sourcePath,
       documents: documents,
+      target: target,
+      artifactDirectory: artifactDirectory,
     );
     final compilation = CompilationResult(
       success: response['success'] == true,

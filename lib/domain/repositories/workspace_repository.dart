@@ -20,6 +20,8 @@ abstract interface class CompilerRepository {
     required String rootPath,
     required String sourcePath,
     required List<Document> documents,
+    String target = 'none',
+    String? artifactDirectory,
   });
 }
 
