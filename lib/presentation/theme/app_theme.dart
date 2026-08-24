@@ -42,6 +42,29 @@ abstract final class AppTheme {
           color: scheme.onSurface,
         ),
       ),
+      dialogTheme: const DialogThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+        ),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+        ),
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.48),
@@ -68,8 +91,8 @@ abstract final class AppTheme {
         thickness: 1,
       ),
       listTileTheme: const ListTileThemeData(minVerticalPadding: 4),
-      popupMenuTheme: PopupMenuThemeData(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      popupMenuTheme: const PopupMenuThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
       ),
     );
   }

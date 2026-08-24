@@ -32,6 +32,7 @@ class EditorController extends ChangeNotifier {
   Object? error;
   CompilationResult? compilation;
   AssistResponse? assistance;
+  int assistanceIndex = 0;
   List<SearchMatch> searchMatches = const [];
   int currentMatchIndex = -1;
   List<EditorDiagnostic> diagnostics = const [];
@@ -92,6 +93,7 @@ class EditorController extends ChangeNotifier {
     workspace = workspace.select(index);
     searchMatches = const [];
     assistance = null;
+    assistanceIndex = 0;
     notifyListeners();
   }
 
@@ -410,6 +412,27 @@ class EditorController extends ChangeNotifier {
     searchMatches = const [];
     diagnostics = const [];
     assistance = null;
+    assistanceIndex = 0;
+    notifyListeners();
+  }
+
+  AssistCompletionItem? get currentCompletion {
+    final items = assistance?.items ?? const <AssistCompletionItem>[];
+    if (items.isEmpty || assistanceIndex >= items.length) return null;
+    return items[assistanceIndex];
+  }
+
+  void nextCompletion() {
+    final items = assistance?.items ?? const <AssistCompletionItem>[];
+    if (items.isEmpty) return;
+    assistanceIndex = (assistanceIndex + 1) % items.length;
+    notifyListeners();
+  }
+
+  void previousCompletion() {
+    final items = assistance?.items ?? const <AssistCompletionItem>[];
+    if (items.isEmpty) return;
+    assistanceIndex = (assistanceIndex - 1 + items.length) % items.length;
     notifyListeners();
   }
 
@@ -450,6 +473,7 @@ class EditorController extends ChangeNotifier {
         offset: offset,
         symbols: _knownSymbols(),
       );
+      assistanceIndex = 0;
       error = null;
     } catch (exception) {
       error = exception;
@@ -458,8 +482,9 @@ class EditorController extends ChangeNotifier {
   }
 
   void clearAssist() {
-    if (assistance == null) return;
+    if (assistance == null && assistanceIndex == 0) return;
     assistance = null;
+    assistanceIndex = 0;
     notifyListeners();
   }
 
@@ -474,6 +499,7 @@ class EditorController extends ChangeNotifier {
         sourceText: active.text,
         offset: offset,
       );
+      assistanceIndex = 0;
       error = null;
     } catch (exception) {
       error = exception;

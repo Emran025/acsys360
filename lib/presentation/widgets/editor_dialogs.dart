@@ -172,6 +172,7 @@ class AppDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
     title: Row(
       children: [
         Icon(icon, color: Theme.of(context).colorScheme.primary),
