@@ -155,6 +155,7 @@ void main() {
                 ),
               ),
               SizedBox(
+                width: 118,
                 height: 100,
                 child: CodeMinimap(
                   controller: sourceController,
@@ -168,7 +169,8 @@ void main() {
     );
     await tester.pump();
 
-    await tester.tap(find.bySemanticsLabel('خريطة مصغرة للكود'));
+    final minimap = find.byType(CodeMinimap);
+    await tester.tap(minimap);
     await tester.pump();
 
     expect(scrollController.offset, greaterThan(0));
