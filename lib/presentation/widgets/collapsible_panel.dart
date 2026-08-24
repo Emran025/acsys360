@@ -24,7 +24,7 @@ class CollapsiblePanel extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOut,
-      height: expanded ? expandedHeight : 40,
+      height: expanded ? expandedHeight : 41,
       decoration: BoxDecoration(
         color: colors.surfaceContainerLow,
         border: Border(top: BorderSide(color: colors.outlineVariant)),
