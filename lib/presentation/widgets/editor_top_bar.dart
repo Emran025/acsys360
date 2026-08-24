@@ -270,10 +270,7 @@ class _AccentPicker extends StatelessWidget {
           ),
         ),
     ],
-    child: IconButton.filledTonal(
-      onPressed: null,
-      icon: Icon(Icons.palette_outlined, color: accent.color, size: 19),
-    ),
+    child: Icon(Icons.palette_outlined, color: accent.color, size: 22),
   );
 }
 
