@@ -6,6 +6,7 @@ import 'package:acsys360/domain/repositories/workspace_repository.dart';
 import 'package:acsys360/main.dart';
 import 'package:acsys360/presentation/state/editor_controller.dart';
 import 'package:acsys360/presentation/widgets/arabic_code_controller.dart';
+import 'package:acsys360/presentation/widgets/code_minimap.dart';
 import 'package:acsys360/presentation/widgets/line_numbered_editor.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -130,6 +131,49 @@ void main() {
     expect(minimap, findsOneWidget);
     await tester.tap(minimap, warnIfMissed: false);
     await tester.pump();
+  });
+
+  testWidgets('jumps to a distant line from the minimap', (tester) async {
+    final sourceController = TextEditingController(
+      text: List.generate(80, (index) => 'السطر $index').join('\n'),
+    );
+    final scrollController = ScrollController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SizedBox(
+          height: 220,
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  child: SizedBox(
+                    height: 1900,
+                    child: Text(sourceController.text),
+                  ),
+                ),
+              ),
+              SizedBox(
+                height: 100,
+                child: CodeMinimap(
+                  controller: sourceController,
+                  scrollController: scrollController,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.bySemanticsLabel('خريطة مصغرة للكود'));
+    await tester.pump();
+
+    expect(scrollController.offset, greaterThan(0));
+    scrollController.dispose();
+    sourceController.dispose();
   });
 
   testWidgets('configures theme colors and collapsible panels', (tester) async {
