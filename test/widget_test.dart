@@ -8,6 +8,7 @@ import 'package:acsys360/presentation/state/editor_controller.dart';
 import 'package:acsys360/presentation/widgets/arabic_code_controller.dart';
 import 'package:acsys360/presentation/widgets/line_numbered_editor.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class FakeWorkspaceRepository implements WorkspaceRepository {
@@ -101,6 +102,12 @@ void main() {
     expect(find.byType(LineNumberedEditor), findsOneWidget);
     expect(find.text('1'), findsOneWidget);
     expect(controller.activeDocument?.text, 'برنامج اختبار {}.');
+    expect(
+      find.byKey(const ValueKey('arabic-file-icon')),
+      findsAtLeastNWidgets(2),
+    );
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.textDirection, TextDirection.ltr);
   });
 
   testWidgets('configures theme colors and collapsible panels', (tester) async {
@@ -245,6 +252,70 @@ void main() {
 
     await tester.enterText(find.byType(TextField), 'برنامج');
     expect(controller.text, 'برنامج');
+  });
+
+  testWidgets('typing a different character dismisses ghost text once', (
+    tester,
+  ) async {
+    final controller = EditorController(
+      repository: FakeWorkspaceRepository(),
+      rootPath: '.',
+    );
+    await controller.open('main.arb');
+    controller.edit(
+      const TextEdit(offset: 0, before: 'برنامج اختبار {}.', after: 'بر'),
+    );
+    controller.assistance = const AssistResponse(
+      action: AssistAction.completion,
+      prefix: 'بر',
+      replaceStart: 0,
+      replaceLength: 2,
+      items: [
+        AssistCompletionItem(
+          label: 'برنامج',
+          insertText: 'برنامج',
+          kind: 'keyword',
+          detail: 'كلمة محجوزة',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(ArabicEditorApp(controller: controller));
+    await tester.pump();
+    await tester.enterText(find.byType(TextField), 'بز');
+    await tester.pump();
+
+    expect(controller.activeDocument?.text, 'بز');
+  });
+
+  testWidgets('inserts an indented line without moving the cursor to EOF', (
+    tester,
+  ) async {
+    final controller = EditorController(
+      repository: FakeWorkspaceRepository(),
+      rootPath: '.',
+    );
+    await controller.open('main.arb');
+    controller.edit(
+      const TextEdit(
+        offset: 0,
+        before: 'برنامج اختبار {}.',
+        after: 'برنامج اختبار {',
+      ),
+    );
+
+    await tester.pumpWidget(ArabicEditorApp(controller: controller));
+    await tester.pump();
+    final field = find.byType(TextField);
+    await tester.tap(field);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+
+    expect(controller.activeDocument?.text, 'برنامج اختبار {\n  ');
+    expect(
+      tester.widget<TextField>(field).controller?.selection.extentOffset,
+      controller.activeDocument?.text.length,
+    );
   });
 
   testWidgets('shows a diagnostic lamp in the editor gutter', (tester) async {

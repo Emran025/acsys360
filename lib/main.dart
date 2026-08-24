@@ -19,6 +19,7 @@ import 'presentation/widgets/collapsible_panel.dart';
 import 'presentation/widgets/editor_top_bar.dart';
 import 'presentation/widgets/find_replace_bar.dart';
 import 'presentation/widgets/arabic_code_controller.dart';
+import 'presentation/widgets/arabic_file_icon.dart';
 import 'presentation/widgets/line_numbered_editor.dart';
 import 'presentation/widgets/workspace_explorer.dart';
 
@@ -128,6 +129,7 @@ class _EditorShellState extends State<EditorShell> {
   bool resultsExpanded = true;
   EditorDiagnostic? visibleDiagnostic;
   Timer? analysisTimer;
+  int _editGeneration = 0;
 
   @override
   void initState() {
@@ -167,9 +169,19 @@ class _EditorShellState extends State<EditorShell> {
       return;
     }
     final pathChanged = document.path != boundPath;
-    if (pathChanged || textController.text != document.text) {
+    final contentChanged = textController.text != document.text;
+    if (pathChanged || contentChanged) {
+      _editGeneration++;
       boundPath = document.path;
-      textController.value = TextEditingValue(text: document.text);
+      final nextOffset = pathChanged
+          ? 0
+          : textController.selection.extentOffset
+                .clamp(0, document.text.length)
+                .toInt();
+      textController.value = TextEditingValue(
+        text: document.text,
+        selection: TextSelection.collapsed(offset: nextOffset),
+      );
     }
     textController.setDiagnostics(widget.controller.diagnostics);
     _syncGhostCompletion();
@@ -183,14 +195,19 @@ class _EditorShellState extends State<EditorShell> {
   void _scheduleAnalysis() {
     analysisTimer?.cancel();
     if (widget.controller.activeDocument == null) return;
+    final generation = _editGeneration;
     analysisTimer = Timer(const Duration(milliseconds: 350), () async {
-      if (!mounted) return;
+      if (!mounted || generation != _editGeneration) return;
       await widget.controller.analyze();
-      if (!mounted || !_shouldSuggest) {
+      if (!mounted || generation != _editGeneration || !_shouldSuggest) {
         widget.controller.clearAssist();
         return;
       }
-      await widget.controller.complete(_cursorOffset);
+      final offset = _cursorOffset;
+      await widget.controller.complete(offset);
+      if (!mounted || generation != _editGeneration) {
+        widget.controller.clearAssist();
+      }
     });
   }
 
@@ -244,6 +261,17 @@ class _EditorShellState extends State<EditorShell> {
     final key = event.logicalKey;
     final hardware = HardwareKeyboard.instance;
     final hasCompletion = widget.controller.currentCompletion != null;
+    if (hasCompletion && _dismissesCompletion(key, hardware)) {
+      widget.controller.clearAssist();
+      if (key == LogicalKeyboardKey.enter &&
+          !hardware.isControlPressed &&
+          !hardware.isMetaPressed &&
+          !hardware.isAltPressed) {
+        _insertIndentedNewLine();
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored;
+    }
     if (key == LogicalKeyboardKey.tab) {
       if (hardware.isShiftPressed) {
         _outdent();
@@ -267,6 +295,13 @@ class _EditorShellState extends State<EditorShell> {
       widget.controller.clearAssist();
       return KeyEventResult.handled;
     }
+    if (key == LogicalKeyboardKey.enter &&
+        !hardware.isControlPressed &&
+        !hardware.isMetaPressed &&
+        !hardware.isAltPressed) {
+      _insertIndentedNewLine();
+      return KeyEventResult.handled;
+    }
     if (key == LogicalKeyboardKey.keyD &&
         (hardware.isControlPressed || hardware.isMetaPressed)) {
       if (hardware.isShiftPressed) {
@@ -279,8 +314,27 @@ class _EditorShellState extends State<EditorShell> {
     return KeyEventResult.ignored;
   }
 
+  bool _dismissesCompletion(LogicalKeyboardKey key, HardwareKeyboard hardware) {
+    if (key == LogicalKeyboardKey.arrowLeft ||
+        key == LogicalKeyboardKey.arrowRight ||
+        key == LogicalKeyboardKey.home ||
+        key == LogicalKeyboardKey.end ||
+        key == LogicalKeyboardKey.backspace ||
+        key == LogicalKeyboardKey.delete ||
+        key == LogicalKeyboardKey.enter) {
+      return true;
+    }
+    return !hardware.isControlPressed &&
+        !hardware.isMetaPressed &&
+        !hardware.isAltPressed &&
+        key != LogicalKeyboardKey.tab &&
+        key != LogicalKeyboardKey.arrowUp &&
+        key != LogicalKeyboardKey.arrowDown &&
+        key != LogicalKeyboardKey.escape;
+  }
+
   int get _cursorOffset {
-    final offset = textController.selection.baseOffset;
+    final offset = textController.selection.extentOffset;
     return offset < 0 ? textController.text.length : offset;
   }
 
@@ -312,6 +366,8 @@ class _EditorShellState extends State<EditorShell> {
 
   void _onSelectionChanged(TextSelection selection) {
     _hideTransientUi();
+    final document = widget.controller.activeDocument;
+    if (document != null && textController.text != document.text) return;
     final response = widget.controller.assistance;
     final expectedOffset = response == null
         ? -1
@@ -324,6 +380,18 @@ class _EditorShellState extends State<EditorShell> {
     _syncGhostCompletion();
   }
 
+  void _insertIndentedNewLine() {
+    final selection = textController.selection;
+    if (!selection.isValid) return;
+    final start = selection.start;
+    final source = textController.text;
+    final lineStart = source.lastIndexOf('\n', start - 1) + 1;
+    final linePrefix = source.substring(lineStart, start);
+    final currentIndent = RegExp(r'^[ \t]*').stringMatch(linePrefix) ?? '';
+    final extraIndent = linePrefix.trimRight().endsWith('{') ? '  ' : '';
+    _insertTextAtSelection('\n$currentIndent$extraIndent');
+  }
+
   void _insertTextAtSelection(String value) {
     final selection = textController.selection;
     if (!selection.isValid) return;
@@ -333,6 +401,7 @@ class _EditorShellState extends State<EditorShell> {
     final beforeText = oldText.substring(0, start);
     final replacedText = oldText.substring(start, end);
     final nextText = '$beforeText$value${oldText.substring(end)}';
+    _editGeneration++;
     textController.value = TextEditingValue(
       text: nextText,
       selection: TextSelection.collapsed(offset: start + value.length),
@@ -771,6 +840,7 @@ class _EditorShellState extends State<EditorShell> {
   void _onTextChanged(String value) {
     final document = widget.controller.activeDocument;
     if (document == null || value == document.text) return;
+    _editGeneration++;
     final before = document.text;
     var start = 0;
     while (start < before.length &&
@@ -1557,8 +1627,9 @@ class _TabsState extends State<_Tabs> {
                     child: Row(
                       textDirection: TextDirection.ltr,
                       children: [
-                        Icon(
-                          _tabFileIcon(document.path),
+                        ArabicFileIcon(
+                          path: document.path,
+                          fallback: _tabFileIcon(document.path),
                           size: 16,
                           color: active
                               ? Theme.of(context).colorScheme.primary
