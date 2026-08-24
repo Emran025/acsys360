@@ -198,7 +198,7 @@ class _EditorShellState extends State<EditorShell> {
   }
 
   Future<void> _openFile() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       dialogTitle: 'فتح ملف عربي',
       type: FileType.custom,
       allowedExtensions: [
@@ -218,7 +218,7 @@ class _EditorShellState extends State<EditorShell> {
     final active = widget.controller.activeDocument;
     if (active == null) return;
     final currentName = active.path.split(Platform.pathSeparator).last;
-    final path = await FilePicker.platform.saveFile(
+    final path = await FilePicker.saveFile(
       dialogTitle: 'حفظ الملف باسم',
       fileName: currentName,
       type: FileType.custom,
