@@ -220,8 +220,9 @@ class _EditorShellState extends State<EditorShell> {
       replaceController.text,
     );
     if (!mounted || count == 0) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('تم استبدال $count تطابقات')));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('تم استبدال $count تطابقات')));
   }
 
   void _onTextChanged(String value) {
