@@ -9,34 +9,48 @@ permissions:
   contents: read
 
 jobs:
-  analyze-and-test:
+  compiler-core:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build the pinned development image
-        run: docker build --file .devcontainer/Dockerfile --tag acsys360-dev .
-      - name: Format, analyze, and test inside the development image
-        run: >-
-          docker run --rm
-          --volume "${{ github.workspace }}:/workspace/acsys360"
-          --workdir /workspace/acsys360
-          acsys360-dev
-          bash -lc "flutter pub get && dart format --output=none --set-exit-if-changed lib test && flutter analyze && flutter test"
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - name: Analyze compiler core
+        working-directory: packages/compiler_core
+        run: dart analyze
+      - name: Run compiler self-tests
+        working-directory: packages/compiler_core
+        run: dart run bin/self_test.dart
+      - name: Analyze shared contracts
+        working-directory: packages/compiler_contracts
+        run: dart analyze
+
+  editor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart format --output=none --set-exit-if-changed lib test
+      - run: flutter analyze
+      - run: flutter test
 
   desktop-build:
-    needs: analyze-and-test
+    needs: [compiler-core, editor]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build the pinned development image
-        run: docker build --file .devcontainer/Dockerfile --tag acsys360-dev .
-      - name: Build Linux desktop inside the development image
-        run: >-
-          docker run --rm
-          --volume "${{ github.workspace }}:/workspace/acsys360"
-          --workdir /workspace/acsys360
-          acsys360-dev
-          bash -lc "flutter pub get && flutter build linux --release"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter config --enable-linux-desktop
+      - run: flutter pub get
+      - run: flutter build linux --release
       - uses: actions/upload-artifact@v4
         with:
           name: acsys360-linux
