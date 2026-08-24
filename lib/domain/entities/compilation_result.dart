@@ -12,6 +12,10 @@ class CompilationResult {
   String get assembly => payload['assembly'] as String? ?? '';
   List<dynamic> get executionOutput =>
       payload['executionOutput'] as List<dynamic>? ?? const [];
+  List<String> get artifacts =>
+      (payload['artifacts'] as List<dynamic>? ?? const [])
+          .whereType<String>()
+          .toList(growable: false);
   List<dynamic> get symbols =>
       payload['symbolTable'] as List<dynamic>? ?? const [];
   Map<String, dynamic>? get syntaxTree =>
