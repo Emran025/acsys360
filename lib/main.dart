@@ -152,11 +152,12 @@ class _EditorShellState extends State<EditorShell> {
   }
 
   Future<void> _pickFile() async {
-    final result = await FilePicker.pickFiles(
+    final files = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['arb'],
+      allowMultiple: false,
     );
-    final path = result?.files.single.path;
+    final path = files.isEmpty ? null : files.first.path;
     if (path != null && mounted) {
       await widget.controller.open(path);
     }

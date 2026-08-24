@@ -2,7 +2,7 @@
 
 ## الإجابة الدقيقة
 
-نعم، توجد الآن صورة تطوير في `.devcontainer/Dockerfile` وإعداد `.devcontainer/devcontainer.json`. الصورة تثبت Ubuntu 24.04 وإصدار Flutter محددًا (`3.32.5`) وتثبت أدوات Linux Desktop. كما يثبت كل من CI وRelease workflow الإصدار نفسه صراحةً عبر `flutter-version: 3.32.5` بدل قناة `stable` المتحركة. هذا يجعل بيئة compiler والتحليل وبناء Linux متطابقة بين المطور وGitHub عند استخدام نفس الصورة.
+نعم، توجد الآن صورة تطوير في `.devcontainer/Dockerfile` وإعداد `.devcontainer/devcontainer.json`. الصورة تثبت Ubuntu 24.04 وإصدار Flutter محددًا (`3.44.5`) وتثبت أدوات Linux Desktop. كما يثبت كل من CI وRelease workflow الإصدار نفسه صراحةً عبر `flutter-version: 3.44.5` بدل قناة `stable` المتحركة. هذا يجعل بيئة compiler والتحليل وبناء Linux متطابقة بين المطور وGitHub عند استخدام نفس الصورة.
 
 لكن لا يصح استخدام صورة Linux واحدة لبناء Windows وmacOS native. لذلك تستخدم Release workflow runners أصلية لكل منصة: Ubuntu لـ Linux، Windows لـ Windows، وmacOS لـ macOS. هذا ليس تناقضًا؛ الصورة توحّد بيئة التطوير والتحقق، بينما native runners مطلوبة لتجميع artifact الأصلي للمنصة.
 
@@ -10,10 +10,11 @@
 
 | الحدث | ما يحدث |
 |---|---|
-| Pull Request | checkout، Flutter `3.32.5`، pub get، format check، analyze، tests |
-| Push إلى `main` | نفس الفحوصات وبناء Linux artifact للتحقق باستخدام Flutter `3.32.5` |
+| Pull Request | checkout، Flutter `3.44.5`، pub get، format check، analyze، tests |
+| Push إلى `main` | نفس الفحوصات وبناء Linux artifact للتحقق باستخدام Flutter `3.44.5` |
 | تغيير `.devcontainer` على `main` | بناء صورة التطوير ونشرها إلى `ghcr.io/<owner>/<repo>/dev` مع SHA و`latest` |
-| Tag من الشكل `vX.Y.Z` | بناء Linux/Windows/macOS على runners أصلية باستخدام Flutter `3.32.5`، ضغط artifacts، إنشاء GitHub Release وإرفاقها |
+| Tag من الشكل `vX.Y.Z` | بناء Linux/Windows/macOS على runners أصلية باستخدام Flutter `3.44.5`، ضغط artifacts، إنشاء GitHub Release وإرفاقها |
+| فحص البيئة المحلية | تشغيل `bash tool/environment_doctor.sh --strict` على جهاز التطوير؛ ويمكن إضافة `--doctor` لطباعة `flutter doctor -v` |
 | بعد إضافة compiler CLI | يضاف smoke step يترجم fixtures ويمنع release عند فشل العقد أو الترجمة |
 
 ## الصلاحيات والأمان
@@ -26,7 +27,7 @@
 
 ## قيود يجب مراقبتها
 
-إصدار Flutter في Dockerfile وDev Container يجب ترقيته معًا وبمراجعة مقصودة، لا عبر `latest`. كما يجب أن يطابق `pubspec.yaml` ومتطلبات CI. أداة `flutter_code_editor` اختيارية وليست شرطًا؛ إذا سببت قيودًا في RTL أو التحكم بالـ undo/redo نستبدلها بمحرر مخصص فوق Flutter primitives. أما `peg` فيبقى أداة توليد مؤجلة إلى أن تثبت اختبارات grammar أن فائدته أكبر من كلفة دمج parser generated.
+إصدار Flutter في Dockerfile وDev Container وCI وRelease يجب ترقيته معًا وبمراجعة مقصودة، لا عبر `latest`. الإصدار الحالي المعتمد هو `3.44.5`، ويأتي معه Dart `3.12.2` وفق [سجل إصدارات Flutter الرسمي][5]. يمكن تشغيل `bash tool/environment_doctor.sh --strict` على جهاز التطوير للتحقق من ذلك. كما يجب أن يطابق `pubspec.yaml` ومتطلبات CI. أداة `flutter_code_editor` اختيارية وليست شرطًا؛ إذا سببت قيودًا في RTL أو التحكم بالـ undo/redo نستبدلها بمحرر مخصص فوق Flutter primitives. أما `peg` فيبقى أداة توليد مؤجلة إلى أن تثبت اختبارات grammar أن فائدته أكبر من كلفة دمج parser generated.
 
 ## References
 
@@ -34,3 +35,4 @@
 [2]: https://docs.github.com/packages/working-with-a-github-packages-registry/working-with-the-container-registry "GitHub Container registry"
 [3]: https://docs.github.com/actions/writing-workflows/choosing-what-your-workflow-does/running-variations-of-jobs-in-a-workflow "GitHub matrix jobs"
 [4]: https://docs.flutter.dev/platform-integration/desktop "Flutter desktop support"
+[5]: https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json "Flutter official Linux release metadata"
