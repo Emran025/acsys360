@@ -1,3 +1,5 @@
+export 'src/assist/language_assist.dart';
+export 'src/assist/language_catalog.dart';
 export 'src/ast/ast.dart';
 export 'src/codegen/three_address.dart';
 export 'src/compiler.dart';

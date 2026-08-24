@@ -6,6 +6,10 @@ import 'package:compiler_contracts/compiler_contracts.dart';
 import '../lib/arabic_compiler.dart' hide Diagnostic;
 
 Future<void> main(List<String> arguments) async {
+  if (arguments.length == 1 && arguments.single == '--assist') {
+    await _runAssist();
+    return;
+  }
   if (arguments.length == 1 && arguments.single != '--protocol') {
     await _runLegacy(arguments.single);
     return;
@@ -29,6 +33,67 @@ Future<void> _runLegacy(String sourcePath) async {
   final result = Compiler().compile(await file.readAsString());
   stdout.writeln(const JsonEncoder.withIndent('  ').convert(result.toJson()));
   exitCode = result.success ? 0 : 1;
+}
+
+Future<void> _runAssist() async {
+  final payload = await stdin.transform(utf8.decoder).join();
+  try {
+    final decoded = jsonDecode(payload);
+    if (decoded is! Map) {
+      throw const FormatException('يجب أن يكون طلب assist كائن JSON');
+    }
+    final request = AssistRequest.fromJson(Map<String, dynamic>.from(decoded));
+    final assist = const LanguageAssist();
+    if (request.action == AssistAction.completion) {
+      final result = assist.complete(
+        request.sourceText,
+        request.offset,
+        symbols: request.symbols,
+      );
+      await _writeAssistResponse(
+        AssistResponse(
+          action: AssistAction.completion,
+          expected: result.expected,
+          prefix: result.prefix,
+          replaceStart: result.replaceStart,
+          replaceLength: result.replaceLength,
+          items: [
+            for (final item in result.items)
+              AssistCompletionItem(
+                label: item.label,
+                insertText: item.insertText,
+                kind: item.kind,
+                detail: item.detail,
+              ),
+          ],
+        ),
+      );
+    } else {
+      final help = assist.helpFor(request.sourceText, request.offset);
+      await _writeAssistResponse(
+        AssistResponse(
+          action: AssistAction.help,
+          help: help == null
+              ? null
+              : AssistHelp(
+                  keyword: help.keyword,
+                  title: help.title,
+                  description: help.description,
+                  syntax: help.syntax,
+                ),
+        ),
+      );
+    }
+    exitCode = 0;
+  } on FormatException catch (error) {
+    stderr.writeln(error.message);
+    exitCode = 64;
+  }
+}
+
+Future<void> _writeAssistResponse(AssistResponse response) async {
+  stdout.writeln(jsonEncode(response.toJson()));
+  await stdout.flush();
 }
 
 Future<void> _runProtocol() async {

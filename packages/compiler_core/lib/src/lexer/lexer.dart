@@ -1,3 +1,4 @@
+import '../assist/language_catalog.dart';
 import '../model/token.dart';
 
 class LexerResult {
@@ -8,36 +9,7 @@ class LexerResult {
 }
 
 class Lexer {
-  static const keywords = {
-    'برنامج',
-    'ثابت',
-    'نوع',
-    'متغير',
-    'اجراء',
-    'بالقيمة',
-    'بالمرجع',
-    'صحيح',
-    'حقيقي',
-    'منطقي',
-    'حرفي',
-    'خيط_رمزي',
-    'قائمة',
-    'سجل',
-    'من',
-    'اطبع',
-    'اقرا',
-    'اذا',
-    'فان',
-    'والا',
-    'كرر',
-    'طالما',
-    'استمر',
-    'اعد',
-    'حتى',
-    'اضف',
-    'صح',
-    'خطأ',
-  };
+  static final keywords = LanguageCatalog.keywordSet;
 
   static const punctuation = {'{', '}', '(', ')', '[', ']', ';', ',', '.', ':'};
   static const operators = {

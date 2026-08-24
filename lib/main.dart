@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:compiler_contracts/compiler_contracts.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,19 +14,17 @@ import 'presentation/widgets/find_replace_bar.dart';
 
 void main() {
   final repository = LocalWorkspaceRepository();
+  final compiler = ProcessCompilerRepository(
+    executable: 'dart',
+    arguments: ['run', 'packages/compiler_core/bin/arabicc.dart', '--protocol'],
+    processWorkingDirectory: Directory.current.path,
+  );
   runApp(
     ArabicEditorApp(
       controller: EditorController(
         repository: repository,
-        compiler: ProcessCompilerRepository(
-          executable: 'dart',
-          arguments: [
-            'run',
-            'packages/compiler_core/bin/arabicc.dart',
-            '--protocol',
-          ],
-          processWorkingDirectory: Directory.current.path,
-        ),
+        compiler: compiler,
+        assistant: compiler,
         rootPath: Directory.current.path,
       ),
     ),
@@ -124,6 +123,32 @@ class _EditorShellState extends State<EditorShell> {
       boundPath = document.path;
       textController.value = TextEditingValue(text: document.text);
     }
+  }
+
+  int get _cursorOffset {
+    final offset = textController.selection.baseOffset;
+    return offset < 0 ? textController.text.length : offset;
+  }
+
+  void _applyCompletion(AssistCompletionItem item) {
+    final response = widget.controller.assistance;
+    final document = widget.controller.activeDocument;
+    if (response == null || document == null) return;
+    final start = response.replaceStart.clamp(0, document.text.length).toInt();
+    final end = (start + response.replaceLength)
+        .clamp(start, document.text.length)
+        .toInt();
+    final text = document.text.replaceRange(start, end, item.insertText);
+    textController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(
+        offset: start + item.insertText.length,
+      ),
+    );
+    widget.controller.edit(
+      TextEdit(offset: start, before: document.text, after: text),
+    );
+    widget.controller.clearAssist();
   }
 
   Future<void> _newFile() async {
@@ -253,6 +278,11 @@ class _EditorShellState extends State<EditorShell> {
         SingleActivator(LogicalKeyboardKey.f5): CompileIntent(),
         SingleActivator(LogicalKeyboardKey.keyF, control: true): FindIntent(),
         SingleActivator(LogicalKeyboardKey.keyF, meta: true): FindIntent(),
+        SingleActivator(LogicalKeyboardKey.space, control: true):
+            CompletionIntent(),
+        SingleActivator(LogicalKeyboardKey.space, meta: true):
+            CompletionIntent(),
+        SingleActivator(LogicalKeyboardKey.f1): HelpIntent(),
       },
       child: Actions(
         actions: {
@@ -270,6 +300,12 @@ class _EditorShellState extends State<EditorShell> {
           ),
           FindIntent: CallbackAction<FindIntent>(
             onInvoke: (_) => _toggleFindReplace(),
+          ),
+          CompletionIntent: CallbackAction<CompletionIntent>(
+            onInvoke: (_) => controller.complete(_cursorOffset),
+          ),
+          HelpIntent: CallbackAction<HelpIntent>(
+            onInvoke: (_) => controller.help(_cursorOffset),
           ),
         },
         child: Directionality(
@@ -331,6 +367,16 @@ class _EditorShellState extends State<EditorShell> {
                   tooltip: 'بحث واستبدال',
                 ),
                 IconButton(
+                  onPressed: () => controller.complete(_cursorOffset),
+                  icon: const Icon(Icons.auto_awesome),
+                  tooltip: 'إكمال Ctrl+Space',
+                ),
+                IconButton(
+                  onPressed: () => controller.help(_cursorOffset),
+                  icon: const Icon(Icons.lightbulb_outline),
+                  tooltip: 'مساعدة F1',
+                ),
+                IconButton(
                   onPressed: controller.compile,
                   icon: const Icon(Icons.play_arrow),
                   tooltip: 'ترجمة',
@@ -353,6 +399,12 @@ class _EditorShellState extends State<EditorShell> {
                           onSearch: _search,
                           onReplaceAll: _replaceAll,
                           onClose: _toggleFindReplace,
+                        ),
+                      if (controller.assistance != null)
+                        _AssistPanel(
+                          response: controller.assistance!,
+                          onSelect: _applyCompletion,
+                          onClose: controller.clearAssist,
                         ),
                       Expanded(
                         child: active == null
@@ -548,4 +600,97 @@ class _Tabs extends StatelessWidget {
       ],
     ),
   );
+}
+
+class _AssistPanel extends StatelessWidget {
+  final AssistResponse response;
+  final ValueChanged<AssistCompletionItem> onSelect;
+  final VoidCallback onClose;
+
+  const _AssistPanel({
+    required this.response,
+    required this.onSelect,
+    required this.onClose,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final help = response.help;
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 180),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        border: Border(
+          top: BorderSide(color: Theme.of(context).dividerColor),
+          bottom: BorderSide(color: Theme.of(context).dividerColor),
+        ),
+      ),
+      child: help != null
+          ? ListTile(
+              leading: const Icon(Icons.help_outline),
+              title: Text('${help.keyword} — ${help.title}'),
+              subtitle: Text('${help.description}\nالصيغة: ${help.syntax}'),
+              trailing: IconButton(
+                onPressed: onClose,
+                icon: const Icon(Icons.close),
+                tooltip: 'إغلاق المساعدة',
+              ),
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: response.items.length,
+                    itemBuilder: (context, index) {
+                      final item = response.items[index];
+                      return ListTile(
+                        dense: true,
+                        leading: Icon(
+                          item.kind == 'symbol'
+                              ? Icons.data_object
+                              : Icons.code,
+                        ),
+                        title: Text(item.label),
+                        subtitle: Text(item.detail),
+                        onTap: () => onSelect(item),
+                      );
+                    },
+                  ),
+                ),
+                SizedBox(
+                  width: 150,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'المتوقع: ${response.expected}',
+                          style: Theme.of(context).textTheme.labelMedium,
+                        ),
+                        const SizedBox(height: 6),
+                        Text('البادئة: ${response.prefix}'),
+                        IconButton(
+                          onPressed: onClose,
+                          icon: const Icon(Icons.close),
+                          tooltip: 'إغلاق الاقتراحات',
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+class CompletionIntent extends Intent {
+  const CompletionIntent();
+}
+
+class HelpIntent extends Intent {
+  const HelpIntent();
 }
