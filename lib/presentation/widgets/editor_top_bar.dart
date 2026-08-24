@@ -126,12 +126,9 @@ class EditorTopBar extends StatelessWidget {
                         ],
                       ),
                     )
-                  : Align(
+                  : const Align(
                       alignment: AlignmentDirectional.centerStart,
-                      child: _BrandBlock(
-                        activeName: _activeName,
-                        rootPath: rootPath,
-                      ),
+                      child: _CompactBrandBlock(),
                     ),
             ),
             if (expanded) ...[
@@ -158,6 +155,38 @@ class EditorTopBar extends StatelessWidget {
       ),
     );
   }
+}
+
+class _CompactBrandBlock extends StatelessWidget {
+  const _CompactBrandBlock();
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      SizedBox(
+        width: 30,
+        height: 30,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: ColoredBox(
+            color: AppTheme.brandBlack,
+            child: Padding(
+              padding: const EdgeInsets.all(3),
+              child: SvgPicture.asset('assets/branding/arabic360.svg'),
+            ),
+          ),
+        ),
+      ),
+      const SizedBox(width: 8),
+      Text(
+        'محرر العربية',
+        style: Theme.of(
+          context,
+        ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+      ),
+    ],
+  );
 }
 
 class _BrandBlock extends StatelessWidget {
