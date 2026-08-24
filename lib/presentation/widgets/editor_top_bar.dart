@@ -63,11 +63,11 @@ class EditorTopBar extends StatelessWidget {
         decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: colors.outlineVariant)),
         ),
-        child: expanded
-            ? Row(
-                children: [
-                  Expanded(
-                    child: SingleChildScrollView(
+        child: Row(
+          children: [
+            Expanded(
+              child: expanded
+                  ? SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -142,34 +142,36 @@ class EditorTopBar extends StatelessWidget {
                           ),
                         ],
                       ),
+                    )
+                  : Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: _BrandBlock(
+                        activeName: _activeName,
+                        rootPath: rootPath,
+                      ),
                     ),
-                  ),
-                  _AccentPicker(accent: accent, onSelected: onSelectAccent),
-                  _ToolbarButton(
-                    tooltip: isDark ? 'الوضع الفاتح' : 'الوضع الداكن',
-                    icon: isDark
-                        ? Icons.light_mode_outlined
-                        : Icons.dark_mode_outlined,
-                    onPressed: onToggleTheme,
-                  ),
-                  IconButton(
-                    onPressed: onToggleExpanded,
-                    tooltip: 'طي الشريط العلوي',
-                    icon: const Icon(Icons.keyboard_arrow_up_rounded),
-                  ),
-                ],
-              )
-            : Row(
-                children: [
-                  _BrandBlock(activeName: _activeName, rootPath: rootPath),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: onToggleExpanded,
-                    tooltip: 'توسيع الشريط العلوي',
-                    icon: const Icon(Icons.keyboard_arrow_down_rounded),
-                  ),
-                ],
+            ),
+            if (expanded) ...[
+              _AccentPicker(accent: accent, onSelected: onSelectAccent),
+              _ToolbarButton(
+                tooltip: isDark ? 'الوضع الفاتح' : 'الوضع الداكن',
+                icon: isDark
+                    ? Icons.light_mode_outlined
+                    : Icons.dark_mode_outlined,
+                onPressed: onToggleTheme,
               ),
+            ],
+            IconButton(
+              onPressed: onToggleExpanded,
+              tooltip: expanded ? 'طي الشريط العلوي' : 'توسيع الشريط العلوي',
+              icon: Icon(
+                expanded
+                    ? Icons.keyboard_arrow_up_rounded
+                    : Icons.keyboard_arrow_down_rounded,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
