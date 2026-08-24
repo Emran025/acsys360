@@ -36,6 +36,40 @@ Future<String?> showNewFileDialog(BuildContext context) async {
   return name?.trim().isEmpty ?? true ? null : name!.trim();
 }
 
+Future<String?> showNewFolderDialog(BuildContext context) async {
+  final nameController = TextEditingController();
+  final name = await showDialog<String>(
+    context: context,
+    builder: (context) => AppDialog(
+      title: 'مجلد جديد',
+      icon: Icons.create_new_folder_outlined,
+      content: TextField(
+        controller: nameController,
+        autofocus: true,
+        textDirection: TextDirection.rtl,
+        decoration: const InputDecoration(
+          labelText: 'اسم المجلد',
+          hintText: 'src',
+        ),
+        onSubmitted: (value) => Navigator.pop(context, value),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('إلغاء'),
+        ),
+        FilledButton.icon(
+          onPressed: () => Navigator.pop(context, nameController.text),
+          icon: const Icon(Icons.add),
+          label: const Text('إنشاء'),
+        ),
+      ],
+    ),
+  );
+  nameController.dispose();
+  return name?.trim().isEmpty ?? true ? null : name!.trim();
+}
+
 Future<bool> confirmDiscardDialog(
   BuildContext context, {
   required String path,
@@ -55,6 +89,32 @@ Future<bool> confirmDiscardDialog(
             FilledButton(
               onPressed: () => Navigator.pop(context, true),
               child: const Text('إغلاق دون حفظ'),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+}
+
+Future<bool> confirmDeleteDialog(
+  BuildContext context, {
+  required String path,
+}) async {
+  final name = path.split(Platform.pathSeparator).last;
+  return await showDialog<bool>(
+        context: context,
+        builder: (context) => AppDialog(
+          title: 'حذف العنصر',
+          icon: Icons.delete_outline,
+          content: Text('هل تريد حذف «$name» نهائيًا؟'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('حذف'),
             ),
           ],
         ),

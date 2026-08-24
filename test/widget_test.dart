@@ -34,7 +34,17 @@ class FakeWorkspaceRepository implements WorkspaceRepository {
       Document(path: name, text: '');
 
   @override
+  Future<String> createDirectory(String rootPath, String name) async =>
+      '$rootPath/$name';
+
+  @override
   Future<void> write(Document document) async {}
+
+  @override
+  Future<void> delete(String path) async {}
+
+  @override
+  Future<void> move(String sourcePath, String targetDirectory) async {}
 }
 
 void main() {

@@ -8,7 +8,10 @@ abstract interface class WorkspaceRepository {
   Future<List<FileNode>> listTree(String rootPath);
   Future<Document> read(String path);
   Future<Document> create(String rootPath, String name);
+  Future<String> createDirectory(String rootPath, String name);
   Future<void> write(Document document);
+  Future<void> delete(String path);
+  Future<void> move(String sourcePath, String targetDirectory);
 }
 
 abstract interface class CompilerRepository {
