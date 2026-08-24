@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -16,6 +17,7 @@ import 'presentation/widgets/collapsible_panel.dart';
 import 'presentation/widgets/editor_top_bar.dart';
 import 'presentation/widgets/find_replace_bar.dart';
 import 'presentation/widgets/arabic_code_controller.dart';
+import 'presentation/widgets/diagnostic_lamp_dialog.dart';
 import 'presentation/widgets/line_numbered_editor.dart';
 import 'presentation/widgets/workspace_explorer.dart';
 
@@ -115,6 +117,7 @@ class EditorShell extends StatefulWidget {
 
 class _EditorShellState extends State<EditorShell> {
   final textController = ArabicCodeController();
+  final editorFocusNode = FocusNode();
   final findController = TextEditingController();
   final replaceController = TextEditingController();
   String? boundPath;
@@ -122,6 +125,7 @@ class _EditorShellState extends State<EditorShell> {
   bool isRefreshing = false;
   bool topBarExpanded = true;
   bool resultsExpanded = true;
+  Timer? analysisTimer;
 
   @override
   void initState() {
@@ -133,7 +137,9 @@ class _EditorShellState extends State<EditorShell> {
   @override
   void dispose() {
     widget.controller.removeListener(_syncDocument);
+    analysisTimer?.cancel();
     textController.dispose();
+    editorFocusNode.dispose();
     findController.dispose();
     replaceController.dispose();
     super.dispose();
@@ -151,11 +157,45 @@ class _EditorShellState extends State<EditorShell> {
 
   void _syncDocument() {
     final document = widget.controller.activeDocument;
-    if (document == null) return;
-    if (document.path != boundPath || textController.text != document.text) {
+    if (document == null) {
+      textController.setDiagnostics(const []);
+      return;
+    }
+    final pathChanged = document.path != boundPath;
+    if (pathChanged || textController.text != document.text) {
       boundPath = document.path;
       textController.value = TextEditingValue(text: document.text);
     }
+    textController.setDiagnostics(widget.controller.diagnostics);
+    if (pathChanged) _scheduleAnalysis();
+  }
+
+  void _scheduleAnalysis() {
+    analysisTimer?.cancel();
+    if (widget.controller.activeDocument == null) return;
+    analysisTimer = Timer(const Duration(milliseconds: 350), () async {
+      if (!mounted) return;
+      await widget.controller.analyze();
+      if (!mounted || !_shouldSuggest) return;
+      await widget.controller.complete(_cursorOffset);
+    });
+  }
+
+  bool get _shouldSuggest {
+    final offset = _cursorOffset;
+    if (offset == 0 || offset > textController.text.length) return false;
+    final character = textController.text.substring(offset - 1, offset);
+    return RegExp(r'[ء-يA-Za-z_]').hasMatch(character);
+  }
+
+  Future<void> _showDiagnosticLamp() async {
+    final diagnostic = widget.controller.diagnosticAt(_cursorOffset);
+    if (diagnostic == null || !mounted) return;
+    final action = await showDiagnosticLampDialog(
+      context,
+      diagnostic: diagnostic,
+    );
+    if (action != null && mounted) widget.controller.applyCodeAction(action);
   }
 
   int get _cursorOffset {
@@ -188,14 +228,18 @@ class _EditorShellState extends State<EditorShell> {
     widget.controller.clearAssist();
   }
 
-  Future<void> _newFile() async {
+  Future<void> _newFileAt(String rootPath) async {
     final name = await showNewFileDialog(context);
-    if (name != null && mounted) await widget.controller.create(name);
+    if (name != null && mounted) {
+      await widget.controller.create(name, rootPath: rootPath);
+    }
   }
 
-  Future<void> _newFolder() async {
+  Future<void> _newFolderAt(String rootPath) async {
     final name = await showNewFolderDialog(context);
-    if (name != null && mounted) await widget.controller.createFolder(name);
+    if (name != null && mounted) {
+      await widget.controller.createFolder(name, rootPath: rootPath);
+    }
   }
 
   Future<void> _openFile() async {
@@ -267,6 +311,40 @@ class _EditorShellState extends State<EditorShell> {
 
   void _search(String value) {
     widget.controller.search(value);
+    _selectCurrentMatch();
+  }
+
+  void _selectCurrentMatch() {
+    final match = widget.controller.currentMatch;
+    if (match == null) return;
+    textController.selection = TextSelection(
+      baseOffset: match.offset,
+      extentOffset: match.offset + match.length,
+    );
+    editorFocusNode.requestFocus();
+  }
+
+  void _firstMatch() {
+    widget.controller.firstMatch();
+    _selectCurrentMatch();
+  }
+
+  void _previousMatch() {
+    widget.controller.previousMatch();
+    _selectCurrentMatch();
+  }
+
+  void _nextMatch() {
+    widget.controller.nextMatch();
+    _selectCurrentMatch();
+  }
+
+  void _replaceCurrent() {
+    final count = widget.controller.replaceCurrent(
+      findController.text,
+      replaceController.text,
+    );
+    if (count > 0) _selectCurrentMatch();
   }
 
   void _replaceAll() {
@@ -326,6 +404,7 @@ class _EditorShellState extends State<EditorShell> {
         after: value.substring(start, valueEnd),
       ),
     );
+    _scheduleAnalysis();
   }
 
   @override
@@ -390,13 +469,6 @@ class _EditorShellState extends State<EditorShell> {
                   activePath: active?.path,
                   isDark: widget.isDark,
                   expanded: topBarExpanded,
-                  onChooseFolder: _pickWorkspace,
-                  onSave: controller.save,
-                  onSaveAll: controller.saveAll,
-                  onFind: _toggleFindReplace,
-                  onComplete: () => controller.complete(_cursorOffset),
-                  onHelp: () => controller.help(_cursorOffset),
-                  onCompile: controller.compile,
                   onToggleTheme: widget.onToggleTheme ?? () {},
                   onToggleExpanded: () =>
                       setState(() => topBarExpanded = !topBarExpanded),
@@ -411,11 +483,15 @@ class _EditorShellState extends State<EditorShell> {
                           nodes: controller.tree,
                           isLoading: isRefreshing,
                           hasCutPath: controller.hasCutPath,
+                          selectedPath: controller.selectedExplorerPath,
+                          selectedDirectoryPath:
+                              controller.selectedDirectoryPath,
+                          onSelect: controller.selectExplorerPath,
                           onChooseFolder: _pickWorkspace,
                           onOpenFile: _openFile,
                           onRefresh: _refreshFiles,
-                          onNewFile: _newFile,
-                          onNewFolder: _newFolder,
+                          onNewFile: _newFileAt,
+                          onNewFolder: _newFolderAt,
                           onOpen: controller.open,
                           onDelete: _deletePath,
                           onCut: controller.cut,
@@ -432,30 +508,56 @@ class _EditorShellState extends State<EditorShell> {
                                 findController: findController,
                                 replaceController: replaceController,
                                 matches: controller.searchMatches.length,
+                                currentMatch: controller.currentMatchIndex,
                                 onSearch: _search,
+                                onFirst: _firstMatch,
+                                onPrevious: _previousMatch,
+                                onNext: _nextMatch,
+                                onReplaceCurrent: _replaceCurrent,
                                 onReplaceAll: _replaceAll,
                                 onClose: _toggleFindReplace,
                               ),
-                            if (controller.assistance != null)
-                              _AssistPanel(
-                                response: controller.assistance!,
-                                onSelect: _applyCompletion,
-                                onClose: controller.clearAssist,
-                              ),
                             Expanded(
-                              child: GestureDetector(
-                                behavior: HitTestBehavior.translucent,
-                                onSecondaryTapUp: (details) =>
-                                    _showEditorMenu(details.globalPosition),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(14),
-                                  child: active == null
-                                      ? const _EmptyEditor()
-                                      : LineNumberedEditor(
-                                          controller: textController,
-                                          onChanged: _onTextChanged,
+                              child: Stack(
+                                children: [
+                                  GestureDetector(
+                                    behavior: HitTestBehavior.translucent,
+                                    onSecondaryTapUp: (details) =>
+                                        _showEditorMenu(details.globalPosition),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(14),
+                                      child: active == null
+                                          ? const _EmptyEditor()
+                                          : LineNumberedEditor(
+                                              controller: textController,
+                                              focusNode: editorFocusNode,
+                                              onChanged: _onTextChanged,
+                                              onTap: _showDiagnosticLamp,
+                                            ),
+                                    ),
+                                  ),
+                                  if (controller.assistance != null)
+                                    Align(
+                                      alignment: Alignment.topRight,
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(
+                                          top: 22,
+                                          right: 22,
                                         ),
-                                ),
+                                        child: ConstrainedBox(
+                                          constraints: const BoxConstraints(
+                                            maxWidth: 360,
+                                            maxHeight: 190,
+                                          ),
+                                          child: _AssistPanel(
+                                            response: controller.assistance!,
+                                            onSelect: _applyCompletion,
+                                            onClose: controller.clearAssist,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
                             CollapsiblePanel(
