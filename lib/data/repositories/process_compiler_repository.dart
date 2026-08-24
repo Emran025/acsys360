@@ -36,23 +36,30 @@ class ProcessCompilerRepository
     required List<Document> documents,
     String target = 'none',
     String? artifactDirectory,
+    CompilationMode? mode,
   }) async {
     if (sourcePath.isEmpty) {
       return _processFailure('لا يوجد ملف للترجمة', -1);
     }
 
-    final sourcePaths = <String>{
-      for (final document in documents) document.path,
-      sourcePath,
-    }.toList();
+    final effectiveMode = mode ?? this.mode;
+    final requestDocuments = effectiveMode == CompilationMode.active
+        ? documents.where((document) => document.path == sourcePath)
+        : documents;
+    final sourcePaths = effectiveMode == CompilationMode.active
+        ? <String>[sourcePath]
+        : <String>{
+            for (final document in requestDocuments) document.path,
+            sourcePath,
+          }.toList();
     final sourceTexts = <String, String>{
-      for (final document in documents) document.path: document.text,
+      for (final document in requestDocuments) document.path: document.text,
     };
     final request = CompilationRequest(
       rootPath: rootPath,
       sourcePaths: sourcePaths,
       sourceTexts: sourceTexts,
-      mode: mode,
+      mode: effectiveMode,
       entryPath: sourcePath,
       target: target,
       artifactDirectory: artifactDirectory,

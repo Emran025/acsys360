@@ -459,6 +459,7 @@ class EditorController extends ChangeNotifier {
         documents: workspace.documents,
         target: 'dart-native',
         artifactDirectory: artifactDirectory,
+        mode: CompilationMode.active,
       );
       compilation = analysis.compilation;
       diagnostics = analysis.diagnostics;
