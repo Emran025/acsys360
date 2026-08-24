@@ -70,6 +70,40 @@ Future<String?> showNewFolderDialog(BuildContext context) async {
   return name?.trim().isEmpty ?? true ? null : name!.trim();
 }
 
+Future<String?> showRenameDialog(
+  BuildContext context, {
+  required String currentName,
+}) async {
+  final nameController = TextEditingController(text: currentName);
+  final name = await showDialog<String>(
+    context: context,
+    builder: (context) => AppDialog(
+      title: 'إعادة تسمية العنصر',
+      icon: Icons.drive_file_rename_outline,
+      content: TextField(
+        controller: nameController,
+        autofocus: true,
+        textDirection: TextDirection.rtl,
+        decoration: const InputDecoration(labelText: 'الاسم الجديد'),
+        onSubmitted: (value) => Navigator.pop(context, value),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('إلغاء'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, nameController.text),
+          child: const Text('حفظ'),
+        ),
+      ],
+    ),
+  );
+  nameController.dispose();
+  final value = name?.trim();
+  return value == null || value.isEmpty ? null : value;
+}
+
 Future<bool> confirmDiscardDialog(
   BuildContext context, {
   required String path,

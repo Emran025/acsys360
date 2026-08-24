@@ -200,6 +200,11 @@ class EditorController extends ChangeNotifier {
       for (final index in indexes) {
         workspace = workspace.close(index);
       }
+      if (selectedExplorerPath == path ||
+          selectedExplorerPath?.startsWith('$path$separator') == true) {
+        selectedExplorerPath = null;
+        selectedDirectoryPath = null;
+      }
       await refreshFiles();
       error = null;
     } catch (exception) {
@@ -233,27 +238,27 @@ class EditorController extends ChangeNotifier {
     if (sourcePath == null) return;
     try {
       final targetName = sourcePath.split(Platform.pathSeparator).last;
-      final separator = Platform.pathSeparator;
-      final targetPath =
-          '$targetDirectory${targetDirectory.endsWith(separator) ? '' : separator}$targetName';
+      final targetPath = _joinPath(targetDirectory, targetName);
       await repository.move(sourcePath, targetDirectory);
-      final index = workspace.documents.indexWhere(
-        (document) => document.path == sourcePath,
+      final movedDocuments = [
+        for (final document in workspace.documents)
+          Document(
+            path: _relocatePath(document.path, sourcePath, targetPath),
+            text: document.text,
+            savedText: document.savedText,
+            undoStack: document.undoStack,
+            redoStack: document.redoStack,
+          ),
+      ];
+      workspace = workspace.copyWith(documents: movedDocuments);
+      selectedExplorerPath = _relocateOptionalPath(
+        selectedExplorerPath,
+        sourcePath,
+        targetPath,
       );
-      if (index >= 0) {
-        final document = workspace.documents[index];
-        workspace = workspace
-            .close(index)
-            .open(
-              Document(
-                path: targetPath,
-                text: document.text,
-                savedText: document.savedText,
-                undoStack: document.undoStack,
-                redoStack: document.redoStack,
-              ),
-            );
-      }
+      selectedDirectoryPath = selectedExplorerPath == null
+          ? targetDirectory
+          : _parentDirectory(selectedExplorerPath!);
       cutPath = null;
       await refreshFiles();
       error = null;
@@ -262,6 +267,55 @@ class EditorController extends ChangeNotifier {
     }
     notifyListeners();
   }
+
+  Future<void> rename(String path, String newName) async {
+    try {
+      final targetPath = _joinPath(_parentDirectory(path), newName);
+      await repository.rename(path, newName);
+      workspace = workspace.copyWith(
+        documents: [
+          for (final document in workspace.documents)
+            Document(
+              path: _relocatePath(document.path, path, targetPath),
+              text: document.text,
+              savedText: document.savedText,
+              undoStack: document.undoStack,
+              redoStack: document.redoStack,
+            ),
+        ],
+      );
+      selectedExplorerPath = _relocateOptionalPath(
+        selectedExplorerPath,
+        path,
+        targetPath,
+      );
+      selectedDirectoryPath = selectedExplorerPath == null
+          ? workspace.rootPath
+          : _parentDirectory(selectedExplorerPath!);
+      await refreshFiles();
+      error = null;
+    } catch (exception) {
+      error = exception;
+    }
+    notifyListeners();
+  }
+
+  String _joinPath(String directory, String name) {
+    final separator = Platform.pathSeparator;
+    return '$directory${directory.endsWith(separator) ? '' : separator}$name';
+  }
+
+  String _relocatePath(String path, String source, String target) {
+    final separator = Platform.pathSeparator;
+    if (path == source) return target;
+    if (path.startsWith('$source$separator')) {
+      return '$target${path.substring(source.length)}';
+    }
+    return path;
+  }
+
+  String? _relocateOptionalPath(String? path, String source, String target) =>
+      path == null ? null : _relocatePath(path, source, target);
 
   Future<void> saveAll() async {
     try {
