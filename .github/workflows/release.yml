@@ -33,6 +33,9 @@ jobs:
           flutter-version: 3.44.5
           cache: true
       - run: flutter pub get
+      - name: Get compiler dependencies
+        working-directory: packages/compiler_core
+        run: dart pub get
       - run: dart format --output=none --set-exit-if-changed lib test
       - run: flutter analyze
       - run: flutter test
@@ -42,6 +45,50 @@ jobs:
           sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
       - run: flutter config --enable-${{ matrix.target }}-desktop
       - run: flutter build ${{ matrix.target }} --release
+      - name: Build bundled compiler on Unix
+        if: matrix.target != 'windows'
+        shell: bash
+        run: |
+          mkdir -p packages/compiler_core/build
+          dart compile exe packages/compiler_core/bin/arabicc.dart -o packages/compiler_core/build/arabicc
+      - name: Build bundled compiler on Windows
+        if: matrix.target == 'windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force packages/compiler_core/build | Out-Null
+          dart compile exe packages/compiler_core/bin/arabicc.dart -o packages/compiler_core/build/arabicc.exe
+      - name: Bundle compiler on Linux
+        if: matrix.target == 'linux'
+        shell: bash
+        run: |
+          mkdir -p build/linux/x64/release/bundle/compiler
+          cp packages/compiler_core/build/arabicc build/linux/x64/release/bundle/compiler/arabicc
+      - name: Bundle compiler on Windows
+        if: matrix.target == 'windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build/windows/x64/runner/Release/compiler | Out-Null
+          Copy-Item packages/compiler_core/build/arabicc.exe build/windows/x64/runner/Release/compiler/arabicc.exe
+      - name: Bundle compiler on macOS
+        if: matrix.target == 'macos'
+        shell: bash
+        run: |
+          mkdir -p build/macos/Build/Products/Release/acsys360.app/Contents/MacOS/compiler
+          cp packages/compiler_core/build/arabicc build/macos/Build/Products/Release/acsys360.app/Contents/MacOS/compiler/arabicc
+      - name: Smoke test bundled compiler on Unix
+        if: matrix.target != 'windows'
+        shell: bash
+        run: |
+          if [ "${{ matrix.target }}" = "linux" ]; then
+            compiler_path="build/linux/x64/release/bundle/compiler/arabicc"
+          else
+            compiler_path="build/macos/Build/Products/Release/acsys360.app/Contents/MacOS/compiler/arabicc"
+          fi
+          dart run tool/verify_compiler_bundle.dart --executable "$compiler_path"
+      - name: Smoke test bundled compiler on Windows
+        if: matrix.target == 'windows'
+        shell: pwsh
+        run: dart run tool/verify_compiler_bundle.dart --executable build/windows/x64/runner/Release/compiler/arabicc.exe
       - name: Package Linux
         if: matrix.target == 'linux'
         run: tar -czf acsys360-linux-${{ github.ref_name }}.tar.gz -C build/linux/x64/release bundle

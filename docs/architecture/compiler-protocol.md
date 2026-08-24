@@ -46,6 +46,12 @@
 
 تتحقق factories من نوع الحقول الأساسية، وإصدار البروتوكول، وعدم فراغ قائمة المصادر، وصحة أرقام المواقع، وقيم التعدادات. اختبارات `packages/compiler_contracts/test/compilation_protocol_test.dart` تغطي round-trip للطلب والاستجابة، الاستجابة متعددة المراحل، الإصدار غير المدعوم، وقائمة المصادر الفارغة.
 
+## تشغيل المترجم داخل حزمة Desktop
+
+في بيئة التطوير يبقى التشغيل عبر `dart run packages/compiler_core/bin/arabicc.dart --protocol` حتى يمكن تعديل مصدر المترجم بسرعة. أما Release workflow فينفذ `dart compile exe` على runner المنصة، ثم ينسخ الناتج إلى مجلد `compiler` بجوار executable المحرر داخل كل bundle. عند تشغيل النسخة المصدرة يبحث المحرر عن `compiler/arabicc` أو `compiler/arabicc.exe` ويشغل الملف نفسه مع `--protocol`، ويستبدلها داخليًا بـ `--assist` لطلبات الإكمال والمساعدة. إذا لم يجد الملف المضمّن يعود لمسار التطوير فقط.
+
+لا يعني ذلك أن Windows output ملف EXE منفردًا؛ Flutter Desktop يحتاج executable وDLL و`data` وملفات runtime. الناتج القابل للنقل هو ZIP يحتوي `acsys360.exe` ومجلده الكامل، إضافة إلى `compiler/arabicc.exe`، وبذلك لا يحتاج المستخدم إلى Dart SDK أو مصدر المستودع.
+
 ## ما لم ينفذ بعد
 
-العقد يعرّف شكل النقل، وCLI الحالي يمرر كل ملف إلى lexer/parser/semantic ثم يجمع النتائج في استجابة project، مع فحص project-level محدود لتعارض أسماء المتغيرات. لا يدعي ذلك تحليل dependencies أو import resolution عابرًا للملفات بعد. المرحلة التالية هي إضافة تحليل dependencies وsymbol resolution عابر للملفات، ثم تجهيز executable مستقل داخل app bundle بدل الاعتماد على `dart run` في بيئة التطوير. أما مسار stdin/stdout والـ adapter واختبار smoke الأساسي فقد نُفذت واختُبرت.
+العقد يعرّف شكل النقل، وCLI الحالي يمرر كل ملف إلى lexer/parser/semantic ثم يجمع النتائج في استجابة project، مع فحص project-level محدود لتعارض أسماء المتغيرات. لا يدعي ذلك تحليل dependencies أو import resolution عابرًا للملفات بعد. المرحلة التالية هي إضافة تحليل dependencies وsymbol resolution عابر للملفات. أما مسار stdin/stdout والـ adapter واختبار smoke الأساسي وبناء compiler executable المضمّن في release فقد نُفذت واختُبرت في workflow.

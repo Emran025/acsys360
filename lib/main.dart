@@ -14,11 +14,7 @@ import 'presentation/widgets/find_replace_bar.dart';
 
 void main() {
   final repository = LocalWorkspaceRepository();
-  final compiler = ProcessCompilerRepository(
-    executable: 'dart',
-    arguments: ['run', 'packages/compiler_core/bin/arabicc.dart', '--protocol'],
-    processWorkingDirectory: Directory.current.path,
-  );
+  final compiler = _createCompilerRepository();
   runApp(
     ArabicEditorApp(
       controller: EditorController(
@@ -28,6 +24,31 @@ void main() {
         rootPath: Directory.current.path,
       ),
     ),
+  );
+}
+
+ProcessCompilerRepository _createCompilerRepository() {
+  final compilerName = Platform.isWindows ? 'arabicc.exe' : 'arabicc';
+  final bundledPath = [
+    File(Platform.resolvedExecutable).parent.path,
+    'compiler',
+    compilerName,
+  ].join(Platform.pathSeparator);
+  if (File(bundledPath).existsSync()) {
+    return ProcessCompilerRepository(
+      executable: bundledPath,
+      arguments: const ['--protocol'],
+      processWorkingDirectory: File(Platform.resolvedExecutable).parent.path,
+    );
+  }
+  return ProcessCompilerRepository(
+    executable: 'dart',
+    arguments: const [
+      'run',
+      'packages/compiler_core/bin/arabicc.dart',
+      '--protocol',
+    ],
+    processWorkingDirectory: Directory.current.path,
   );
 }
 

@@ -13,9 +13,9 @@
 | Pull Request | checkout، Flutter `3.44.5`، pub get، format check، analyze، tests |
 | Push إلى `main` | نفس الفحوصات وبناء Linux artifact للتحقق باستخدام Flutter `3.44.5` |
 | تغيير `.devcontainer` على `main` | بناء صورة التطوير ونشرها إلى `ghcr.io/<owner>/<repo>/dev` مع SHA و`latest` |
-| Tag من الشكل `vX.Y.Z` | بناء Linux/Windows/macOS على runners أصلية باستخدام Flutter `3.44.5`، ضغط artifacts، إنشاء GitHub Release وإرفاقها |
+| Tag من الشكل `vX.Y.Z` | بناء Linux/Windows/macOS على runners أصلية باستخدام Flutter `3.44.5`، ترجمة `arabicc` إلى executable للمنصة، نسخه داخل bundle، ضغط artifacts، إنشاء GitHub Release وإرفاقها |
 | فحص البيئة المحلية | تشغيل `bash tool/environment_doctor.sh --strict` على جهاز التطوير؛ ويمكن إضافة `--doctor` لطباعة `flutter doctor -v` |
-| بعد إضافة compiler CLI | يضاف smoke step يترجم fixtures ويمنع release عند فشل العقد أو الترجمة |
+| تحقق compiler المضمّن | يترجم Release workflow `packages/compiler_core/bin/arabicc.dart` عبر `dart compile exe` ثم يثبت الملف في `compiler/arabicc[.exe]` داخل حزمة المنصة قبل الضغط |
 
 ## الصلاحيات والأمان
 
@@ -23,7 +23,7 @@
 
 ## معنى الترجمة التلقائية
 
-في الوضع الحالي، الترجمة التلقائية تعني أن GitHub يبني تطبيق Flutter ويشغّل فحوصاته عند PR وtag. بعد إنشاء compiler داخل المستودع، يجب أن يضيف CI أمرًا صريحًا يترجم جميع fixtures العربية ويخزن JSON/TAC/Assembly كـ artifacts، ثم يمنع إصدارًا لا ينجح فيه compiler. لا نضع compiler وهميًا في workflow قبل وجوده.
+تعني الترجمة التلقائية أن GitHub يبني تطبيق Flutter ويشغّل فحوصاته عند PR وtag، كما يبني compiler executable مستقلًا لكل منصة. حزمة Windows ليست ملفًا منفردًا؛ ZIP الإصدار يحتوي `acsys360.exe` وملفات Flutter المصاحبة ومجلد `compiler/arabicc.exe`. لذلك يعمل الإصدار دون Dart SDK أو `dart run` أو مصدر المستودع. يبقى fallback التطوير في `main.dart` مخصصًا للتشغيل من checkout فقط.
 
 ## قيود يجب مراقبتها
 
