@@ -647,9 +647,7 @@ class _EditorShellState extends State<EditorShell> {
                 ),
                 Expanded(
                   child: Row(
-                    textDirection: hasWorkspace
-                        ? TextDirection.rtl
-                        : TextDirection.ltr,
+                    textDirection: TextDirection.rtl,
                     children: [
                       SizedBox(
                         width: 300,
