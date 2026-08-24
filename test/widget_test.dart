@@ -5,6 +5,7 @@ import 'package:acsys360/main.dart';
 import 'package:acsys360/presentation/state/editor_controller.dart';
 import 'package:acsys360/presentation/widgets/arabic_code_controller.dart';
 import 'package:acsys360/presentation/widgets/line_numbered_editor.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class FakeWorkspaceRepository implements WorkspaceRepository {
@@ -165,10 +166,10 @@ void main() {
       ),
     );
 
-    final colors = [
+    final colors = {
       for (final child in span.children!.whereType<TextSpan>())
         if (child.style?.color != null) child.style!.color,
-    ].toSet();
+    };
     expect(colors.length, greaterThanOrEqualTo(5));
   });
 }
