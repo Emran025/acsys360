@@ -210,6 +210,11 @@ class _EditorShellState extends State<EditorShell> {
               tooltip: 'حفظ',
             ),
             IconButton(
+              onPressed: controller.saveAll,
+              icon: const Icon(Icons.save_as),
+              tooltip: 'حفظ الكل',
+            ),
+            IconButton(
               onPressed: controller.compile,
               icon: const Icon(Icons.play_arrow),
               tooltip: 'ترجمة',
@@ -250,6 +255,8 @@ class _EditorShellState extends State<EditorShell> {
                     height: 120,
                     child: _DiagnosticsPanel(controller: controller),
                   ),
+                  const Divider(height: 1),
+                  _StatusBar(controller: controller),
                 ],
               ),
             ),
@@ -280,6 +287,34 @@ class _Explorer extends StatelessWidget {
       if (controller.files.isEmpty) const Text('لا توجد ملفات .arb'),
     ],
   );
+}
+
+class _StatusBar extends StatelessWidget {
+  final EditorController controller;
+  const _StatusBar({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    final dirty = controller.workspace.documents
+        .where((document) => document.isDirty)
+        .length;
+    return SizedBox(
+      height: 28,
+      child: Row(
+        children: [
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              controller.workspace.rootPath,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Text('تعديلات غير محفوظة: $dirty'),
+          const SizedBox(width: 12),
+        ],
+      ),
+    );
+  }
 }
 
 class _DiagnosticsPanel extends StatelessWidget {

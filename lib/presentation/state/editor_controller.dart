@@ -97,6 +97,23 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> saveAll() async {
+    try {
+      for (final document in workspace.documents) {
+        await repository.write(document);
+      }
+      workspace = workspace.copyWith(
+        documents: [
+          for (final document in workspace.documents) document.markSaved(),
+        ],
+      );
+      error = null;
+    } catch (exception) {
+      error = exception;
+    }
+    notifyListeners();
+  }
+
   void edit(TextEdit change) {
     workspace = applyEdit(workspace, change);
     notifyListeners();
