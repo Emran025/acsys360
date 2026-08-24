@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:compiler_contracts/compiler_contracts.dart';
 import 'package:file_picker/file_picker.dart';
@@ -198,14 +200,14 @@ class _EditorShellState extends State<EditorShell> {
   }
 
   Future<void> _openFile() async {
-    final result = await FilePicker.pickFiles(
+    final files = await FilePicker.pickFiles(
       dialogTitle: 'فتح ملف عربي',
       type: FileType.custom,
       allowedExtensions: [
         LocalWorkspaceRepository.sourceExtension.substring(1),
       ],
     );
-    final path = result?.files.single.path;
+    final path = files.isEmpty ? null : files.first.path;
     if (path != null && mounted) await widget.controller.open(path);
   }
 
@@ -218,14 +220,16 @@ class _EditorShellState extends State<EditorShell> {
     final active = widget.controller.activeDocument;
     if (active == null) return;
     final currentName = active.path.split(Platform.pathSeparator).last;
-    final path = await FilePicker.saveFile(
+    final selected = await FilePicker.saveFile(
       dialogTitle: 'حفظ الملف باسم',
       fileName: currentName,
+      bytes: Uint8List.fromList(utf8.encode(active.text)),
       type: FileType.custom,
       allowedExtensions: [
         LocalWorkspaceRepository.sourceExtension.substring(1),
       ],
     );
+    final path = selected?.toFilePath();
     if (path == null || !mounted) return;
     final normalized =
         path.toLowerCase().endsWith(LocalWorkspaceRepository.sourceExtension)
