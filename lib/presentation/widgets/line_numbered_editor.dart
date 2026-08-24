@@ -181,8 +181,8 @@ class _LineNumberedEditorState extends State<LineNumberedEditor> {
                   expands: true,
                   maxLines: null,
                   minLines: null,
-                  textDirection: TextDirection.rtl,
-                  textAlign: TextAlign.right,
+                  textDirection: TextDirection.ltr,
+                  textAlign: TextAlign.left,
                   cursorColor: colors.primary,
                   style: editorStyle,
                   decoration: const InputDecoration(

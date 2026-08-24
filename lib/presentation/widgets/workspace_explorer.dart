@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../domain/entities/file_node.dart';
+import 'arabic_file_icon.dart';
 
 enum _WorkspaceAction { open, cut, delete, paste, newFile, newFolder, rename }
 
@@ -323,13 +324,7 @@ class _WorkspaceTreeNode extends StatelessWidget {
           contentPadding: const EdgeInsetsDirectional.only(start: 4, end: 8),
           selected: node.path == selectedPath,
           selectedTileColor: colors.primaryContainer.withValues(alpha: .38),
-          leading: Icon(
-            _fileIcon,
-            size: 17,
-            color: node.path == selectedPath
-                ? colors.primary
-                : colors.onSurfaceVariant,
-          ),
+          leading: _fileLeading(colors),
           title: Text(
             node.name,
             overflow: TextOverflow.ellipsis,
@@ -403,6 +398,13 @@ class _WorkspaceTreeNode extends StatelessWidget {
       ),
     );
   }
+
+  Widget _fileLeading(ColorScheme colors) => ArabicFileIcon(
+    path: node.name,
+    fallback: _fileIcon,
+    size: 17,
+    color: node.path == selectedPath ? colors.primary : colors.onSurfaceVariant,
+  );
 
   IconData get _fileIcon {
     final extension = node.name.toLowerCase().split('.').last;
