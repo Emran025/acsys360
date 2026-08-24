@@ -15,6 +15,19 @@ extension CompilationModeJson on CompilationMode {
 
 enum DiagnosticSeverity { info, warning, error }
 
+enum AssistAction { completion, help }
+
+extension AssistActionJson on AssistAction {
+  String get value => name;
+
+  static AssistAction parse(Object? value) {
+    return AssistAction.values.firstWhere(
+      (action) => action.value == value,
+      orElse: () => throw FormatException('عملية مساعدة غير معروفة: $value'),
+    );
+  }
+}
+
 extension DiagnosticSeverityJson on DiagnosticSeverity {
   String get value => name;
 
@@ -240,6 +253,157 @@ class CompilationResponse {
   }
 }
 
+class AssistRequest {
+  final String sourcePath;
+  final String sourceText;
+  final int offset;
+  final AssistAction action;
+  final List<String> symbols;
+
+  const AssistRequest({
+    required this.sourcePath,
+    required this.sourceText,
+    required this.offset,
+    required this.action,
+    this.symbols = const [],
+  });
+
+  Map<String, Object> toJson() => {
+    'protocolVersion': protocolVersion,
+    'requestType': 'assist',
+    'sourcePath': sourcePath,
+    'sourceText': sourceText,
+    'offset': offset,
+    'action': action.value,
+    'symbols': symbols,
+  };
+
+  factory AssistRequest.fromJson(Map<String, dynamic> json) {
+    _checkProtocolVersion(json);
+    if (json['requestType'] != 'assist') {
+      throw const FormatException('نوع الطلب ليس assist');
+    }
+    return AssistRequest(
+      sourcePath: _requiredString(json, 'sourcePath'),
+      sourceText: _requiredString(json, 'sourceText'),
+      offset: _requiredNonNegativeInt(json, 'offset'),
+      action: AssistActionJson.parse(json['action']),
+      symbols: _optionalStringList(json['symbols']),
+    );
+  }
+}
+
+class AssistCompletionItem {
+  final String label;
+  final String insertText;
+  final String kind;
+  final String detail;
+
+  const AssistCompletionItem({
+    required this.label,
+    required this.insertText,
+    required this.kind,
+    required this.detail,
+  });
+
+  Map<String, Object> toJson() => {
+    'label': label,
+    'insertText': insertText,
+    'kind': kind,
+    'detail': detail,
+  };
+
+  factory AssistCompletionItem.fromJson(Map<String, dynamic> json) =>
+      AssistCompletionItem(
+        label: _requiredString(json, 'label'),
+        insertText: _requiredString(json, 'insertText'),
+        kind: _requiredString(json, 'kind'),
+        detail: _requiredString(json, 'detail'),
+      );
+}
+
+class AssistHelp {
+  final String keyword;
+  final String title;
+  final String description;
+  final String syntax;
+
+  const AssistHelp({
+    required this.keyword,
+    required this.title,
+    required this.description,
+    required this.syntax,
+  });
+
+  Map<String, Object> toJson() => {
+    'keyword': keyword,
+    'title': title,
+    'description': description,
+    'syntax': syntax,
+  };
+
+  factory AssistHelp.fromJson(Map<String, dynamic> json) => AssistHelp(
+    keyword: _requiredString(json, 'keyword'),
+    title: _requiredString(json, 'title'),
+    description: _requiredString(json, 'description'),
+    syntax: _requiredString(json, 'syntax'),
+  );
+}
+
+class AssistResponse {
+  final AssistAction action;
+  final String expected;
+  final String prefix;
+  final int replaceStart;
+  final int replaceLength;
+  final List<AssistCompletionItem> items;
+  final AssistHelp? help;
+
+  const AssistResponse({
+    required this.action,
+    this.expected = '',
+    this.prefix = '',
+    this.replaceStart = 0,
+    this.replaceLength = 0,
+    this.items = const [],
+    this.help,
+  });
+
+  Map<String, Object?> toJson() => {
+    'protocolVersion': protocolVersion,
+    'success': true,
+    'requestType': 'assist',
+    'action': action.value,
+    'expected': expected,
+    'prefix': prefix,
+    'replaceStart': replaceStart,
+    'replaceLength': replaceLength,
+    'items': [for (final item in items) item.toJson()],
+    'help': help?.toJson(),
+  };
+
+  factory AssistResponse.fromJson(Map<String, dynamic> json) {
+    _checkProtocolVersion(json);
+    if (json['requestType'] != 'assist') {
+      throw const FormatException('نوع الاستجابة ليس assist');
+    }
+    return AssistResponse(
+      action: AssistActionJson.parse(json['action']),
+      expected: _requiredString(json, 'expected'),
+      prefix: _requiredString(json, 'prefix'),
+      replaceStart: _requiredNonNegativeInt(json, 'replaceStart'),
+      replaceLength: _requiredNonNegativeInt(json, 'replaceLength'),
+      items: _requiredMapList(
+        json,
+        'items',
+      ).map(AssistCompletionItem.fromJson).toList(),
+      help: json['help'] == null
+          ? null
+          : AssistHelp.fromJson(_requiredMap(json, 'help')),
+    );
+  }
+}
+
 void _checkProtocolVersion(Map<String, dynamic> json) {
   if (json['protocolVersion'] != protocolVersion) {
     throw FormatException(
@@ -276,6 +440,14 @@ int _requiredNonNegativeInt(Map<String, dynamic> json, String key) {
   final value = json[key];
   if (value is int && value >= 0) return value;
   throw FormatException('الحقل $key يجب أن يكون عددًا غير سالب');
+}
+
+List<String> _optionalStringList(Object? value) {
+  if (value == null) return const [];
+  if (value is List && value.every((item) => item is String)) {
+    return [for (final item in value) item as String];
+  }
+  throw const FormatException('الحقل الاختياري يجب أن يكون قائمة نصوص');
 }
 
 List<String> _requiredStringList(Map<String, dynamic> json, String key) {

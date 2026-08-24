@@ -54,6 +54,64 @@ void main() {
     expect(response['success'], isFalse);
     expect((response['diagnostics'] as List).single['phase'], 'protocol');
   });
+
+  test('CLI returns Arabic completion suggestions', () async {
+    final process = await Process.start(Platform.resolvedExecutable, [
+      'run',
+      'bin/arabicc.dart',
+      '--assist',
+    ], workingDirectory: Directory.current.path);
+    process.stdin.writeln(
+      jsonEncode({
+        'protocolVersion': '0.2.0',
+        'requestType': 'assist',
+        'sourcePath': 'main.arb',
+        'sourceText': 'مت',
+        'offset': 2,
+        'action': 'completion',
+      }),
+    );
+    await process.stdin.close();
+    final stdout = await process.stdout.transform(utf8.decoder).join();
+    await process.stderr.drain();
+    final exitCode = await process.exitCode;
+
+    expect(exitCode, 0);
+    final response = jsonDecode(stdout) as Map<String, dynamic>;
+    expect(response['requestType'], 'assist');
+    expect(response['action'], 'completion');
+    expect(
+      (response['items'] as List).map((item) => (item as Map)['label']),
+      contains('متغير'),
+    );
+  });
+
+  test('CLI returns contextual Arabic help', () async {
+    final process = await Process.start(Platform.resolvedExecutable, [
+      'run',
+      'bin/arabicc.dart',
+      '--assist',
+    ], workingDirectory: Directory.current.path);
+    process.stdin.writeln(
+      jsonEncode({
+        'protocolVersion': '0.2.0',
+        'requestType': 'assist',
+        'sourcePath': 'main.arb',
+        'sourceText': 'برنامج ',
+        'offset': 8,
+        'action': 'help',
+      }),
+    );
+    await process.stdin.close();
+    final stdout = await process.stdout.transform(utf8.decoder).join();
+    await process.stderr.drain();
+    final exitCode = await process.exitCode;
+
+    expect(exitCode, 0);
+    final response = jsonDecode(stdout) as Map<String, dynamic>;
+    expect(response['action'], 'help');
+    expect((response['help'] as Map)['keyword'], 'برنامج');
+  });
 }
 
 String _validProgram(String name, String value) =>

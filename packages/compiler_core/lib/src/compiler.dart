@@ -33,6 +33,8 @@ class CompilationResult {
 }
 
 class Compiler {
+  const Compiler();
+
   CompilationResult compile(String source) {
     final lexical = Lexer(source).scan();
     final parsed = Parser(lexical.tokens).parse();
