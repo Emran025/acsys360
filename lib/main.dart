@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'data/repositories/local_workspace_repository.dart';
 import 'data/repositories/process_compiler_repository.dart';
 import 'domain/entities/document.dart';
+import 'domain/entities/editor_diagnostic.dart';
 import 'presentation/state/editor_controller.dart';
 import 'presentation/theme/app_theme.dart';
 import 'presentation/widgets/editor_dialogs.dart';
@@ -17,7 +18,6 @@ import 'presentation/widgets/collapsible_panel.dart';
 import 'presentation/widgets/editor_top_bar.dart';
 import 'presentation/widgets/find_replace_bar.dart';
 import 'presentation/widgets/arabic_code_controller.dart';
-import 'presentation/widgets/diagnostic_lamp_dialog.dart';
 import 'presentation/widgets/line_numbered_editor.dart';
 import 'presentation/widgets/workspace_explorer.dart';
 
@@ -125,6 +125,7 @@ class _EditorShellState extends State<EditorShell> {
   bool isRefreshing = false;
   bool topBarExpanded = true;
   bool resultsExpanded = true;
+  EditorDiagnostic? visibleDiagnostic;
   Timer? analysisTimer;
 
   @override
@@ -159,6 +160,9 @@ class _EditorShellState extends State<EditorShell> {
     final document = widget.controller.activeDocument;
     if (document == null) {
       textController.setDiagnostics(const []);
+      textController.clearGhostText();
+      visibleDiagnostic = null;
+      boundPath = null;
       return;
     }
     final pathChanged = document.path != boundPath;
@@ -167,6 +171,11 @@ class _EditorShellState extends State<EditorShell> {
       textController.value = TextEditingValue(text: document.text);
     }
     textController.setDiagnostics(widget.controller.diagnostics);
+    _syncGhostCompletion();
+    if (visibleDiagnostic != null &&
+        !widget.controller.diagnostics.contains(visibleDiagnostic)) {
+      visibleDiagnostic = null;
+    }
     if (pathChanged) _scheduleAnalysis();
   }
 
@@ -176,7 +185,10 @@ class _EditorShellState extends State<EditorShell> {
     analysisTimer = Timer(const Duration(milliseconds: 350), () async {
       if (!mounted) return;
       await widget.controller.analyze();
-      if (!mounted || !_shouldSuggest) return;
+      if (!mounted || !_shouldSuggest) {
+        widget.controller.clearAssist();
+        return;
+      }
       await widget.controller.complete(_cursorOffset);
     });
   }
@@ -188,14 +200,78 @@ class _EditorShellState extends State<EditorShell> {
     return RegExp(r'[ء-يA-Za-z_]').hasMatch(character);
   }
 
-  Future<void> _showDiagnosticLamp() async {
-    final diagnostic = widget.controller.diagnosticAt(_cursorOffset);
-    if (diagnostic == null || !mounted) return;
-    final action = await showDiagnosticLampDialog(
-      context,
-      diagnostic: diagnostic,
-    );
-    if (action != null && mounted) widget.controller.applyCodeAction(action);
+  void _showDiagnosticLamp(EditorDiagnostic diagnostic) {
+    if (!mounted) return;
+    setState(() => visibleDiagnostic = diagnostic);
+  }
+
+  void _hideTransientUi() {
+    if (visibleDiagnostic != null) {
+      setState(() => visibleDiagnostic = null);
+    }
+  }
+
+  void _syncGhostCompletion() {
+    final response = widget.controller.assistance;
+    final item = widget.controller.currentCompletion;
+    final expectedOffset = response == null
+        ? -1
+        : response.replaceStart + response.replaceLength;
+    if (response == null ||
+        response.help != null ||
+        item == null ||
+        _cursorOffset != expectedOffset) {
+      textController.clearGhostText();
+      return;
+    }
+    final prefix = response.prefix;
+    final ghost = item.insertText.startsWith(prefix)
+        ? item.insertText.substring(prefix.length)
+        : item.insertText;
+    textController.setGhostText(ghost, _cursorOffset);
+  }
+
+  void _acceptCompletion() {
+    final item = widget.controller.currentCompletion;
+    if (item != null) _applyCompletion(item);
+  }
+
+  KeyEventResult _handleEditorKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+    final hardware = HardwareKeyboard.instance;
+    final hasCompletion = widget.controller.currentCompletion != null;
+    if (key == LogicalKeyboardKey.tab) {
+      if (hardware.isShiftPressed) {
+        _outdent();
+      } else if (hasCompletion) {
+        _acceptCompletion();
+      } else {
+        _indent();
+      }
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowDown && hasCompletion) {
+      widget.controller.nextCompletion();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowUp && hasCompletion) {
+      widget.controller.previousCompletion();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.escape &&
+        (hasCompletion || widget.controller.assistance != null)) {
+      widget.controller.clearAssist();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.keyD &&
+        (hardware.isControlPressed || hardware.isMetaPressed)) {
+      _duplicateLine();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   int get _cursorOffset {
@@ -226,6 +302,91 @@ class _EditorShellState extends State<EditorShell> {
       ),
     );
     widget.controller.clearAssist();
+  }
+
+  void _onSelectionChanged(TextSelection selection) {
+    _hideTransientUi();
+    final response = widget.controller.assistance;
+    final expectedOffset = response == null
+        ? -1
+        : response.replaceStart + response.replaceLength;
+    if (response?.help != null ||
+        (response != null && _cursorOffset != expectedOffset)) {
+      widget.controller.clearAssist();
+      return;
+    }
+    _syncGhostCompletion();
+  }
+
+  void _insertTextAtSelection(String value) {
+    final selection = textController.selection;
+    if (!selection.isValid) return;
+    final start = selection.start;
+    final end = selection.end;
+    final oldText = textController.text;
+    final beforeText = oldText.substring(0, start);
+    final replacedText = oldText.substring(start, end);
+    final nextText = '$beforeText$value${oldText.substring(end)}';
+    textController.value = TextEditingValue(
+      text: nextText,
+      selection: TextSelection.collapsed(offset: start + value.length),
+    );
+    widget.controller.edit(
+      TextEdit(offset: start, before: replacedText, after: value),
+    );
+  }
+
+  void _indent() => _insertTextAtSelection('  ');
+
+  void _outdent() {
+    final selection = textController.selection;
+    if (!selection.isValid || selection.start < 2) return;
+    final startOfLine =
+        textController.text.lastIndexOf('\n', selection.start - 1) + 1;
+    final removeStart = selection.start - 2;
+    if (removeStart >= startOfLine &&
+        textController.text.substring(removeStart, selection.start) == '  ') {
+      _insertTextAtSelectionAt(removeStart, selection.start, '');
+    }
+  }
+
+  void _insertTextAtSelectionAt(int start, int end, String value) {
+    final oldText = textController.text;
+    final nextText = oldText.replaceRange(start, end, value);
+    textController.value = TextEditingValue(
+      text: nextText,
+      selection: TextSelection.collapsed(offset: start + value.length),
+    );
+    widget.controller.edit(
+      TextEdit(
+        offset: start,
+        before: oldText.substring(start, end),
+        after: value,
+      ),
+    );
+  }
+
+  void _duplicateLine() {
+    final selection = textController.selection;
+    if (!selection.isValid) return;
+    final oldText = textController.text;
+    final lineStart = oldText.lastIndexOf('\n', selection.start - 1) + 1;
+    final lineEndIndex = oldText.indexOf('\n', selection.end);
+    final lineEnd = lineEndIndex == -1 ? oldText.length : lineEndIndex;
+    final line = oldText.substring(lineStart, lineEnd);
+    final insertAt = lineEndIndex == -1 ? lineEnd : lineEnd + 1;
+    final insertion = lineEndIndex == -1 ? '\n$line' : '$line\n';
+    final nextText = oldText.replaceRange(insertAt, insertAt, insertion);
+    final nextSelection = selection.start >= insertAt
+        ? selection.start + insertion.length
+        : selection.start;
+    textController.value = TextEditingValue(
+      text: nextText,
+      selection: TextSelection.collapsed(offset: nextSelection),
+    );
+    widget.controller.edit(
+      TextEdit(offset: insertAt, before: '', after: insertion),
+    );
   }
 
   Future<void> _newFileAt(String rootPath) async {
@@ -552,31 +713,42 @@ class _EditorShellState extends State<EditorShell> {
                                               : LineNumberedEditor(
                                                   controller: textController,
                                                   focusNode: editorFocusNode,
+                                                  diagnostics:
+                                                      controller.diagnostics,
                                                   onChanged: _onTextChanged,
-                                                  onTap: _showDiagnosticLamp,
+                                                  onSelectionChanged:
+                                                      _onSelectionChanged,
+                                                  onTap: _hideTransientUi,
+                                                  onDiagnosticTap:
+                                                      _showDiagnosticLamp,
+                                                  onKeyEvent: _handleEditorKey,
                                                 ),
                                         ),
                                       ),
-                                      if (controller.assistance != null)
-                                        Align(
-                                          alignment: Alignment.topRight,
-                                          child: Padding(
-                                            padding: const EdgeInsets.only(
-                                              top: 22,
-                                              right: 22,
-                                            ),
-                                            child: ConstrainedBox(
-                                              constraints: const BoxConstraints(
-                                                maxWidth: 360,
-                                                maxHeight: 190,
-                                              ),
-                                              child: _AssistPanel(
-                                                response:
-                                                    controller.assistance!,
-                                                onSelect: _applyCompletion,
-                                                onClose: controller.clearAssist,
-                                              ),
-                                            ),
+                                      if (visibleDiagnostic != null)
+                                        Positioned(
+                                          top: 12,
+                                          right: 12,
+                                          width: 340,
+                                          child: _DiagnosticPopover(
+                                            diagnostic: visibleDiagnostic!,
+                                            onApply: (action) {
+                                              widget.controller.applyCodeAction(
+                                                action,
+                                              );
+                                              _hideTransientUi();
+                                            },
+                                            onClose: _hideTransientUi,
+                                          ),
+                                        ),
+                                      if (controller.assistance?.help != null)
+                                        Positioned(
+                                          top: 12,
+                                          right: 12,
+                                          width: 340,
+                                          child: _HelpPopover(
+                                            help: controller.assistance!.help!,
+                                            onClose: controller.clearAssist,
                                           ),
                                         ),
                                     ],
@@ -755,87 +927,152 @@ class _Tabs extends StatelessWidget {
   );
 }
 
-class _AssistPanel extends StatelessWidget {
-  final AssistResponse response;
-  final ValueChanged<AssistCompletionItem> onSelect;
+class _DiagnosticPopover extends StatelessWidget {
+  final EditorDiagnostic diagnostic;
+  final ValueChanged<EditorCodeAction> onApply;
   final VoidCallback onClose;
 
-  const _AssistPanel({
-    required this.response,
-    required this.onSelect,
+  const _DiagnosticPopover({
+    required this.diagnostic,
+    required this.onApply,
     required this.onClose,
   });
 
   @override
   Widget build(BuildContext context) {
-    final help = response.help;
-    return Container(
-      constraints: const BoxConstraints(maxHeight: 180),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        border: Border(
-          top: BorderSide(color: Theme.of(context).dividerColor),
-          bottom: BorderSide(color: Theme.of(context).dividerColor),
+    final colors = Theme.of(context).colorScheme;
+    final accent = diagnostic.severity == EditorDiagnosticSeverity.error
+        ? colors.error
+        : colors.secondary;
+    return Material(
+      color: colors.surfaceContainerHighest,
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          border: Border(
+            right: BorderSide(color: accent, width: 3),
+            top: BorderSide(color: colors.outlineVariant),
+            bottom: BorderSide(color: colors.outlineVariant),
+            left: BorderSide(color: colors.outlineVariant),
+          ),
         ),
-      ),
-      child: help != null
-          ? ListTile(
-              leading: const Icon(Icons.help_outline),
-              title: Text('${help.keyword} — ${help.title}'),
-              subtitle: Text('${help.description}\nالصيغة: ${help.syntax}'),
-              trailing: IconButton(
-                onPressed: onClose,
-                icon: const Icon(Icons.close),
-                tooltip: 'إغلاق المساعدة',
-              ),
-            )
-          : Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
               children: [
+                Icon(Icons.lightbulb_rounded, color: accent, size: 18),
+                const SizedBox(width: 6),
                 Expanded(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: response.items.length,
-                    itemBuilder: (context, index) {
-                      final item = response.items[index];
-                      return ListTile(
-                        dense: true,
-                        leading: Icon(
-                          item.kind == 'symbol'
-                              ? Icons.data_object
-                              : Icons.code,
-                        ),
-                        title: Text(item.label),
-                        subtitle: Text(item.detail),
-                        onTap: () => onSelect(item),
-                      );
-                    },
+                  child: Text(
+                    '${diagnostic.code} · ${diagnostic.phase}',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
-                SizedBox(
-                  width: 150,
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'المتوقع: ${response.expected}',
-                          style: Theme.of(context).textTheme.labelMedium,
-                        ),
-                        const SizedBox(height: 6),
-                        Text('البادئة: ${response.prefix}'),
-                        IconButton(
-                          onPressed: onClose,
-                          icon: const Icon(Icons.close),
-                          tooltip: 'إغلاق الاقتراحات',
-                        ),
-                      ],
-                    ),
+                IconButton(
+                  onPressed: onClose,
+                  icon: const Icon(Icons.close, size: 17),
+                  tooltip: 'إغلاق التشخيص',
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 28,
+                    minHeight: 28,
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 4),
+            Text(
+              diagnostic.message,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'السطر ${diagnostic.line}، العمود ${diagnostic.column}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            if (diagnostic.actions.isNotEmpty) ...[
+              const Divider(height: 12),
+              for (final action in diagnostic.actions)
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: TextButton(
+                    onPressed: () => onApply(action),
+                    style: TextButton.styleFrom(
+                      alignment: AlignmentDirectional.centerStart,
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      minimumSize: const Size(0, 30),
+                    ),
+                    child: Text(action.title),
+                  ),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HelpPopover extends StatelessWidget {
+  final AssistHelp help;
+  final VoidCallback onClose;
+
+  const _HelpPopover({required this.help, required this.onClose});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Material(
+      color: colors.surfaceContainerHighest,
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          border: Border.all(color: colors.outlineVariant),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.help_outline_rounded,
+                  color: colors.primary,
+                  size: 18,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '${help.keyword} · ${help.title}',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                IconButton(
+                  onPressed: onClose,
+                  icon: const Icon(Icons.close, size: 17),
+                  tooltip: 'إغلاق المساعدة',
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 28,
+                    minHeight: 28,
+                  ),
+                ),
+              ],
+            ),
+            Text(help.description),
+            const SizedBox(height: 4),
+            Text(
+              'الصيغة: ${help.syntax}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
