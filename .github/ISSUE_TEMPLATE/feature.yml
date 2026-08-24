@@ -1,0 +1,40 @@
+name: Feature
+description: تنفيذ قدرة قابلة للاختبار
+title: "[FEATURE] "
+labels: [feature]
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: السياق والهدف
+      description: لماذا نحتاج هذه القدرة وما النتيجة المطلوبة؟
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: النطاق
+      description: ما الذي سيدخل في هذه المهمة وما الذي لن يدخل؟
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: معايير القبول
+      description: شروط قابلة للتحقق قبل الإغلاق.
+    validations:
+      required: true
+  - type: textarea
+    id: tests
+    attributes:
+      label: خطة الاختبار
+      description: unit, golden, widget, integration أو smoke tests المطلوبة.
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: الاعتماديات والمخاطر
+      description: Issues أو قرارات تقنية مرتبطة.
+    validations:
+      required: false
