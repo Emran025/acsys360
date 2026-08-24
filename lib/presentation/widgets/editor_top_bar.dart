@@ -55,7 +55,6 @@ class EditorTopBar extends StatelessWidget {
       color: colors.surface,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
         height: expanded ? 68 : 44,
         padding: EdgeInsets.symmetric(
           horizontal: 18,
@@ -65,93 +64,100 @@ class EditorTopBar extends StatelessWidget {
           border: Border(bottom: BorderSide(color: colors.outlineVariant)),
         ),
         child: expanded
-            ? SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _BrandBlock(activeName: _activeName, rootPath: rootPath),
-                    const SizedBox(width: 24),
-                    _ToolbarGroup(
-                      label: 'تحرير',
-                      children: [
-                        _ToolbarButton(
-                          tooltip: 'تراجع Ctrl+Z',
-                          icon: Icons.undo_rounded,
-                          onPressed: onUndo,
-                        ),
-                        _ToolbarButton(
-                          tooltip: 'إعادة Ctrl+Y',
-                          icon: Icons.redo_rounded,
-                          onPressed: onRedo,
-                        ),
-                        _ToolbarButton(
-                          tooltip: 'بحث واستبدال Ctrl+F',
-                          icon: Icons.search_rounded,
-                          onPressed: onFind,
-                        ),
-                      ],
+            ? Row(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _BrandBlock(
+                            activeName: _activeName,
+                            rootPath: rootPath,
+                          ),
+                          const SizedBox(width: 24),
+                          _ToolbarGroup(
+                            label: 'تحرير',
+                            children: [
+                              _ToolbarButton(
+                                tooltip: 'تراجع Ctrl+Z',
+                                icon: Icons.undo_rounded,
+                                onPressed: onUndo,
+                              ),
+                              _ToolbarButton(
+                                tooltip: 'إعادة Ctrl+Y',
+                                icon: Icons.redo_rounded,
+                                onPressed: onRedo,
+                              ),
+                              _ToolbarButton(
+                                tooltip: 'بحث واستبدال Ctrl+F',
+                                icon: Icons.search_rounded,
+                                onPressed: onFind,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(width: 12),
+                          _ToolbarGroup(
+                            label: 'لغة',
+                            children: [
+                              _ToolbarButton(
+                                tooltip: 'إكمال Ctrl+Space',
+                                icon: Icons.auto_awesome_rounded,
+                                onPressed: onComplete,
+                              ),
+                              _ToolbarButton(
+                                tooltip: 'مساعدة F1',
+                                icon: Icons.help_outline_rounded,
+                                onPressed: onHelp,
+                              ),
+                              _ToolbarButton(
+                                tooltip: 'ترجمة F5',
+                                icon: Icons.play_arrow_rounded,
+                                filled: true,
+                                onPressed: onCompile,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(width: 12),
+                          _ToolbarGroup(
+                            label: 'ملف',
+                            children: [
+                              _ToolbarButton(
+                                tooltip: 'حفظ Ctrl+S',
+                                icon: Icons.save_outlined,
+                                onPressed: onSave,
+                              ),
+                              _ToolbarButton(
+                                tooltip: 'حفظ الكل',
+                                icon: Icons.save_as_outlined,
+                                onPressed: onSaveAll,
+                              ),
+                              _ToolbarButton(
+                                tooltip: 'اختيار مجلد المشروع',
+                                icon: Icons.folder_open_outlined,
+                                onPressed: onChooseFolder,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(width: 12),
-                    _ToolbarGroup(
-                      label: 'لغة',
-                      children: [
-                        _ToolbarButton(
-                          tooltip: 'إكمال Ctrl+Space',
-                          icon: Icons.auto_awesome_rounded,
-                          onPressed: onComplete,
-                        ),
-                        _ToolbarButton(
-                          tooltip: 'مساعدة F1',
-                          icon: Icons.help_outline_rounded,
-                          onPressed: onHelp,
-                        ),
-                        _ToolbarButton(
-                          tooltip: 'ترجمة F5',
-                          icon: Icons.play_arrow_rounded,
-                          filled: true,
-                          onPressed: onCompile,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(width: 12),
-                    _ToolbarGroup(
-                      label: 'ملف',
-                      children: [
-                        _ToolbarButton(
-                          tooltip: 'حفظ Ctrl+S',
-                          icon: Icons.save_outlined,
-                          onPressed: onSave,
-                        ),
-                        _ToolbarButton(
-                          tooltip: 'حفظ الكل',
-                          icon: Icons.save_as_outlined,
-                          onPressed: onSaveAll,
-                        ),
-                        _ToolbarButton(
-                          tooltip: 'اختيار مجلد المشروع',
-                          icon: Icons.folder_open_outlined,
-                          onPressed: onChooseFolder,
-                        ),
-                        _AccentPicker(
-                          accent: accent,
-                          onSelected: onSelectAccent,
-                        ),
-                        _ToolbarButton(
-                          tooltip: isDark ? 'الوضع الفاتح' : 'الوضع الداكن',
-                          icon: isDark
-                              ? Icons.light_mode_outlined
-                              : Icons.dark_mode_outlined,
-                          onPressed: onToggleTheme,
-                        ),
-                      ],
-                    ),
-                    IconButton(
-                      onPressed: onToggleExpanded,
-                      tooltip: 'طي الشريط العلوي',
-                      icon: const Icon(Icons.keyboard_arrow_up_rounded),
-                    ),
-                  ],
-                ),
+                  ),
+                  _AccentPicker(accent: accent, onSelected: onSelectAccent),
+                  _ToolbarButton(
+                    tooltip: isDark ? 'الوضع الفاتح' : 'الوضع الداكن',
+                    icon: isDark
+                        ? Icons.light_mode_outlined
+                        : Icons.dark_mode_outlined,
+                    onPressed: onToggleTheme,
+                  ),
+                  IconButton(
+                    onPressed: onToggleExpanded,
+                    tooltip: 'طي الشريط العلوي',
+                    icon: const Icon(Icons.keyboard_arrow_up_rounded),
+                  ),
+                ],
               )
             : Row(
                 children: [
@@ -242,6 +248,36 @@ class _ToolbarGroup extends StatelessWidget {
   );
 }
 
+class _ToolbarButton extends StatelessWidget {
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final bool filled;
+
+  const _ToolbarButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+    this.filled = false,
+  });
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 1),
+    child: IconButton.filledTonal(
+      onPressed: onPressed,
+      tooltip: tooltip,
+      icon: Icon(icon, size: 19),
+      style: filled
+          ? IconButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+            )
+          : null,
+    ),
+  );
+}
+
 class _AccentPicker extends StatelessWidget {
   final AppAccent accent;
   final ValueChanged<AppAccent> onSelected;
@@ -271,35 +307,5 @@ class _AccentPicker extends StatelessWidget {
         ),
     ],
     child: Icon(Icons.palette_outlined, color: accent.color, size: 22),
-  );
-}
-
-class _ToolbarButton extends StatelessWidget {
-  final String tooltip;
-  final IconData icon;
-  final VoidCallback onPressed;
-  final bool filled;
-
-  const _ToolbarButton({
-    required this.tooltip,
-    required this.icon,
-    required this.onPressed,
-    this.filled = false,
-  });
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 1),
-    child: IconButton.filledTonal(
-      onPressed: onPressed,
-      tooltip: tooltip,
-      icon: Icon(icon, size: 19),
-      style: filled
-          ? IconButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Theme.of(context).colorScheme.onPrimary,
-            )
-          : null,
-    ),
   );
 }
