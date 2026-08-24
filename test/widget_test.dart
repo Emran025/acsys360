@@ -72,7 +72,9 @@ void main() {
 
     expect(find.text('No Folder Opened'), findsOneWidget);
     expect(find.text('Open Editors'), findsOneWidget);
-    expect(find.text('فتح مجلد'), findsOneWidget);
+    expect(find.text('فتح مجلد'), findsAtLeastNWidgets(1));
+    expect(find.text('ملف جديد'), findsOneWidget);
+    expect(find.text('فتح ملف'), findsAtLeastNWidgets(1));
     expect(find.text('مستكشف المشروع'), findsNothing);
     expect(find.text('Welcome'), findsAtLeastNWidgets(1));
   });
