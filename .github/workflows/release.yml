@@ -1,0 +1,74 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            os: ubuntu-latest
+            target: linux
+          - platform: windows
+            os: windows-latest
+            target: windows
+          - platform: macos
+            os: macos-latest
+            target: macos
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart format --output=none --set-exit-if-changed lib test
+      - run: flutter analyze
+      - run: flutter test
+      - if: matrix.target == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+      - run: flutter config --enable-${{ matrix.target }}-desktop
+      - run: flutter build ${{ matrix.target }} --release
+      - name: Package Linux
+        if: matrix.target == 'linux'
+        run: tar -czf acsys360-linux-${{ github.ref_name }}.tar.gz -C build/linux/x64/release bundle
+      - name: Package Windows
+        if: matrix.target == 'windows'
+        shell: pwsh
+        run: Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath acsys360-windows-${{ github.ref_name }}.zip
+      - name: Package macOS
+        if: matrix.target == 'macos'
+        run: ditto -c -k --sequesterRsrc --keepParent build/macos/Build/Products/Release/acsys360.app acsys360-macos-${{ github.ref_name }}.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: acsys360-${{ matrix.platform }}
+          path: |
+            *.tar.gz
+            *.zip
+
+  publish:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: dist/*
