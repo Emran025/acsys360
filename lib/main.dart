@@ -1428,6 +1428,7 @@ class _DiagnosticsPanelState extends State<_DiagnosticsPanel> {
     'Symbol Table',
     'Semantic',
     '3AC',
+    'Typed IR',
     'Assembly',
     'التنفيذ',
     'Artifact',
@@ -1488,14 +1489,19 @@ class _DiagnosticsPanelState extends State<_DiagnosticsPanel> {
     ),
     5 => _selectable(result.threeAddressCode.join('\n')),
     6 => _selectable(
-      result.assembly.isEmpty ? 'لا يوجد مخرج Assembly' : result.assembly,
+      result.intermediateRepresentation == null
+          ? 'لا يوجد Typed IR'
+          : _prettyJson(result.intermediateRepresentation),
     ),
     7 => _selectable(
+      result.assembly.isEmpty ? 'لا يوجد مخرج Assembly' : result.assembly,
+    ),
+    8 => _selectable(
       result.executionOutput.isEmpty
           ? 'لا يوجد خرج تنفيذ'
-          : result.executionOutput.join('\n'),
+          : result.executionOutput.join('\\n'),
     ),
-    8 => _artifacts(result),
+    9 => _artifacts(result),
     _ => const SizedBox.shrink(),
   };
 

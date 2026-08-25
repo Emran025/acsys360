@@ -54,8 +54,8 @@ tool/
 
 يُعامل كل ملف كـ `Document` مستقل له URI ومحتوى ونسخة وdirty state ومكدس undo ومكدس redo. يدير `WorkspaceSession` الملفات المفتوحة والتبويبات والملف النشط والمجلد الجذري. تُنفذ عمليات التحرير عبر `EditCommand` تحمل النص السابق واللاحق ونطاق التعديل، بحيث يكون Undo وRedo قابلين للتوقع والاختبار. تحفظ الاختصارات في `CommandRegistry` بدل ربطها عشوائيًا بعناصر الواجهة.
 
-يبدأ المحرر بشريط علوي للأوامر، مستكشف ملفات يساري، مساحة تبويبات مركزية، لوحة نتائج سفلية، وشريط حالة. تشمل الأوامر New/Open/Save/Save All/Close/Undo/Redo/Find/Replace/Format/Compile/Run/Stop، وتعرض لوحة النتائج تبويبات Tokens وAST وSymbol Table وDiagnostics وTAC وAssembly وRuntime Output.
+يبدأ المحرر بشريط علوي للأوامر، مستكشف ملفات يساري، مساحة تبويبات مركزية، لوحة نتائج سفلية، وشريط حالة. تشمل الأوامر New/Open/Save/Save All/Close/Undo/Redo/Find/Replace/Format/Compile/Run/Stop، وتعرض لوحة النتائج تبويبات Tokens وAST وSymbol Table وDiagnostics وTAC وTyped IR وAssembly وRuntime Output وArtifact.
 
 ## حدود التكامل
 
-يستدعي المحرر `compiler_cli` بعقد JSON versioned. يرسل المسار الجذري والملفات أو snapshot المشروع، ويستقبل نتيجة تحتوي على `protocolVersion`, `diagnostics`, `tokens`, `syntaxTree`, `symbolTable`, `threeAddressCode`, `assembly`, و`artifacts`. لا يُسمح بإظهار نتيجة ثابتة أو مصطنعة.
+يستدعي المحرر `compiler_cli` بعقد JSON versioned. يرسل المسار الجذري والملفات أو snapshot المشروع، ويستقبل نتيجة تحتوي على `protocolVersion`, `diagnostics`, `tokens`, `syntaxTree`, `symbolTable`, `threeAddressCode`, `intermediateRepresentation`, `assembly`, و`artifacts`. لا يُسمح بإظهار نتيجة ثابتة أو مصطنعة.

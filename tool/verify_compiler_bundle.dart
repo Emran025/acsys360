@@ -13,7 +13,7 @@ Future<void> main(List<String> arguments) async {
 
   final executable = arguments[executableIndex + 1];
   final request = {
-    'protocolVersion': '0.4.0',
+    'protocolVersion': '0.5.0',
     'rootPath': Directory.current.path,
     'sourcePaths': ['smoke.arb'],
     'sourceTexts': {
@@ -42,10 +42,11 @@ Future<void> main(List<String> arguments) async {
 
   final response = jsonDecode(output);
   if (response is! Map ||
-      response['protocolVersion'] != '0.4.0' ||
+      response['protocolVersion'] != '0.5.0' ||
       response['success'] != true ||
       response['executionOutput'] is! List ||
-      response['artifacts'] is! List) {
+      response['artifacts'] is! List ||
+      response['intermediateRepresentation'] is! Map) {
     stderr.writeln(
       'Bundled compiler returned an unsuccessful protocol response.',
     );

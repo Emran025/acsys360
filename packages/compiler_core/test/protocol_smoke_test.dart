@@ -8,7 +8,7 @@ void main() {
     final root = await Directory.systemTemp.createTemp('arabicc-protocol-');
     addTearDown(() => root.delete(recursive: true));
     final request = jsonEncode({
-      'protocolVersion': '0.4.0',
+      'protocolVersion': '0.5.0',
       'rootPath': root.path,
       'sourcePaths': ['main.arb', 'lib.arb'],
       'sourceTexts': {
@@ -30,11 +30,15 @@ void main() {
 
     expect(exitCode, 0, reason: stderr);
     final response = jsonDecode(stdout) as Map<String, dynamic>;
-    expect(response['protocolVersion'], '0.4.0');
+    expect(response['protocolVersion'], '0.5.0');
     expect(response['success'], isTrue);
     expect((response['syntaxTree'] as Map)['kind'], 'project');
     expect((response['tokens'] as List), isNotEmpty);
     expect((response['threeAddressCode'] as List), isNotEmpty);
+    final intermediateRepresentation =
+        response['intermediateRepresentation'] as Map<String, dynamic>;
+    expect(intermediateRepresentation['kind'], 'project');
+    expect(intermediateRepresentation['files'], isNotEmpty);
   });
 
   test('CLI resolves project procedures across source files', () async {
@@ -47,7 +51,7 @@ void main() {
     ], workingDirectory: Directory.current.path);
     process.stdin.writeln(
       jsonEncode({
-        'protocolVersion': '0.4.0',
+        'protocolVersion': '0.5.0',
         'rootPath': root.path,
         'sourcePaths': ['main.arb', 'lib.arb'],
         'sourceTexts': {
@@ -74,6 +78,10 @@ void main() {
     final response = jsonDecode(stdout) as Map<String, dynamic>;
     expect(response['success'], isTrue);
     expect(response['diagnostics'], isEmpty);
+    final intermediateRepresentation =
+        response['intermediateRepresentation'] as Map<String, dynamic>;
+    expect(intermediateRepresentation['kind'], 'project');
+    expect(intermediateRepresentation['files'], isNotEmpty);
   });
 
   test('CLI builds a dart-native artifact when requested', () async {
@@ -93,7 +101,7 @@ void main() {
     );
     process.stdin.writeln(
       jsonEncode({
-        'protocolVersion': '0.4.0',
+        'protocolVersion': '0.5.0',
         'rootPath': root.path,
         'sourcePaths': ['main.arb'],
         'sourceTexts': {
@@ -151,7 +159,7 @@ void main() {
     ], workingDirectory: Directory.current.path);
     process.stdin.writeln(
       jsonEncode({
-        'protocolVersion': '0.4.0',
+        'protocolVersion': '0.5.0',
         'requestType': 'assist',
         'sourcePath': 'main.arb',
         'sourceText': 'مت',
@@ -182,7 +190,7 @@ void main() {
     ], workingDirectory: Directory.current.path);
     process.stdin.writeln(
       jsonEncode({
-        'protocolVersion': '0.4.0',
+        'protocolVersion': '0.5.0',
         'requestType': 'assist',
         'sourcePath': 'main.arb',
         'sourceText': 'برنامج ',

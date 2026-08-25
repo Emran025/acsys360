@@ -40,7 +40,7 @@ Optional dart-native emitter → Dart source → dart compile exe → artifact
 
 ## 4. العقد بين البرنامجين
 
-الإصدار المعتمد هو `0.4.0`. يرسل الطلب `rootPath` و`sourcePaths` و`sourcetexts` و`mode` و`entryPath`، ويمكنه تحديد `target: none` أو `target: dart-native` و`artifactDirectory`. تعيد الاستجابة `success` و`diagnostics` و`tokens` و`syntaxTree` و`symbolTable` و`threeAddressCode` و`assembly` و`executionOutput` و`artifacts`.
+الإصدار المعتمد هو `0.5.0`. يرسل الطلب `rootPath` و`sourcePaths` و`sourcetexts` و`mode` و`entryPath`، ويمكنه تحديد `target: none` أو `target: dart-native` و`artifactDirectory`. تعيد الاستجابة `success` و`diagnostics` و`tokens` و`syntaxTree` و`symbolTable` و`threeAddressCode` و`assembly` و`intermediateRepresentation` و`executionOutput` و`artifacts`.
 
 في compile العادي يمكن أن يكون `mode` هو project لتجميع ملفات Workspace. أما Ctrl/Cmd+F5 فيستخدم `CompilationMode.active` ويرسل الملف النشط فقط، حتى لا يفشل native build بسبب تبويب آخر غير صالح أو ملف لا ينتمي إلى entry point الحالي.
 

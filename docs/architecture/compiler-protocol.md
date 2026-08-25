@@ -6,7 +6,7 @@
 
 ## الإصدار الحالي
 
-الإصدار الحالي هو `0.4.0`. يجب أن يظهر الحقل `protocolVersion` في كل طلب واستجابة. يرفض الطرف المستقبل الإصدار غير المدعوم برسالة خطأ واضحة بدل تفسير payload مختلف بصمت.
+الإصدار الحالي هو `0.5.0`. أضيفت في هذا الإصدار مرحلة `intermediateRepresentation` لتمرير Typed IR الذي تنتجه النواة بعد التحقق من التعليمات والقفزات. يجب أن يظهر الحقل `protocolVersion` في كل طلب واستجابة. يرفض الطرف المستقبل الإصدار غير المدعوم برسالة خطأ واضحة بدل تفسير payload مختلف بصمت.
 
 ## طلب الترجمة
 
@@ -34,7 +34,8 @@
 | `tokens` | `List<ProtocolToken>` | ناتج التحليل المعجمي الحقيقي |
 | `syntaxTree` | `Map?` | شجرة التحليل النحوي عند توفرها |
 | `symbolTable` | `List<SymbolRecord>` | الرموز المستخرجة مع مواقعها |
-| `threeAddressCode` | `List<String>` | الشفرة الوسيطة |
+| `threeAddressCode` | `List<String>` | الشفرة الوسيطة النصية |
+| `intermediateRepresentation` | `Map?` | Typed IR متحقق منه؛ وفي المشروع متعدد الملفات يضم IR الخاص بكل ملف |
 | `assembly` | `String` | الشفرة التجميعية النصية الناتجة من TAC |
 | `executionOutput` | `List<String>` | أسطر stdout من التنفيذ الفعلي للبرنامج الصحيح داخل compiler runtime |
 | `artifacts` | `List<String>` | مسارات الملفات التنفيذية أو مخرجات البناء؛ تكون فارغة ما لم ينفذ target backend موثوق |
@@ -59,4 +60,4 @@
 
 ## ما لم ينفذ بعد
 
-العقد يعرّف شكل النقل، وCLI يمرر كل ملف إلى lexer/parser/semantic ثم يجمع النتائج في استجابة project، مع تحليل project-level للإجراءات والأنواع المصدرة. لا تُسرّب المتغيرات بين الملفات دون import syntax. يدعم الإصدار `dart-native` طلب بناء artifact في `artifactDirectory`، ويستخدم Dart SDK المضمّن في release أو `DART_EXECUTABLE`/PATH في التطوير، ولا يعيد المسار إلا بعد إنشاء executable والتحقق من وجوده. أما `target: none` فيبقى السلوك الافتراضي المتوافق مع الترجمة والتحليل والتنفيذ الداخلي.
+العقد يعرّف شكل النقل، وCLI يمرر كل ملف إلى lexer/parser/semantic ثم يجمع النتائج في استجابة project، ويمرر `intermediateRepresentation` بعد بناء Typed IR والتحقق منه، مع تحليل project-level للإجراءات والأنواع المصدرة. لا تُسرّب المتغيرات بين الملفات دون import syntax. يدعم الإصدار `dart-native` طلب بناء artifact في `artifactDirectory`، ويستخدم Dart SDK المضمّن في release أو `DART_EXECUTABLE`/PATH في التطوير، ولا يعيد المسار إلا بعد إنشاء executable والتحقق من وجوده. أما `target: none` فيبقى السلوك الافتراضي المتوافق مع الترجمة والتحليل والتنفيذ الداخلي.

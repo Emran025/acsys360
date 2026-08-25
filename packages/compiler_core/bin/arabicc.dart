@@ -137,6 +137,7 @@ Future<CompilationResponse> _compileRequest(CompilationRequest request) async {
   final executionOutput = <String>[];
   final artifacts = <String>[];
   final trees = <Map<String, Object?>>[];
+  final intermediateRepresentations = <Map<String, Object?>>[];
   final sources = <String, String>{};
 
   for (final sourcePath in paths) {
@@ -189,6 +190,12 @@ Future<CompilationResponse> _compileRequest(CompilationRequest request) async {
     );
     if (result.program != null) {
       trees.add({'sourcePath': sourcePath, 'tree': result.program!.toJson()});
+    }
+    if (result.intermediateRepresentation != null) {
+      intermediateRepresentations.add({
+        'sourcePath': sourcePath,
+        'ir': result.intermediateRepresentation!.toJson(),
+      });
     }
     for (final symbol in result.semantic?.symbols.values ?? const <Symbol>[]) {
       symbols.add(
@@ -305,6 +312,14 @@ Future<CompilationResponse> _compileRequest(CompilationRequest request) async {
   final syntaxTree = paths.length == 1
       ? (trees.isEmpty ? null : trees.single['tree'] as Map<String, Object?>?)
       : <String, Object?>{'kind': 'project', 'files': trees};
+  final intermediateRepresentation = paths.length == 1
+      ? (intermediateRepresentations.isEmpty
+            ? null
+            : intermediateRepresentations.single['ir'] as Map<String, Object?>?)
+      : <String, Object?>{
+          'kind': 'project',
+          'files': intermediateRepresentations,
+        };
   return CompilationResponse(
     success: sources.length == paths.length && diagnostics.isEmpty,
     diagnostics: diagnostics,
@@ -315,6 +330,7 @@ Future<CompilationResponse> _compileRequest(CompilationRequest request) async {
     assembly: assembly.join('\n'),
     executionOutput: executionOutput,
     artifacts: artifacts,
+    intermediateRepresentation: intermediateRepresentation,
   );
 }
 

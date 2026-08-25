@@ -52,7 +52,7 @@ flutter build linux --release
 
 | العنصر | الحالة المثبتة |
 |---|---|
-| protocol `0.4.0` | مدمج ومختبر |
+| protocol `0.5.0` | مدمج ومختبر مع Typed IR طرفيًا |
 | typed IR | مدمج مع اختبارات تحقق |
 | native executable | مدعوم عبر `dart-native` للتركيبات المختبرة |
 | release self-contained | منشور في v0.9.0 مع compiler وDart SDK |

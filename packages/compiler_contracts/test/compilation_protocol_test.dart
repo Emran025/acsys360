@@ -60,6 +60,12 @@ void main() {
       threeAddressCode: ['س := 1'],
       assembly: 'MOV R0, 1',
       artifacts: ['build/program.exe'],
+      intermediateRepresentation: {
+        'instructions': [
+          {'opcode': 'assign', 'result': 'س', 'left': '1', 'type': 'صحيح'},
+        ],
+        'diagnostics': [],
+      },
     );
 
     final json = Map<String, dynamic>.from(response.toJson());
@@ -72,6 +78,10 @@ void main() {
     expect(decoded.symbols.single.type, 'صحيح');
     expect(decoded.threeAddressCode, ['س := 1']);
     expect(decoded.artifacts, ['build/program.exe']);
+    expect(
+      decoded.intermediateRepresentation?['instructions'],
+      isA<List<dynamic>>(),
+    );
   });
 
   test('rejects unsupported protocol versions', () {

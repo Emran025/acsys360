@@ -16,6 +16,7 @@
 | [06-deliverables-checklist.md](06-deliverables-checklist.md) | قائمة التسليم النهائية ومطابقة الملفات للمطلوب |
 | [07-vscode-editing-reference.md](07-vscode-editing-reference.md) | خلاصة دراسة سلوك VS Code ومراجعها التنفيذية |
 | [08-minimap-reference.md](08-minimap-reference.md) | مواصفة Minimap والتنقل السريع داخل الملف |
+| [09-quality-gates.md](09-quality-gates.md) | بوابة الجودة الإنتاجية والأكاديمية ومعايير القبول |
 
 ## مبدأ الدقة
 

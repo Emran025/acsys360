@@ -36,11 +36,12 @@ void main() {
       ],
     );
 
-    expect(response['protocolVersion'], '0.4.0');
+    expect(response['protocolVersion'], '0.5.0');
     expect(response['success'], isTrue);
     expect(response['executionOutput'], ['2', '4']);
     expect((response['syntaxTree'] as Map)['kind'], 'project');
     expect(response['tokens'], isNotEmpty);
+    expect(response['intermediateRepresentation'], isA<Map>());
   });
 
   test('builds only the active document for a native target', () async {
@@ -77,10 +78,11 @@ void main() {
       mode: CompilationMode.active,
     );
 
-    expect(response['protocolVersion'], '0.4.0');
+    expect(response['protocolVersion'], '0.5.0');
     expect(response['success'], isTrue);
     expect(response['diagnostics'], isEmpty);
     expect(response['executionOutput'], ['2']);
+    expect(response['intermediateRepresentation'], isA<Map>());
     expect(response['artifacts'], hasLength(1));
     expect(File((response['artifacts'] as List).single).existsSync(), isTrue);
   });
