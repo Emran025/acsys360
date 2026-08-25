@@ -491,10 +491,10 @@ void main() {
         code: 'L001',
         message: 'رمز غير معروف',
         sourcePath: 'main.arb',
-        offset: 6,
+        offset: 7,
         length: 1,
         line: 1,
-        column: 7,
+        column: 8,
       ),
     ]);
     late TextSpan span;

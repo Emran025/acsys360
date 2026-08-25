@@ -81,8 +81,9 @@ class ToggleLineComment {
     required bool uncomment,
   }) {
     if (offset <= firstLineStart) return firstLineStart;
-    if (offset >= lastLineEnd)
+    if (offset >= lastLineEnd) {
       return firstLineStart + transformedLines.join('\n').length;
+    }
     var originalCursor = firstLineStart;
     var transformedCursor = firstLineStart;
     for (var index = 0; index < lines.length; index++) {
