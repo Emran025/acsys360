@@ -1,5 +1,6 @@
 import 'package:acsys360/domain/entities/document.dart';
 import 'package:compiler_contracts/compiler_contracts.dart';
+import 'package:acsys360/domain/entities/compilation_result.dart';
 import 'package:acsys360/domain/entities/editor_diagnostic.dart';
 import 'package:acsys360/domain/entities/source_token.dart';
 import 'package:acsys360/domain/entities/file_node.dart';
@@ -80,6 +81,30 @@ void main() {
     expect(find.text('فتح ملف'), findsAtLeastNWidgets(1));
     expect(find.text('مستكشف المشروع'), findsNothing);
     expect(find.text('Welcome'), findsAtLeastNWidgets(1));
+  });
+
+  testWidgets('renders execution output on separate lines', (tester) async {
+    final controller = EditorController(
+      repository: FakeWorkspaceRepository(),
+      rootPath: '.',
+    );
+    await controller.open('main.arb');
+    controller.compilation = const CompilationResult(
+      success: true,
+      payload: {
+        'executionOutput': ['الأول', 'الثاني'],
+      },
+    );
+
+    await tester.pumpWidget(ArabicEditorApp(controller: controller));
+    await tester.pump();
+    final executionStage = find.widgetWithText(TextButton, 'التنفيذ');
+    await tester.ensureVisible(executionStage);
+    await tester.tap(executionStage);
+    await tester.pump();
+
+    expect(find.text('الأول\nالثاني'), findsOneWidget);
+    expect(find.text(r'الأول\nالثاني'), findsNothing);
   });
 
   testWidgets('opens an Arabic source document', (tester) async {
@@ -391,6 +416,77 @@ void main() {
       tester.widget<TextField>(field).controller?.selection.extentOffset,
       controller.activeDocument?.text.length,
     );
+  });
+
+  testWidgets('inserts a new line safely at offset zero', (tester) async {
+    final controller = EditorController(
+      repository: FakeWorkspaceRepository(),
+      rootPath: '.',
+    );
+    await controller.open('main.arb');
+
+    await tester.pumpWidget(ArabicEditorApp(controller: controller));
+    await tester.pump();
+    final field = find.byType(TextField);
+    await tester.tap(field);
+    final textFieldController = tester.widget<TextField>(field).controller!;
+    textFieldController.selection = const TextSelection.collapsed(offset: 0);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+
+    expect(controller.activeDocument?.text, '\nبرنامج اختبار {}.');
+    expect(textFieldController.selection.extentOffset, 1);
+  });
+
+  testWidgets('toggles line comments through the editor shortcut', (
+    tester,
+  ) async {
+    final controller = EditorController(
+      repository: FakeWorkspaceRepository(),
+      rootPath: '.',
+    );
+    await controller.open('main.arb');
+
+    await tester.pumpWidget(ArabicEditorApp(controller: controller));
+    await tester.pump();
+    final field = find.byType(TextField);
+    await tester.tap(field);
+    final textFieldController = tester.widget<TextField>(field).controller!;
+    textFieldController.selection = const TextSelection.collapsed(offset: 0);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.slash);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+
+    expect(controller.activeDocument?.text, '// برنامج اختبار {}.');
+  });
+
+  testWidgets('changes global text scale once and resets it', (tester) async {
+    final controller = EditorController(
+      repository: FakeWorkspaceRepository(),
+      rootPath: '.',
+    );
+    await controller.open('main.arb');
+
+    await tester.pumpWidget(ArabicEditorApp(controller: controller));
+    await tester.pump();
+    final scaffold = find.byType(Scaffold);
+    double scale() =>
+        MediaQuery.of(tester.element(scaffold)).textScaler.scale(1);
+
+    expect(scale(), 1.0);
+    await tester.tap(find.byType(TextField));
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.equal);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+    expect(scale(), closeTo(1.1, 0.001));
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.digit0);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+    expect(scale(), 1.0);
   });
 
   testWidgets('shows a diagnostic lamp in the editor gutter', (tester) async {

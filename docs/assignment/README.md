@@ -19,12 +19,15 @@
 | [09-quality-gates.md](09-quality-gates.md) | بوابة الجودة الإنتاجية والأكاديمية ومعايير القبول |
 | [10-vscode-highlighting-findings.md](10-vscode-highlighting-findings.md) | نتائج دراسة VS Code وتطبيقها على التلوين والتعليقات والإزاحة |
 | [11-editor-command-and-language-status.md](11-editor-command-and-language-status.md) | حالة أوامر المحرر وخدمة اللغة وقواعد RTL وبوابة الإثبات |
+| [12-code-component-guide.md](12-code-component-guide.md) | سبب وجود المكونات ومسار البيانات والمدخلات والمخرجات والحدود |
+| [13-deep-audit-report.md](13-deep-audit-report.md) | حلقة التدقيق المتكررة، العيوب المكتشفة، التصحيحات، الأدلة والحدود |
+| [../architecture/dependencies.md](../architecture/dependencies.md) | الأدوات والإصدارات والغرض ومواضع الاستخدام |
 
 ## مبدأ الدقة
 
 > لا تُسمّى الشفرة التنفيذية artifact إلا إذا وُجد الملف فعلًا، واجتاز البناء والتحقق التشغيلي المقصود، وأُعيد مساره من خلال العقد. ولا تُسمّى Assembly النصية binary assembled ما لم تمر عبر assembler حقيقي.
 
-تستخدم النسخة الحالية target باسم `dart-native` لبناء executable حقيقي عبر `dart compile exe` عند توفر Dart SDK، وتضمّن release SDK المطلوب بجانب compiler. وتبقى صلاحية native backend مرتبطة بالتركيبات التي يغطيها semantic analyzer واختبارات parity؛ لذلك لا تدعي هذه الوثائق دعم كل امتداد مستقبلي قبل إضافة اختبار صريح له.
+تستخدم النسخة الحالية target باسم `dart-native` لبناء executable حقيقي عبر `dart compile exe` عند توفر Dart SDK، وتضمّن release SDK المطلوب بجانب compiler. وتبقى صلاحية native backend مرتبطة بالتركيبات التي يغطيها semantic analyzer واختبارات parity؛ لذلك لا تدعي هذه الوثائق دعم كل امتداد مستقبلي قبل إضافة اختبار صريح له. توجد عشرة fixtures نجاح في `examples/` وfixture syntax وfixture semantic في `examples/errors/`.
 
 ## مراجع السلوك التحريري
 

@@ -2,6 +2,7 @@ import 'package:compiler_core/arabic_compiler.dart';
 
 import '../entities/source_token.dart';
 
+/// يحول Lexer الحقيقي إلى spans مستقلة عن Flutter؛ لا يعيد تعريف grammar داخل Widget.
 class ArabicSyntaxHighlighter {
   const ArabicSyntaxHighlighter();
 

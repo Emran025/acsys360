@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:compiler_contracts/compiler_contracts.dart';
 import 'package:flutter/foundation.dart';
 
@@ -13,7 +11,9 @@ import '../../domain/usecases/find_replace.dart';
 import '../../domain/usecases/editor_language_server.dart';
 import '../../domain/usecases/format_arabic_source.dart';
 import '../../domain/usecases/workspace_actions.dart';
+import '../../domain/services/workspace_path_service.dart';
 
+/// مصدر حالة المحرر: workspace والوثائق والنتائج، بينما تبقى الملفات والمترجم خلف عقود repositories.
 class EditorController extends ChangeNotifier {
   final WorkspaceRepository repository;
   final OpenDocument openDocument;
@@ -25,6 +25,7 @@ class EditorController extends ChangeNotifier {
   final ReplaceAllText replaceAllText;
   final CompilerRepository? compiler;
   final AssistRepository? assistant;
+  final WorkspacePathService pathService;
 
   Workspace workspace;
   List<String> files = const [];
@@ -39,6 +40,7 @@ class EditorController extends ChangeNotifier {
   String? cutPath;
   String? selectedExplorerPath;
   String? selectedDirectoryPath;
+  int _stateVersion = 0;
 
   EditorLanguageServer? get languageServer {
     final compilerService = compiler;
@@ -55,6 +57,7 @@ class EditorController extends ChangeNotifier {
     required String rootPath,
     this.compiler,
     this.assistant,
+    this.pathService = const DefaultWorkspacePathService(),
   }) : workspace = Workspace(rootPath: rootPath),
        openDocument = OpenDocument(repository),
        saveDocument = SaveDocument(repository),
@@ -67,6 +70,7 @@ class EditorController extends ChangeNotifier {
   Document? get activeDocument => workspace.activeDocument;
 
   Future<void> changeRoot(String rootPath) async {
+    _stateVersion++;
     workspace = Workspace(rootPath: rootPath);
     files = const [];
     tree = const [];
@@ -79,24 +83,29 @@ class EditorController extends ChangeNotifier {
     await refreshFiles();
   }
 
-  Future<void> refreshFiles() async {
-    if (workspace.rootPath.trim().isEmpty) {
+  Future<void> refreshFiles({bool notify = true}) async {
+    final version = _stateVersion;
+    final rootPath = workspace.rootPath;
+    if (rootPath.trim().isEmpty) {
       tree = const [];
       files = const [];
       error = null;
       return;
     }
     try {
-      tree = await repository.listTree(workspace.rootPath);
-      files = _flattenFiles(tree);
+      final nextTree = await repository.listTree(rootPath);
+      if (version != _stateVersion) return;
+      tree = nextTree;
+      files = _flattenFiles(nextTree);
       error = null;
     } catch (exception) {
-      error = exception;
+      if (version == _stateVersion) error = exception;
     }
-    notifyListeners();
+    if (notify && version == _stateVersion) notifyListeners();
   }
 
   void selectTab(int index) {
+    _stateVersion++;
     workspace = workspace.select(index);
     searchMatches = const [];
     assistance = null;
@@ -108,37 +117,39 @@ class EditorController extends ChangeNotifier {
     if (index < 0 || index >= workspace.documents.length) return false;
     final document = workspace.documents[index];
     if (document.isDirty && !discard) return false;
+    _stateVersion++;
     workspace = workspace.close(index);
     notifyListeners();
     return true;
   }
 
   Future<void> create(String name, {String? rootPath}) async {
+    final version = ++_stateVersion;
+    final targetRoot = rootPath ?? workspace.rootPath;
     try {
-      final document = await repository.create(
-        rootPath ?? workspace.rootPath,
-        name,
-      );
+      final document = await repository.create(targetRoot, name);
+      if (version != _stateVersion) return;
       workspace = workspace.open(document);
-      await refreshFiles();
-      error = null;
+      await refreshFiles(notify: false);
+      if (version == _stateVersion) error = null;
     } catch (exception) {
-      error = exception;
-      notifyListeners();
+      if (version == _stateVersion) error = exception;
     }
-    notifyListeners();
+    if (version == _stateVersion) notifyListeners();
   }
 
   Future<void> createFolder(String name, {String? rootPath}) async {
+    final version = ++_stateVersion;
+    final targetRoot = rootPath ?? workspace.rootPath;
     try {
-      await repository.createDirectory(rootPath ?? workspace.rootPath, name);
-      await refreshFiles();
-      error = null;
+      await repository.createDirectory(targetRoot, name);
+      if (version != _stateVersion) return;
+      await refreshFiles(notify: false);
+      if (version == _stateVersion) error = null;
     } catch (exception) {
-      error = exception;
-      notifyListeners();
+      if (version == _stateVersion) error = exception;
     }
-    notifyListeners();
+    if (version == _stateVersion) notifyListeners();
   }
 
   List<String> _flattenFiles(List<FileNode> nodes) => [
@@ -147,29 +158,37 @@ class EditorController extends ChangeNotifier {
   ];
 
   Future<void> open(String path) async {
+    final version = ++_stateVersion;
     try {
-      workspace = await openDocument(workspace, path);
+      final nextWorkspace = await openDocument(workspace, path);
+      if (version != _stateVersion) return;
+      workspace = nextWorkspace;
       error = null;
     } catch (exception) {
-      error = exception;
+      if (version == _stateVersion) error = exception;
     }
-    notifyListeners();
+    if (version == _stateVersion) notifyListeners();
   }
 
   Future<void> save() async {
+    formatActive();
+    final version = _stateVersion;
+    final snapshot = workspace;
     try {
-      formatActive();
-      workspace = await saveDocument(workspace);
+      final savedWorkspace = await saveDocument(snapshot);
+      if (version != _stateVersion) return;
+      workspace = savedWorkspace;
       error = null;
     } catch (exception) {
-      error = exception;
+      if (version == _stateVersion) error = exception;
     }
-    notifyListeners();
+    if (version == _stateVersion) notifyListeners();
   }
 
   Future<void> saveAs(String path) async {
     final active = workspace.activeDocument;
     if (active == null) return;
+    final version = _stateVersion;
     try {
       final formatted = formatArabicSource(active.text);
       final document = Document(
@@ -180,12 +199,13 @@ class EditorController extends ChangeNotifier {
         redoStack: active.redoStack,
       );
       await repository.write(document);
+      if (version != _stateVersion) return;
       workspace = workspace.open(document);
       error = null;
     } catch (exception) {
-      error = exception;
+      if (version == _stateVersion) error = exception;
     }
-    notifyListeners();
+    if (version == _stateVersion) notifyListeners();
   }
 
   void formatActive() {
@@ -197,24 +217,27 @@ class EditorController extends ChangeNotifier {
   }
 
   Future<void> delete(String path) async {
+    _stateVersion++;
     try {
       await repository.delete(path);
-      final separator = Platform.pathSeparator;
       final indexes = [
         for (var index = workspace.documents.length - 1; index >= 0; index--)
-          if (workspace.documents[index].path == path ||
-              workspace.documents[index].path.startsWith('$path$separator'))
+          if (pathService.isSameOrDescendant(
+            workspace.documents[index].path,
+            path,
+          ))
             index,
       ];
       for (final index in indexes) {
         workspace = workspace.close(index);
       }
       if (selectedExplorerPath == path ||
-          selectedExplorerPath?.startsWith('$path$separator') == true) {
+          (selectedExplorerPath != null &&
+              pathService.isSameOrDescendant(selectedExplorerPath!, path))) {
         selectedExplorerPath = null;
         selectedDirectoryPath = null;
       }
-      await refreshFiles();
+      await refreshFiles(notify: false);
       error = null;
     } catch (exception) {
       error = exception;
@@ -236,19 +259,18 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
-  String _parentDirectory(String path) {
-    final separatorIndex = path.lastIndexOf(Platform.pathSeparator);
-    if (separatorIndex <= 0) return workspace.rootPath;
-    return path.substring(0, separatorIndex);
-  }
+  String _parentDirectory(String path) =>
+      pathService.parentOf(path, fallback: workspace.rootPath);
 
   Future<void> paste(String targetDirectory) async {
+    final version = ++_stateVersion;
     final sourcePath = cutPath;
     if (sourcePath == null) return;
     try {
-      final targetName = sourcePath.split(Platform.pathSeparator).last;
-      final targetPath = _joinPath(targetDirectory, targetName);
+      final targetName = pathService.baseName(sourcePath);
+      final targetPath = pathService.join(targetDirectory, targetName);
       await repository.move(sourcePath, targetDirectory);
+      if (version != _stateVersion) return;
       final movedDocuments = [
         for (final document in workspace.documents)
           Document(
@@ -269,7 +291,7 @@ class EditorController extends ChangeNotifier {
           ? targetDirectory
           : _parentDirectory(selectedExplorerPath!);
       cutPath = null;
-      await refreshFiles();
+      await refreshFiles(notify: false);
       error = null;
     } catch (exception) {
       error = exception;
@@ -278,9 +300,11 @@ class EditorController extends ChangeNotifier {
   }
 
   Future<void> rename(String path, String newName) async {
+    final version = ++_stateVersion;
     try {
       final targetPath = _joinPath(_parentDirectory(path), newName);
       await repository.rename(path, newName);
+      if (version != _stateVersion) return;
       workspace = workspace.copyWith(
         documents: [
           for (final document in workspace.documents)
@@ -301,7 +325,7 @@ class EditorController extends ChangeNotifier {
       selectedDirectoryPath = selectedExplorerPath == null
           ? workspace.rootPath
           : _parentDirectory(selectedExplorerPath!);
-      await refreshFiles();
+      await refreshFiles(notify: false);
       error = null;
     } catch (exception) {
       error = exception;
@@ -309,38 +333,33 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
-  String _joinPath(String directory, String name) {
-    final separator = Platform.pathSeparator;
-    return '$directory${directory.endsWith(separator) ? '' : separator}$name';
-  }
+  String _joinPath(String directory, String name) =>
+      pathService.join(directory, name);
 
-  String _relocatePath(String path, String source, String target) {
-    final separator = Platform.pathSeparator;
-    if (path == source) return target;
-    if (path.startsWith('$source$separator')) {
-      return '$target${path.substring(source.length)}';
-    }
-    return path;
-  }
+  String _relocatePath(String path, String source, String target) =>
+      pathService.relocate(path, source: source, target: target);
 
   String? _relocateOptionalPath(String? path, String source, String target) =>
       path == null ? null : _relocatePath(path, source, target);
 
   Future<void> saveAll() async {
+    final version = _stateVersion;
+    final snapshot = workspace;
     try {
-      for (final document in workspace.documents) {
+      for (final document in snapshot.documents) {
         await repository.write(document);
       }
-      workspace = workspace.copyWith(
+      if (version != _stateVersion) return;
+      workspace = snapshot.copyWith(
         documents: [
-          for (final document in workspace.documents) document.markSaved(),
+          for (final document in snapshot.documents) document.markSaved(),
         ],
       );
       error = null;
     } catch (exception) {
-      error = exception;
+      if (version == _stateVersion) error = exception;
     }
-    notifyListeners();
+    if (version == _stateVersion) notifyListeners();
   }
 
   void search(String query, {bool caseSensitive = true}) {
@@ -415,6 +434,7 @@ class EditorController extends ChangeNotifier {
   }
 
   void edit(TextEdit change) {
+    _stateVersion++;
     workspace = applyEdit(workspace, change);
     searchMatches = const [];
     diagnostics = const [];
@@ -446,13 +466,16 @@ class EditorController extends ChangeNotifier {
   Future<void> analyze() => compile();
 
   Future<void> buildNative() async {
+    final version = _stateVersion;
     final service = languageServer;
     final active = workspace.activeDocument;
     final root = workspace.rootPath.trim();
     if (service == null || active == null || root.isEmpty) return;
     try {
-      final artifactDirectory =
-          '$root${Platform.pathSeparator}.arabic360${Platform.pathSeparator}build';
+      final artifactDirectory = pathService.join(
+        pathService.join(root, '.arabic360'),
+        'build',
+      );
       final analysis = await service.analyze(
         rootPath: root,
         sourcePath: active.path,
@@ -461,13 +484,14 @@ class EditorController extends ChangeNotifier {
         artifactDirectory: artifactDirectory,
         mode: CompilationMode.active,
       );
+      if (version != _stateVersion) return;
       compilation = analysis.compilation;
       diagnostics = analysis.diagnostics;
       error = null;
     } catch (exception) {
-      error = exception;
+      if (version == _stateVersion) error = exception;
     }
-    notifyListeners();
+    if (version == _stateVersion) notifyListeners();
   }
 
   EditorDiagnostic? diagnosticAt(int offset) {
@@ -494,23 +518,26 @@ class EditorController extends ChangeNotifier {
   }
 
   Future<void> complete(int offset) async {
+    final version = _stateVersion;
     final service = languageServer;
     final active = workspace.activeDocument;
     if (service == null || active == null) return;
     try {
-      assistance = await service.complete(
+      final result = await service.complete(
         rootPath: workspace.rootPath,
         sourcePath: active.path,
         sourceText: active.text,
         offset: offset,
         symbols: _knownSymbols(),
       );
+      if (version != _stateVersion) return;
+      assistance = result;
       assistanceIndex = 0;
       error = null;
     } catch (exception) {
-      error = exception;
+      if (version == _stateVersion) error = exception;
     }
-    notifyListeners();
+    if (version == _stateVersion) notifyListeners();
   }
 
   void clearAssist() {
@@ -521,22 +548,25 @@ class EditorController extends ChangeNotifier {
   }
 
   Future<void> help(int offset) async {
+    final version = _stateVersion;
     final service = languageServer;
     final active = workspace.activeDocument;
     if (service == null || active == null) return;
     try {
-      assistance = await service.help(
+      final result = await service.help(
         rootPath: workspace.rootPath,
         sourcePath: active.path,
         sourceText: active.text,
         offset: offset,
       );
+      if (version != _stateVersion) return;
+      assistance = result;
       assistanceIndex = 0;
       error = null;
     } catch (exception) {
-      error = exception;
+      if (version == _stateVersion) error = exception;
     }
-    notifyListeners();
+    if (version == _stateVersion) notifyListeners();
   }
 
   List<String> _knownSymbols() {
@@ -549,16 +579,29 @@ class EditorController extends ChangeNotifier {
   }
 
   void undo() {
+    _stateVersion++;
     workspace = undoEdit(workspace);
+    _clearDerivedState();
     notifyListeners();
   }
 
   void redo() {
+    _stateVersion++;
     workspace = redoEdit(workspace);
+    _clearDerivedState();
     notifyListeners();
   }
 
+  void _clearDerivedState() {
+    searchMatches = const [];
+    currentMatchIndex = -1;
+    diagnostics = const [];
+    assistance = null;
+    assistanceIndex = 0;
+  }
+
   Future<void> compile() async {
+    final version = _stateVersion;
     final service = languageServer;
     final active = workspace.activeDocument;
     if (service == null || active == null) return;
@@ -568,12 +611,13 @@ class EditorController extends ChangeNotifier {
         sourcePath: active.path,
         documents: workspace.documents,
       );
+      if (version != _stateVersion) return;
       compilation = analysis.compilation;
       diagnostics = analysis.diagnostics;
       error = null;
     } catch (exception) {
-      error = exception;
+      if (version == _stateVersion) error = exception;
     }
-    notifyListeners();
+    if (version == _stateVersion) notifyListeners();
   }
 }

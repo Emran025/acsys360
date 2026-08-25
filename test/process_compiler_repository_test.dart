@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:compiler_contracts/compiler_contracts.dart';
@@ -86,6 +87,31 @@ void main() {
     expect(response['artifacts'], hasLength(1));
     expect(File((response['artifacts'] as List).single).existsSync(), isTrue);
   });
+
+  test(
+    'returns a process diagnostic when compiler startup times out',
+    () async {
+      final pending = Completer<Process>();
+      final repository = ProcessCompilerRepository(
+        executable: 'arabicc',
+        processTimeout: const Duration(milliseconds: 1),
+        startProcess: (executable, arguments, {workingDirectory}) =>
+            pending.future,
+      );
+
+      final response = await repository.compile(
+        rootPath: '/workspace',
+        sourcePath: '/workspace/main.arb',
+        documents: const [Document(path: '/workspace/main.arb', text: 'س')],
+      );
+
+      expect(response['success'], isFalse);
+      final diagnostic = (response['diagnostics'] as List).single as Map;
+      expect(diagnostic['phase'], 'process');
+      expect(diagnostic['code'], 'P005');
+      expect(diagnostic['message'], contains('حد الانتظار'));
+    },
+  );
 }
 
 String _validProgram(String name, String value) =>

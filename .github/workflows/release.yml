@@ -36,7 +36,11 @@ jobs:
       - name: Get compiler dependencies
         working-directory: packages/compiler_core
         run: dart pub get
-      - run: dart format --output=none --set-exit-if-changed lib test
+      - run: >-
+          dart format --output=none --set-exit-if-changed
+          lib test
+          packages/compiler_core/lib packages/compiler_core/test
+          packages/compiler_contracts/lib packages/compiler_contracts/test
       - run: flutter analyze
       - run: flutter test
       - if: matrix.target == 'linux'

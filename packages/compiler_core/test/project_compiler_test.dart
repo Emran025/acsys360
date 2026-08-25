@@ -44,6 +44,23 @@ void main() {
     );
   });
 
+  test('executes access through a type exported by another project file', () {
+    final result = const ProjectCompiler().compile({
+      'main.arb': '''برنامج رئيسي {
+متغير الطالب: طالب;
+الطالب.اسم = "علي";
+اطبع(الطالب.اسم);
+}.''',
+      'types.arb': '''برنامج انواع {
+نوع طالب = سجل { اسم: خيط_رمزي; };
+}.''',
+    });
+
+    expect(result.success, isTrue);
+    expect(result.diagnosticsFor('main.arb'), isEmpty);
+    expect(result.files.first.result.executionOutput, ['علي']);
+  });
+
   test('resolves a procedure exported by another project file', () {
     final result = const ProjectCompiler().compile({
       'main.arb': '''برنامج رئيسي {
@@ -61,6 +78,7 @@ void main() {
     expect(result.success, isTrue);
     expect(result.projectDiagnostics, isEmpty);
     expect(result.diagnosticsFor('main.arb'), isEmpty);
+    expect(result.files.first.result.executionOutput, ['3']);
   });
 }
 

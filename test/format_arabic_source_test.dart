@@ -30,4 +30,19 @@ void main() {
       'برنامج اختبار {\n  متغير س = 1;\n}\nس = 2;',
     );
   });
+
+  test('preserves CRLF line endings', () {
+    const source = 'برنامج اختبار {\r\nمتغير س = 1;\r\n}';
+
+    expect(
+      formatArabicSource(source),
+      'برنامج اختبار {\r\n  متغير س = 1;\r\n}',
+    );
+  });
+
+  test('leaves an unterminated literal untouched', () {
+    const source = 'برنامج اختبار {\nمتغير نص = "{;\n';
+
+    expect(formatArabicSource(source), source);
+  });
 }
