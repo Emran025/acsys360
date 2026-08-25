@@ -62,7 +62,7 @@
 
 ## نتيجة الجولة المحلية
 
-قبل الدمج الأخير نجح format gate الموسع، و`flutter analyze`، و`flutter test` بعدد 53 اختبارًا، و`compiler_core` analyze وself-test و36 اختبارًا، و`compiler_contracts` analyze و6 اختبارات. هذه نتيجة محلية على Flutter `3.44.5` وDart `3.12.2` المرفق به؛ لا تستبدل نتيجة CI إلى أن ينتهي workflow بعد الرفع.
+قبل الدمج الأخير نجح format gate الموسع، و`flutter analyze`، و`flutter test` بعدد 53 اختبارًا، و`compiler_core` analyze وself-test و36 اختبارًا، و`compiler_contracts` analyze و6 اختبارات. هذه نتيجة محلية على Flutter `3.44.5` وDart `3.12.2` المرفق به. بعد الرفع نجح CI في التشغيل [`32844493727`](https://github.com/Emran025/acsys360/actions/runs/32844493727) على commit `98741b5`؛ نجحت jobs `editor` و`compiler-core` و`desktop-build`، وشملت بوابة format الموسعة وبناء Linux Desktop.
 
 ## حدود لم تُخفَ
 
@@ -70,4 +70,4 @@
 
 ## قرار الدمج
 
-لا يُنشأ tag جديد من هذه الجولة قبل نجاح workflow الذي يشمل format للحزم، analyze، اختبارات Flutter، اختبارات compiler/contracts، وبناء Desktop. بعد ذلك فقط تُحدّث checklist إلى `[x]` للبوابات المثبتة، وتُذكر أرقام التشغيل والcommit والأصول دون تقريب أو استنتاج من نتيجة محلية.
+اجتاز commit `98741b5` workflow الذي يشمل format للحزم، analyze، اختبارات Flutter، اختبارات compiler/contracts، وبناء Linux Desktop في التشغيل `32844493727`. لذلك يمكن إنشاء tag لاحق لهذه الجولة إذا كان إصدارها مطلوبًا، مع إعادة التحقق من workflow الخاص بالـrelease نفسه. تُذكر أرقام التشغيل والcommit والأصول دون تقريب أو استنتاج من نتيجة محلية.
