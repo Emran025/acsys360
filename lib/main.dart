@@ -187,7 +187,9 @@ class _EditorShellState extends State<EditorShell> {
       );
     }
     textController.setDiagnostics(widget.controller.diagnostics);
-    textController.setSemanticRoles(_semanticRoles(controller.compilation));
+    textController.setSemanticRoles(
+      _semanticRoles(widget.controller.compilation),
+    );
     _syncGhostCompletion();
     if (visibleDiagnostic != null &&
         !widget.controller.diagnostics.contains(visibleDiagnostic)) {
@@ -866,8 +868,9 @@ class _EditorShellState extends State<EditorShell> {
       replaceController.text,
     );
     if (!mounted || count == 0) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('تم استبدال $count تطابقات')));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('تم استبدال $count تطابقات')));
   }
 
   Future<void> _showEditorMenu(Offset position) async {
@@ -1004,15 +1007,9 @@ class _EditorShellState extends State<EditorShell> {
         SingleActivator(LogicalKeyboardKey.equal, control: true):
             ZoomInIntent(),
         SingleActivator(LogicalKeyboardKey.equal, meta: true): ZoomInIntent(),
-        SingleActivator(LogicalKeyboardKey.add, control: true): ZoomInIntent(),
-        SingleActivator(LogicalKeyboardKey.add, meta: true): ZoomInIntent(),
         SingleActivator(LogicalKeyboardKey.minus, control: true):
             ZoomOutIntent(),
         SingleActivator(LogicalKeyboardKey.minus, meta: true): ZoomOutIntent(),
-        SingleActivator(LogicalKeyboardKey.subtract, control: true):
-            ZoomOutIntent(),
-        SingleActivator(LogicalKeyboardKey.subtract, meta: true):
-            ZoomOutIntent(),
         SingleActivator(LogicalKeyboardKey.digit0, control: true):
             ResetZoomIntent(),
         SingleActivator(LogicalKeyboardKey.digit0, meta: true):
@@ -1111,8 +1108,9 @@ class _EditorShellState extends State<EditorShell> {
           ),
         },
         child: MediaQuery(
-          data: MediaQuery.of(context)
-              .copyWith(textScaler: TextScaler.linear(_zoomScale)),
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(_zoomScale)),
           child: Directionality(
             textDirection: TextDirection.rtl,
             child: Scaffold(
@@ -1416,8 +1414,9 @@ class _WelcomeEditor extends StatelessWidget {
               const SizedBox(height: 14),
               Text(
                 'Arabic360',
-                style: Theme.of(context).textTheme.headlineMedium
-                    ?.copyWith(fontWeight: FontWeight.w700),
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 6),
               Text(
@@ -1455,8 +1454,9 @@ class _WelcomeEditor extends StatelessWidget {
                 Text(
                   'تصفح شجرة المشروع من مستكشف الملفات لفتح ملف .arb',
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium
-                      ?.copyWith(color: colors.onSurfaceVariant),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
                 ),
             ],
           ),
@@ -1724,9 +1724,9 @@ class _TabsState extends State<_Tabs> {
                     ),
                     decoration: BoxDecoration(
                       color: active
-                          ? Theme.of(context)
-                                .colorScheme
-                                .surfaceContainerHighest
+                          ? Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest
                           : null,
                       border: Border(
                         bottom: BorderSide(
@@ -1905,8 +1905,9 @@ class _NoFolderExplorer extends StatelessWidget {
               children: [
                 Text(
                   'Explorer',
-                  style: Theme.of(context).textTheme.titleSmall
-                      ?.copyWith(fontWeight: FontWeight.w700),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const Spacer(),
                 IconButton(
@@ -1989,8 +1990,9 @@ class _NoFolderExplorer extends StatelessWidget {
                   const SizedBox(height: 14),
                   Text(
                     'فتح مجلد سيعرض شجرة المشروع هنا، بينما تبقى الملفات المفتوحة مستقلة عن Workspace.',
-                    style: Theme.of(context).textTheme.bodySmall
-                        ?.copyWith(color: colors.onSurfaceVariant),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),

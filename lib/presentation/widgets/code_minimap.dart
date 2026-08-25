@@ -134,8 +134,9 @@ List<_MinimapSection> _sections(List<String> lines) {
       }
       continue;
     }
-    final match = RegExp(r'^(برنامج|اجراء|نوع|ثابت|متغير)\b(.*)')
-        .firstMatch(trimmed);
+    final match = RegExp(
+      r'^(برنامج|اجراء|نوع|ثابت|متغير)\b(.*)',
+    ).firstMatch(trimmed);
     if (match == null) continue;
     final label = '${match.group(1)}${match.group(2)?.trim() ?? ''}'.trim();
     sections.add(_MinimapSection(line: index, label: label));
@@ -259,8 +260,9 @@ class _MinimapPainter extends CustomPainter {
 
   Color _lineColor(String text) {
     if (text.startsWith('//')) return colors.onSurfaceVariant;
-    if (RegExp(r'^(برنامج|اجراء|نوع|ثابت|متغير|اذا|والا|طالما|كرر|اعد)\b')
-        .hasMatch(text)) {
+    if (RegExp(
+      r'^(برنامج|اجراء|نوع|ثابت|متغير|اذا|والا|طالما|كرر|اعد)\b',
+    ).hasMatch(text)) {
       return colors.primary;
     }
     if (RegExp(r'^(صحيح|حقيقي|منطقي|حرفي|خيط)').hasMatch(text)) {
