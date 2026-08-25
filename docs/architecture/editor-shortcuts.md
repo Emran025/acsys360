@@ -20,7 +20,7 @@
 | تحرير | Alt+Up/Down | نقل السطر أو التحديد | المرحلة التالية |
 | تحرير | Shift+Alt+Up/Down | نسخ السطر أو التحديد | النسخ الحالية تحتاج توسيعًا |
 | تحرير | Ctrl/Cmd+D | تحديد التكرار التالي، لا تكرار السطر | يجب فصل السلوك الحالي |
-| تحرير | Ctrl/Cmd+/ | تعليق السطر حسب قواعد اللغة | يحتاج قرار grammar للتعليق |
+| تحرير | Ctrl/Cmd+/ | تعليق/فك تعليق الأسطر المحددة باستخدام `//` فقط، مع تعديل واحد قابل للتراجع | منفذ عبر `ToggleLineComment`؛ يحتاج widget regression للـ chord |
 | تحديد | Ctrl/Cmd+L | تحديد السطر الحالي | المرحلة التالية |
 | تحديد | Ctrl/Cmd+Shift+L | تحديد كل التكرارات | المرحلة التالية |
 | مسافة | Tab/Shift+Tab | قبول اقتراح أو indent/outdent | موجود، يحتاج regression أعمق |
@@ -37,9 +37,11 @@
 | لغة | F12 | الانتقال للتعريف | يحتاج symbol locations في protocol |
 | لغة | Ctrl/Cmd+. | quick fix | موجود بصيغة lamp؛ يحتاج binding مباشر |
 | عرض | Ctrl/Cmd+B | إخفاء/إظهار الشريط الجانبي | يحتاج state مستقل |
+| عرض | Ctrl/Cmd+Plus/Minus | تكبير/تصغير النص في مكونات الواجهة | منفذ عبر `MediaQuery.textScaler`؛ الحدود 0.8–1.8 |
+| عرض | Ctrl/Cmd+0 | إعادة مقياس النص إلى 100% | منفذ |
 | عرض | Ctrl/Cmd+J | إخفاء/إظهار لوحة النتائج | موجود عبر state، يحتاج binding |
 | عرض | F5 | ترجمة/تشغيل | موجود كـ compile؛ يجب الفصل عند إضافة artifact |
 
 ## معيار القبول
 
-لا يعد الاختصار منفذًا حتى يمر اختبار widget أو controller يثبت أن الاختصار يطبق التحويل على النص الصحيح، يحافظ على selection، يسجل تعديلًا واحدًا في undo stack، ولا يكسر الكتابة الطبيعية أو ghost completion. اختصارات Workspace تُختبر مع fake repository، واختصارات compiler تُختبر على protocol response حقيقي.
+لا يعد الاختصار منفذًا حتى يمر اختبار widget أو controller يثبت أن الاختصار يطبق التحويل على النص الصحيح، يحافظ على selection، يسجل تعديلًا واحدًا في undo stack، ولا يكسر الكتابة الطبيعية أو ghost completion. اختصارات Workspace تُختبر مع fake repository، واختصارات compiler تُختبر على protocol response حقيقي. التكبير العام يمرر قيمة واحدة إلى `MediaQuery.textScaler`؛ لا يجوز أن يضاعف `TextField` وgutter وminimap حجم الخط كل منها فوق القيمة العامة.

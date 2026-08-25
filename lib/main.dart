@@ -12,6 +12,8 @@ import 'data/repositories/process_compiler_repository.dart';
 import 'domain/entities/compilation_result.dart';
 import 'domain/entities/document.dart';
 import 'domain/entities/editor_diagnostic.dart';
+import 'domain/entities/source_token.dart';
+import 'domain/usecases/toggle_line_comment.dart';
 import 'presentation/state/editor_controller.dart';
 import 'presentation/theme/app_theme.dart';
 import 'presentation/widgets/editor_dialogs.dart';
@@ -130,6 +132,7 @@ class _EditorShellState extends State<EditorShell> {
   EditorDiagnostic? visibleDiagnostic;
   Timer? analysisTimer;
   int _editGeneration = 0;
+  double _zoomScale = 1.0;
 
   @override
   void initState() {
@@ -184,6 +187,7 @@ class _EditorShellState extends State<EditorShell> {
       );
     }
     textController.setDiagnostics(widget.controller.diagnostics);
+    textController.setSemanticRoles(_semanticRoles(controller.compilation));
     _syncGhostCompletion();
     if (visibleDiagnostic != null &&
         !widget.controller.diagnostics.contains(visibleDiagnostic)) {
@@ -227,6 +231,25 @@ class _EditorShellState extends State<EditorShell> {
     if (visibleDiagnostic != null) {
       setState(() => visibleDiagnostic = null);
     }
+  }
+
+  Map<String, SourceTokenRole> _semanticRoles(CompilationResult? result) {
+    if (result == null) return const {};
+    final roles = <String, SourceTokenRole>{};
+    for (final item in result.symbols) {
+      if (item is! Map) continue;
+      final name = item['name'];
+      final kind = item['kind'];
+      if (name is! String || kind is! String) continue;
+      roles[name] = switch (kind) {
+        'constant' => SourceTokenRole.constant,
+        'type' => SourceTokenRole.type,
+        'procedure' || 'function' => SourceTokenRole.procedure,
+        'parameter' => SourceTokenRole.parameter,
+        _ => SourceTokenRole.variable,
+      };
+    }
+    return roles;
   }
 
   void _syncGhostCompletion() {
@@ -411,6 +434,36 @@ class _EditorShellState extends State<EditorShell> {
     );
   }
 
+  void _toggleLineComment() {
+    final selection = textController.selection;
+    if (!selection.isValid) return;
+    final comment = const ToggleLineComment().apply(
+      textController.text,
+      selection.start,
+      selection.end,
+    );
+    final edit = TextEdit(
+      offset: comment.offset,
+      before: comment.before,
+      after: comment.after,
+    );
+    _applyEditorEdit(
+      edit,
+      TextSelection(
+        baseOffset: comment.selectionBase,
+        extentOffset: comment.selectionExtent,
+      ),
+    );
+  }
+
+  void _adjustZoom(double delta) {
+    setState(() {
+      _zoomScale = (_zoomScale + delta).clamp(.8, 1.8).toDouble();
+    });
+  }
+
+  void _resetZoom() => setState(() => _zoomScale = 1.0);
+
   void _indent() => _insertTextAtSelection('  ');
 
   void _outdent() {
@@ -508,7 +561,9 @@ class _EditorShellState extends State<EditorShell> {
 
   ({int start, int end}) _currentLineBounds(TextSelection selection) {
     final text = textController.text;
-    final start = text.lastIndexOf('\n', selection.start - 1) + 1;
+    final start = selection.start == 0
+        ? 0
+        : text.lastIndexOf('\n', selection.start - 1) + 1;
     final endIndex = text.indexOf('\n', selection.end);
     return (start: start, end: endIndex == -1 ? text.length : endIndex);
   }
@@ -811,9 +866,8 @@ class _EditorShellState extends State<EditorShell> {
       replaceController.text,
     );
     if (!mounted || count == 0) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('تم استبدال $count تطابقات')));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('تم استبدال $count تطابقات')));
   }
 
   Future<void> _showEditorMenu(Offset position) async {
@@ -943,6 +997,26 @@ class _EditorShellState extends State<EditorShell> {
             ToggleResultsIntent(),
         SingleActivator(LogicalKeyboardKey.keyJ, meta: true):
             ToggleResultsIntent(),
+        SingleActivator(LogicalKeyboardKey.slash, control: true):
+            ToggleCommentIntent(),
+        SingleActivator(LogicalKeyboardKey.slash, meta: true):
+            ToggleCommentIntent(),
+        SingleActivator(LogicalKeyboardKey.equal, control: true):
+            ZoomInIntent(),
+        SingleActivator(LogicalKeyboardKey.equal, meta: true): ZoomInIntent(),
+        SingleActivator(LogicalKeyboardKey.add, control: true): ZoomInIntent(),
+        SingleActivator(LogicalKeyboardKey.add, meta: true): ZoomInIntent(),
+        SingleActivator(LogicalKeyboardKey.minus, control: true):
+            ZoomOutIntent(),
+        SingleActivator(LogicalKeyboardKey.minus, meta: true): ZoomOutIntent(),
+        SingleActivator(LogicalKeyboardKey.subtract, control: true):
+            ZoomOutIntent(),
+        SingleActivator(LogicalKeyboardKey.subtract, meta: true):
+            ZoomOutIntent(),
+        SingleActivator(LogicalKeyboardKey.digit0, control: true):
+            ResetZoomIntent(),
+        SingleActivator(LogicalKeyboardKey.digit0, meta: true):
+            ResetZoomIntent(),
         SingleActivator(LogicalKeyboardKey.keyF, alt: true, shift: true):
             FormatDocumentIntent(),
         SingleActivator(LogicalKeyboardKey.keyF, meta: true, alt: true):
@@ -1017,6 +1091,18 @@ class _EditorShellState extends State<EditorShell> {
           FormatDocumentIntent: CallbackAction<FormatDocumentIntent>(
             onInvoke: (_) => widget.controller.formatActive(),
           ),
+          ToggleCommentIntent: CallbackAction<ToggleCommentIntent>(
+            onInvoke: (_) => _toggleLineComment(),
+          ),
+          ZoomInIntent: CallbackAction<ZoomInIntent>(
+            onInvoke: (_) => _adjustZoom(.1),
+          ),
+          ZoomOutIntent: CallbackAction<ZoomOutIntent>(
+            onInvoke: (_) => _adjustZoom(-.1),
+          ),
+          ResetZoomIntent: CallbackAction<ResetZoomIntent>(
+            onInvoke: (_) => _resetZoom(),
+          ),
           CompletionIntent: CallbackAction<CompletionIntent>(
             onInvoke: (_) => controller.complete(_cursorOffset),
           ),
@@ -1024,169 +1110,176 @@ class _EditorShellState extends State<EditorShell> {
             onInvoke: (_) => controller.help(_cursorOffset),
           ),
         },
-        child: Directionality(
-          textDirection: TextDirection.rtl,
-          child: Scaffold(
-            body: Column(
-              children: [
-                EditorTopBar(
-                  rootPath: controller.workspace.rootPath,
-                  activePath: active?.path,
-                  isDark: widget.isDark,
-                  expanded: topBarExpanded,
-                  onToggleTheme: widget.onToggleTheme ?? () {},
-                  onToggleExpanded: () =>
-                      setState(() => topBarExpanded = !topBarExpanded),
-                ),
-                Expanded(
-                  child: Row(
-                    textDirection: TextDirection.rtl,
-                    children: [
-                      SizedBox(
-                        width: 300,
-                        child: hasWorkspace
-                            ? Directionality(
-                                textDirection: TextDirection.rtl,
-                                child: WorkspaceExplorer(
-                                  rootPath: controller.workspace.rootPath,
-                                  nodes: controller.tree,
-                                  isLoading: isRefreshing,
-                                  hasCutPath: controller.hasCutPath,
-                                  selectedPath: controller.selectedExplorerPath,
-                                  selectedDirectoryPath:
-                                      controller.selectedDirectoryPath,
-                                  onSelect: controller.selectExplorerPath,
+        child: MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(_zoomScale)),
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Scaffold(
+              body: Column(
+                children: [
+                  EditorTopBar(
+                    rootPath: controller.workspace.rootPath,
+                    activePath: active?.path,
+                    isDark: widget.isDark,
+                    expanded: topBarExpanded,
+                    onToggleTheme: widget.onToggleTheme ?? () {},
+                    onToggleExpanded: () =>
+                        setState(() => topBarExpanded = !topBarExpanded),
+                  ),
+                  Expanded(
+                    child: Row(
+                      textDirection: TextDirection.rtl,
+                      children: [
+                        SizedBox(
+                          width: 300,
+                          child: hasWorkspace
+                              ? Directionality(
+                                  textDirection: TextDirection.rtl,
+                                  child: WorkspaceExplorer(
+                                    rootPath: controller.workspace.rootPath,
+                                    nodes: controller.tree,
+                                    isLoading: isRefreshing,
+                                    hasCutPath: controller.hasCutPath,
+                                    selectedPath:
+                                        controller.selectedExplorerPath,
+                                    selectedDirectoryPath:
+                                        controller.selectedDirectoryPath,
+                                    onSelect: controller.selectExplorerPath,
+                                    onChooseFolder: _pickWorkspace,
+                                    onOpenFile: _openFile,
+                                    onRefresh: _refreshFiles,
+                                    onNewFile: _newFileAt,
+                                    onNewFolder: _newFolderAt,
+                                    onOpen: controller.open,
+                                    onDelete: _deletePath,
+                                    onRename: _renamePath,
+                                    onCut: controller.cut,
+                                    onPaste: controller.paste,
+                                  ),
+                                )
+                              : _NoFolderExplorer(
+                                  controller: controller,
                                   onChooseFolder: _pickWorkspace,
                                   onOpenFile: _openFile,
-                                  onRefresh: _refreshFiles,
-                                  onNewFile: _newFileAt,
-                                  onNewFolder: _newFolderAt,
-                                  onOpen: controller.open,
-                                  onDelete: _deletePath,
-                                  onRename: _renamePath,
-                                  onCut: controller.cut,
-                                  onPaste: controller.paste,
                                 ),
-                              )
-                            : _NoFolderExplorer(
-                                controller: controller,
-                                onChooseFolder: _pickWorkspace,
-                                onOpenFile: _openFile,
-                              ),
-                      ),
-                      const VerticalDivider(width: 1),
-                      Expanded(
-                        child: Directionality(
-                          textDirection: TextDirection.rtl,
-                          child: Column(
-                            children: [
-                              _Tabs(
-                                controller: controller,
-                                onClose: _closeTab,
-                                showWelcome: !hasWorkspace,
-                              ),
-                              if (hasWorkspace)
-                                _Breadcrumb(
-                                  rootPath: controller.workspace.rootPath,
-                                  activePath: active?.path,
-                                ),
-                              if (showFindReplace)
-                                FindReplaceBar(
-                                  findController: findController,
-                                  replaceController: replaceController,
-                                  matches: controller.searchMatches.length,
-                                  currentMatch: controller.currentMatchIndex,
-                                  onSearch: _search,
-                                  onFirst: _firstMatch,
-                                  onPrevious: _previousMatch,
-                                  onNext: _nextMatch,
-                                  onReplaceCurrent: _replaceCurrent,
-                                  onReplaceAll: _replaceAll,
-                                  onClose: _toggleFindReplace,
-                                ),
-                              Expanded(
-                                child: Stack(
-                                  children: [
-                                    GestureDetector(
-                                      behavior: HitTestBehavior.translucent,
-                                      onSecondaryTapUp: (details) =>
-                                          _showEditorMenu(
-                                            details.globalPosition,
-                                          ),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(14),
-                                        child: active == null
-                                            ? _WelcomeEditor(
-                                                hasWorkspace: hasWorkspace,
-                                                onNewFile: _newFileFromWelcome,
-                                                onOpenFile: _openFile,
-                                                onOpenFolder: _pickWorkspace,
-                                              )
-                                            : LineNumberedEditor(
-                                                controller: textController,
-                                                focusNode: editorFocusNode,
-                                                diagnostics:
-                                                    controller.diagnostics,
-                                                onChanged: _onTextChanged,
-                                                onSelectionChanged:
-                                                    _onSelectionChanged,
-                                                onTap: _hideTransientUi,
-                                                onDiagnosticTap:
-                                                    _showDiagnosticLamp,
-                                                onKeyEvent: _handleEditorKey,
-                                              ),
-                                      ),
-                                    ),
-                                    if (visibleDiagnostic != null)
-                                      Positioned(
-                                        top: 12,
-                                        right: 12,
-                                        width: 340,
-                                        child: _DiagnosticPopover(
-                                          diagnostic: visibleDiagnostic!,
-                                          onApply: (action) {
-                                            widget.controller.applyCodeAction(
-                                              action,
-                                            );
-                                            _hideTransientUi();
-                                          },
-                                          onClose: _hideTransientUi,
-                                        ),
-                                      ),
-                                    if (controller.assistance?.help != null)
-                                      Positioned(
-                                        top: 12,
-                                        right: 12,
-                                        width: 340,
-                                        child: _HelpPopover(
-                                          help: controller.assistance!.help!,
-                                          onClose: controller.clearAssist,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              CollapsiblePanel(
-                                title: 'نتائج الترجمة',
-                                icon: Icons.terminal_rounded,
-                                expanded: resultsExpanded,
-                                expandedHeight: 160,
-                                onToggle: () => setState(
-                                  () => resultsExpanded = !resultsExpanded,
-                                ),
-                                child: _DiagnosticsPanel(
+                        ),
+                        const VerticalDivider(width: 1),
+                        Expanded(
+                          child: Directionality(
+                            textDirection: TextDirection.rtl,
+                            child: Column(
+                              children: [
+                                _Tabs(
                                   controller: controller,
+                                  onClose: _closeTab,
+                                  showWelcome: !hasWorkspace,
                                 ),
-                              ),
-                              _StatusBar(controller: controller),
-                            ],
+                                if (hasWorkspace)
+                                  _Breadcrumb(
+                                    rootPath: controller.workspace.rootPath,
+                                    activePath: active?.path,
+                                  ),
+                                if (showFindReplace)
+                                  FindReplaceBar(
+                                    findController: findController,
+                                    replaceController: replaceController,
+                                    matches: controller.searchMatches.length,
+                                    currentMatch: controller.currentMatchIndex,
+                                    onSearch: _search,
+                                    onFirst: _firstMatch,
+                                    onPrevious: _previousMatch,
+                                    onNext: _nextMatch,
+                                    onReplaceCurrent: _replaceCurrent,
+                                    onReplaceAll: _replaceAll,
+                                    onClose: _toggleFindReplace,
+                                  ),
+                                Expanded(
+                                  child: Stack(
+                                    children: [
+                                      GestureDetector(
+                                        behavior: HitTestBehavior.translucent,
+                                        onSecondaryTapUp: (details) =>
+                                            _showEditorMenu(
+                                              details.globalPosition,
+                                            ),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(14),
+                                          child: active == null
+                                              ? _WelcomeEditor(
+                                                  hasWorkspace: hasWorkspace,
+                                                  onNewFile:
+                                                      _newFileFromWelcome,
+                                                  onOpenFile: _openFile,
+                                                  onOpenFolder: _pickWorkspace,
+                                                )
+                                              : LineNumberedEditor(
+                                                  controller: textController,
+                                                  focusNode: editorFocusNode,
+                                                  diagnostics:
+                                                      controller.diagnostics,
+                                                  onChanged: _onTextChanged,
+                                                  onSelectionChanged:
+                                                      _onSelectionChanged,
+                                                  onTap: _hideTransientUi,
+                                                  onDiagnosticTap:
+                                                      _showDiagnosticLamp,
+                                                  onKeyEvent: _handleEditorKey,
+                                                  fontScale: _zoomScale,
+                                                ),
+                                        ),
+                                      ),
+                                      if (visibleDiagnostic != null)
+                                        Positioned(
+                                          top: 12,
+                                          right: 12,
+                                          width: 340,
+                                          child: _DiagnosticPopover(
+                                            diagnostic: visibleDiagnostic!,
+                                            onApply: (action) {
+                                              widget.controller.applyCodeAction(
+                                                action,
+                                              );
+                                              _hideTransientUi();
+                                            },
+                                            onClose: _hideTransientUi,
+                                          ),
+                                        ),
+                                      if (controller.assistance?.help != null)
+                                        Positioned(
+                                          top: 12,
+                                          right: 12,
+                                          width: 340,
+                                          child: _HelpPopover(
+                                            help: controller.assistance!.help!,
+                                            onClose: controller.clearAssist,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                CollapsiblePanel(
+                                  title: 'نتائج الترجمة',
+                                  icon: Icons.terminal_rounded,
+                                  expanded: resultsExpanded,
+                                  expandedHeight: 160,
+                                  onToggle: () => setState(
+                                    () => resultsExpanded = !resultsExpanded,
+                                  ),
+                                  child: _DiagnosticsPanel(
+                                    controller: controller,
+                                  ),
+                                ),
+                                _StatusBar(controller: controller),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -1279,6 +1372,22 @@ class FormatDocumentIntent extends Intent {
   const FormatDocumentIntent();
 }
 
+class ToggleCommentIntent extends Intent {
+  const ToggleCommentIntent();
+}
+
+class ZoomInIntent extends Intent {
+  const ZoomInIntent();
+}
+
+class ZoomOutIntent extends Intent {
+  const ZoomOutIntent();
+}
+
+class ResetZoomIntent extends Intent {
+  const ResetZoomIntent();
+}
+
 class _WelcomeEditor extends StatelessWidget {
   final bool hasWorkspace;
   final Future<void> Function() onNewFile;
@@ -1307,9 +1416,8 @@ class _WelcomeEditor extends StatelessWidget {
               const SizedBox(height: 14),
               Text(
                 'Arabic360',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+                style: Theme.of(context).textTheme.headlineMedium
+                    ?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 6),
               Text(
@@ -1347,9 +1455,8 @@ class _WelcomeEditor extends StatelessWidget {
                 Text(
                   'تصفح شجرة المشروع من مستكشف الملفات لفتح ملف .arb',
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
+                  style: Theme.of(context).textTheme.bodyMedium
+                      ?.copyWith(color: colors.onSurfaceVariant),
                 ),
             ],
           ),
@@ -1617,9 +1724,9 @@ class _TabsState extends State<_Tabs> {
                     ),
                     decoration: BoxDecoration(
                       color: active
-                          ? Theme.of(
-                              context,
-                            ).colorScheme.surfaceContainerHighest
+                          ? Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest
                           : null,
                       border: Border(
                         bottom: BorderSide(
@@ -1798,9 +1905,8 @@ class _NoFolderExplorer extends StatelessWidget {
               children: [
                 Text(
                   'Explorer',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                  style: Theme.of(context).textTheme.titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const Spacer(),
                 IconButton(
@@ -1883,9 +1989,8 @@ class _NoFolderExplorer extends StatelessWidget {
                   const SizedBox(height: 14),
                   Text(
                     'فتح مجلد سيعرض شجرة المشروع هنا، بينما تبقى الملفات المفتوحة مستقلة عن Workspace.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colors.onSurfaceVariant,
-                    ),
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(color: colors.onSurfaceVariant),
                   ),
                 ],
               ),

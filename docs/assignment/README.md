@@ -17,6 +17,8 @@
 | [07-vscode-editing-reference.md](07-vscode-editing-reference.md) | خلاصة دراسة سلوك VS Code ومراجعها التنفيذية |
 | [08-minimap-reference.md](08-minimap-reference.md) | مواصفة Minimap والتنقل السريع داخل الملف |
 | [09-quality-gates.md](09-quality-gates.md) | بوابة الجودة الإنتاجية والأكاديمية ومعايير القبول |
+| [10-vscode-highlighting-findings.md](10-vscode-highlighting-findings.md) | نتائج دراسة VS Code وتطبيقها على التلوين والتعليقات والإزاحة |
+| [11-editor-command-and-language-status.md](11-editor-command-and-language-status.md) | حالة أوامر المحرر وخدمة اللغة وقواعد RTL وبوابة الإثبات |
 
 ## مبدأ الدقة
 
@@ -26,7 +28,7 @@
 
 ## مراجع السلوك التحريري
 
-تستفيد مواصفة المحرر من مبادئ VS Code الرسمية في IntelliSense وlanguage configuration وsyntax highlighting، مع تكييفها للغة عربية ومحرر Flutter مستقل.
+تستفيد مواصفة المحرر من مبادئ VS Code الرسمية في IntelliSense وlanguage configuration وsyntax highlighting، مع تكييفها للغة عربية ومحرر Flutter مستقل. ويستخدم التلوين الحالي Lexer الفعلي من `compiler_core` للطبقة المعجمية، مع refinement دلالي خفيف بالأدوار المستخرجة من compilation result؛ ولا يُعد ذلك language server كاملًا أو تحديد مواقع رموز دقيقة.
 
 [1]: https://code.visualstudio.com/docs/editing/intellisense "VS Code IntelliSense"
 [2]: https://code.visualstudio.com/api/language-extensions/language-configuration-guide "VS Code Language Configuration Guide"

@@ -1,82 +1,40 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/entities/editor_diagnostic.dart';
+import '../../domain/entities/source_token.dart';
+import '../../domain/usecases/arabic_syntax_highlighter.dart';
 import '../theme/app_theme.dart';
 
 class ArabicCodeController extends TextEditingController {
-  static final _tokenPattern = RegExp(
-    r'//[^\r\n]*|"(?:\\.|[^"\\])*"|[‘’][^‘’]*[‘’]|[0-9]+(?:\.[0-9]+)?|[ء-يً-ٟۑ-ے]+(?:_[ء-يً-ٟۑ-ے]+)*|[A-Za-z_][A-Za-z0-9_]*|==|!=|=<|=>|&&|\|\||[+\-*\/%\\^!<>=]|[{}()[\],.:;؛،]',
-  );
-  static const _keywords = {
-    'برنامج',
-    'ثابت',
-    'نوع',
-    'متغير',
-    'اجراء',
-    'بالقيمة',
-    'بالمرجع',
-    'اطبع',
-    'اقرا',
-    'اذا',
-    'فان',
-    'والا',
-    'كرر',
-    'طالما',
-    'استمر',
-    'اعد',
-    'حتى',
-  };
-  static const _types = {
-    'صحيح',
-    'حقيقي',
-    'منطقي',
-    'حرفي',
-    'خيط_رمزي',
-    'قائمة',
-    'سجل',
-  };
-  static const _booleans = {'صح', 'خطأ'};
-  static const _operators = {
-    '+',
-    '-',
-    '*',
-    '/',
-    '%',
-    r'\',
-    '^',
-    '&&',
-    '||',
-    '!',
-    '=',
-    '==',
-    '!=',
-    '=<',
-    '=>',
-    '<',
-    '>',
-  };
-  static const _punctuation = {
-    '{',
-    '}',
-    '(',
-    ')',
-    '[',
-    ']',
-    ';',
-    ',',
-    '.',
-    ':',
-  };
-
+  final ArabicSyntaxHighlighter _highlighter;
   List<EditorDiagnostic> diagnostics = const [];
+  Map<String, SourceTokenRole> semanticRoles = const {};
   String ghostText = '';
   int ghostOffset = -1;
 
-  ArabicCodeController({super.text});
+  ArabicCodeController({super.text, ArabicSyntaxHighlighter? highlighter})
+    : _highlighter = highlighter ?? const ArabicSyntaxHighlighter();
 
   void setDiagnostics(List<EditorDiagnostic> next) {
     diagnostics = List.unmodifiable(next);
     notifyListeners();
+  }
+
+  void setSemanticRoles(Map<String, SourceTokenRole> next) {
+    if (_mapsEqual(semanticRoles, next)) return;
+    semanticRoles = Map.unmodifiable(next);
+    notifyListeners();
+  }
+
+  bool _mapsEqual(
+    Map<String, SourceTokenRole> left,
+    Map<String, SourceTokenRole> right,
+  ) {
+    if (left.length != right.length) return false;
+    for (final entry in left.entries) {
+      if (right[entry.key] != entry.value) return false;
+    }
+    return true;
   }
 
   void setGhostText(String value, int offset) {
@@ -96,7 +54,7 @@ class ArabicCodeController extends TextEditingController {
   }) {
     final baseStyle = style ?? DefaultTextStyle.of(context).style;
     final colors = Theme.of(context).colorScheme;
-    final tokens = _tokenPattern.allMatches(text).toList();
+    final tokens = _highlighter.tokenize(text, roles: semanticRoles);
     final boundaries = <int>{0, text.length};
     for (final token in tokens) {
       boundaries.add(token.start);
@@ -108,26 +66,17 @@ class ArabicCodeController extends TextEditingController {
       boundaries.add(ghostOffset);
     }
     for (final diagnostic in diagnostics) {
-      final start = diagnostic.offset.clamp(0, text.length);
-      final end = (diagnostic.offset + diagnostic.length).clamp(
-        start,
-        text.length,
-      );
+      final start = diagnostic.offset.clamp(0, text.length).toInt();
+      final end = (diagnostic.offset + diagnostic.length)
+          .clamp(start, text.length)
+          .toInt();
       boundaries.add(start);
       boundaries.add(end);
     }
     final sorted = boundaries.toList()..sort();
     final children = <TextSpan>[];
     if (ghostOffset == 0 && ghostText.isNotEmpty) {
-      children.add(
-        TextSpan(
-          text: ghostText,
-          style: baseStyle.copyWith(
-            color: colors.onSurfaceVariant.withValues(alpha: .52),
-            fontStyle: FontStyle.italic,
-          ),
-        ),
-      );
+      children.add(_ghostSpan(baseStyle, colors));
     }
     for (var index = 0; index < sorted.length - 1; index++) {
       final start = sorted[index];
@@ -136,19 +85,14 @@ class ArabicCodeController extends TextEditingController {
       final segment = text.substring(start, end);
       final token = _tokenAt(tokens, start, end);
       final diagnostic = _diagnosticAt(start, end);
-      final tokenColor = token == null ? null : _tokenColor(token, colors);
-      final diagnosticColor = diagnostic == null
-          ? null
-          : diagnostic.severity == EditorDiagnosticSeverity.error
-          ? colors.error
-          : diagnostic.severity == EditorDiagnosticSeverity.warning
-          ? colors.secondary
-          : colors.primary;
+      final diagnosticColor = _diagnosticColor(diagnostic, colors);
       children.add(
         TextSpan(
           text: segment,
           style: baseStyle.copyWith(
-            color: diagnosticColor ?? tokenColor,
+            color:
+                diagnosticColor ??
+                (token == null ? null : _tokenColor(token, colors)),
             decoration: diagnostic == null ? null : TextDecoration.underline,
             decorationColor: diagnosticColor,
             decorationStyle: diagnostic == null
@@ -158,32 +102,24 @@ class ArabicCodeController extends TextEditingController {
         ),
       );
       if (end == ghostOffset && ghostText.isNotEmpty) {
-        children.add(
-          TextSpan(
-            text: ghostText,
-            style: baseStyle.copyWith(
-              color: colors.onSurfaceVariant.withValues(alpha: .52),
-              fontStyle: FontStyle.italic,
-            ),
-          ),
-        );
+        children.add(_ghostSpan(baseStyle, colors));
       }
     }
     if (sorted.length == 1 && ghostOffset != 0 && ghostText.isNotEmpty) {
-      children.add(
-        TextSpan(
-          text: ghostText,
-          style: baseStyle.copyWith(
-            color: colors.onSurfaceVariant.withValues(alpha: .52),
-            fontStyle: FontStyle.italic,
-          ),
-        ),
-      );
+      children.add(_ghostSpan(baseStyle, colors));
     }
     return TextSpan(style: baseStyle, children: children);
   }
 
-  Match? _tokenAt(List<Match> tokens, int start, int end) {
+  TextSpan _ghostSpan(TextStyle baseStyle, ColorScheme colors) => TextSpan(
+    text: ghostText,
+    style: baseStyle.copyWith(
+      color: colors.onSurfaceVariant.withValues(alpha: .52),
+      fontStyle: FontStyle.italic,
+    ),
+  );
+
+  SourceToken? _tokenAt(List<SourceToken> tokens, int start, int end) {
     for (final token in tokens) {
       if (token.start <= start && end <= token.end) return token;
     }
@@ -203,25 +139,35 @@ class ArabicCodeController extends TextEditingController {
     return null;
   }
 
-  Color? _tokenColor(Match token, ColorScheme colors) {
-    final value = token.group(0)!;
-    if (value.startsWith('//')) return colors.onSurfaceVariant;
-    if (value.startsWith('"') ||
-        value.startsWith('‘') ||
-        value.startsWith('’')) {
-      return colors.tertiary;
+  Color? _diagnosticColor(EditorDiagnostic? diagnostic, ColorScheme colors) {
+    if (diagnostic == null) return null;
+    return switch (diagnostic.severity) {
+      EditorDiagnosticSeverity.error => colors.error,
+      EditorDiagnosticSeverity.warning => colors.secondary,
+      EditorDiagnosticSeverity.info => colors.primary,
+    };
+  }
+
+  Color? _tokenColor(SourceToken token, ColorScheme colors) {
+    if (token.kind == SourceTokenKind.comment) return colors.onSurfaceVariant;
+    if (token.role != null) {
+      return switch (token.role!) {
+        SourceTokenRole.constant => colors.secondary,
+        SourceTokenRole.type => colors.tertiary,
+        SourceTokenRole.procedure => AppTheme.brandOrange,
+        SourceTokenRole.parameter => colors.primary,
+        SourceTokenRole.variable => colors.onSurface,
+      };
     }
-    if (RegExp(r'^\d').hasMatch(value)) return colors.secondary;
-    if (_booleans.contains(value)) return colors.primary;
-    if (_types.contains(value)) return colors.tertiary;
-    if (_keywords.contains(value)) return AppTheme.brandOrange;
-    if (_operators.contains(value)) return colors.error;
-    if (_punctuation.contains(value) || value == '؛' || value == '،') {
-      return colors.outline;
-    }
-    if (RegExp(r'^[ء-يA-Za-z_]').hasMatch(value)) {
-      return colors.onSurfaceVariant;
-    }
-    return null;
+    return switch (token.kind) {
+      SourceTokenKind.keyword => AppTheme.brandOrange,
+      SourceTokenKind.string || SourceTokenKind.character => colors.tertiary,
+      SourceTokenKind.integer || SourceTokenKind.real => colors.secondary,
+      SourceTokenKind.boolean => colors.primary,
+      SourceTokenKind.operator => colors.error,
+      SourceTokenKind.punctuation => colors.outline,
+      SourceTokenKind.identifier => colors.onSurfaceVariant,
+      SourceTokenKind.comment => colors.onSurfaceVariant,
+    };
   }
 }
