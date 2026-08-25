@@ -128,7 +128,12 @@ void main() {
     );
 
     final minimap = find.bySemanticsLabel('خريطة مصغرة للكود');
+    final editor = find.byType(TextField);
     expect(minimap, findsOneWidget);
+    expect(
+      tester.getCenter(minimap).dx,
+      lessThan(tester.getCenter(editor).dx),
+    );
     await tester.tap(minimap, warnIfMissed: false);
     await tester.pump();
   });
