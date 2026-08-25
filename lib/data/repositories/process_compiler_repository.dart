@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -13,6 +14,7 @@ typedef CompilerProcessStarter =
       String? workingDirectory,
     });
 
+/// حد البنية التحتية بين محرر Flutter والمترجم التنفيذي عبر JSON فقط.
 class ProcessCompilerRepository
     implements CompilerRepository, AssistRepository {
   final String executable;
@@ -20,6 +22,7 @@ class ProcessCompilerRepository
   final CompilationMode mode;
   final String? processWorkingDirectory;
   final CompilerProcessStarter startProcess;
+  final Duration processTimeout;
 
   const ProcessCompilerRepository({
     required this.executable,
@@ -27,6 +30,7 @@ class ProcessCompilerRepository
     this.mode = CompilationMode.project,
     this.processWorkingDirectory,
     this.startProcess = Process.start,
+    this.processTimeout = const Duration(seconds: 30),
   });
 
   @override
@@ -70,12 +74,13 @@ class ProcessCompilerRepository
         executable,
         arguments,
         workingDirectory: processWorkingDirectory ?? rootPath,
-      );
+      ).timeout(processTimeout);
       process.stdin.writeln(jsonEncode(request.toJson()));
       await process.stdin.close();
-      final output = await process.stdout.transform(utf8.decoder).join();
-      final errorOutput = await process.stderr.transform(utf8.decoder).join();
-      final exitCode = await process.exitCode;
+      final completed = await _collect(process);
+      final output = completed.stdout;
+      final errorOutput = completed.stderr;
+      final exitCode = completed.exitCode;
       if (output.trim().isEmpty) {
         return _processFailure(errorOutput, exitCode);
       }
@@ -87,6 +92,11 @@ class ProcessCompilerRepository
         Map<String, dynamic>.from(decoded),
       );
       return Map<String, dynamic>.from(response.toJson());
+    } on TimeoutException {
+      return _processFailure(
+        'تجاوز المترجم حد الانتظار (${processTimeout.inSeconds} ثانية)',
+        -2,
+      );
     } on FormatException catch (error) {
       return _processFailure(error.message, -1);
     } on Object catch (error) {
@@ -137,12 +147,13 @@ class ProcessCompilerRepository
         executable,
         _assistArguments,
         workingDirectory: processWorkingDirectory ?? rootPath,
-      );
+      ).timeout(processTimeout);
       process.stdin.writeln(jsonEncode(request.toJson()));
       await process.stdin.close();
-      final output = await process.stdout.transform(utf8.decoder).join();
-      final errorOutput = await process.stderr.transform(utf8.decoder).join();
-      final exitCode = await process.exitCode;
+      final completed = await _collect(process);
+      final output = completed.stdout;
+      final errorOutput = completed.stderr;
+      final exitCode = completed.exitCode;
       if (output.trim().isEmpty) {
         throw FormatException(
           errorOutput.isEmpty
@@ -155,10 +166,32 @@ class ProcessCompilerRepository
         throw const FormatException('استجابة المساعدة ليست كائن JSON');
       }
       return AssistResponse.fromJson(Map<String, dynamic>.from(decoded));
+    } on TimeoutException {
+      throw FormatException(
+        'تجاوزت خدمة المساعدة حد الانتظار (${processTimeout.inSeconds} ثانية)',
+      );
     } on FormatException {
       rethrow;
     } on Object catch (error) {
       throw FormatException('تعذر تشغيل خدمة المساعدة: $error');
+    }
+  }
+
+  Future<_ProcessResult> _collect(Process process) async {
+    try {
+      final result = await Future.wait<Object?>([
+        process.stdout.transform(utf8.decoder).join(),
+        process.stderr.transform(utf8.decoder).join(),
+        process.exitCode,
+      ]).timeout(processTimeout);
+      return _ProcessResult(
+        stdout: result[0]! as String,
+        stderr: result[1]! as String,
+        exitCode: result[2]! as int,
+      );
+    } on TimeoutException {
+      process.kill();
+      rethrow;
     }
   }
 
@@ -191,4 +224,16 @@ class ProcessCompilerRepository
     'executionOutput': const [],
     'artifacts': const [],
   };
+}
+
+class _ProcessResult {
+  final String stdout;
+  final String stderr;
+  final int exitCode;
+
+  const _ProcessResult({
+    required this.stdout,
+    required this.stderr,
+    required this.exitCode,
+  });
 }

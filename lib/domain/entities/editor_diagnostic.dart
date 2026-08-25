@@ -39,8 +39,9 @@ class EditorDiagnostic {
     this.actions = const [],
   });
 
-  bool containsOffset(int value) =>
-      value >= offset && value <= offset + (length == 0 ? 1 : length);
+  bool containsOffset(int value) => length == 0
+      ? value == offset
+      : value >= offset && value < offset + length;
 
   EditorDiagnostic copyWith({List<EditorCodeAction>? actions}) =>
       EditorDiagnostic(

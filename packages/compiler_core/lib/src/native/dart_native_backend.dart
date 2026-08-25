@@ -333,7 +333,6 @@ class DartNativeEmitter {
         '/' => '_arabicDivide($left, $right)',
         '%' => '_arabicRemainder($left, $right)',
         '^' => '_arabicPow($left, $right)',
-        '=< ' => '($left <= $right)',
         '=<' => '($left <= $right)',
         '=>' => '($left >= $right)',
         _ => '($left ${node.operator} $right)',

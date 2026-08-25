@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'data/repositories/local_workspace_repository.dart';
+import 'data/services/local_workspace_path_service.dart';
 import 'data/repositories/process_compiler_repository.dart';
 import 'domain/entities/compilation_result.dart';
 import 'domain/entities/document.dart';
@@ -34,6 +35,7 @@ void main() {
         repository: repository,
         compiler: compiler,
         assistant: compiler,
+        pathService: const LocalWorkspacePathService(),
         rootPath: '',
       ),
     ),
@@ -410,7 +412,7 @@ class _EditorShellState extends State<EditorShell> {
     if (!selection.isValid) return;
     final start = selection.start;
     final source = textController.text;
-    final lineStart = source.lastIndexOf('\n', start - 1) + 1;
+    final lineStart = _lineStart(source, start);
     final linePrefix = source.substring(lineStart, start);
     final currentIndent = RegExp(r'^[ \t]*').stringMatch(linePrefix) ?? '';
     final extraIndent = linePrefix.trimRight().endsWith('{') ? '  ' : '';
@@ -471,8 +473,7 @@ class _EditorShellState extends State<EditorShell> {
   void _outdent() {
     final selection = textController.selection;
     if (!selection.isValid || selection.start < 2) return;
-    final startOfLine =
-        textController.text.lastIndexOf('\n', selection.start - 1) + 1;
+    final startOfLine = _lineStart(textController.text, selection.start);
     final removeStart = selection.start - 2;
     if (removeStart >= startOfLine &&
         textController.text.substring(removeStart, selection.start) == '  ') {
@@ -500,7 +501,7 @@ class _EditorShellState extends State<EditorShell> {
     final selection = textController.selection;
     if (!selection.isValid) return;
     final oldText = textController.text;
-    final lineStart = oldText.lastIndexOf('\n', selection.start - 1) + 1;
+    final lineStart = _lineStart(oldText, selection.start);
     final lineEndIndex = oldText.indexOf('\n', selection.end);
     final lineEnd = lineEndIndex == -1 ? oldText.length : lineEndIndex;
     final line = oldText.substring(lineStart, lineEnd);
@@ -561,11 +562,15 @@ class _EditorShellState extends State<EditorShell> {
     );
   }
 
+  int _lineStart(String text, int offset) {
+    final safeOffset = offset.clamp(0, text.length).toInt();
+    if (safeOffset == 0) return 0;
+    return text.lastIndexOf('\n', safeOffset - 1) + 1;
+  }
+
   ({int start, int end}) _currentLineBounds(TextSelection selection) {
     final text = textController.text;
-    final start = selection.start == 0
-        ? 0
-        : text.lastIndexOf('\n', selection.start - 1) + 1;
+    final start = _lineStart(text, selection.start);
     final endIndex = text.indexOf('\n', selection.end);
     return (start: start, end: endIndex == -1 ? text.length : endIndex);
   }
@@ -609,7 +614,7 @@ class _EditorShellState extends State<EditorShell> {
     final relative = selection.start - line.start;
     if (direction < 0) {
       if (line.start == 0) return;
-      final previousStart = text.lastIndexOf('\n', line.start - 2) + 1;
+      final previousStart = _lineStart(text, line.start - 1);
       final previousEnd = line.start - 1;
       final previous = text.substring(previousStart, previousEnd);
       final current = text.substring(line.start, line.end);
@@ -1606,7 +1611,7 @@ class _DiagnosticsPanelState extends State<_DiagnosticsPanel> {
     8 => _selectable(
       result.executionOutput.isEmpty
           ? 'لا يوجد خرج تنفيذ'
-          : result.executionOutput.join('\\n'),
+          : result.executionOutput.join('\n'),
     ),
     9 => _artifacts(result),
     _ => const SizedBox.shrink(),

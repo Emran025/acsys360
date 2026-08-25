@@ -474,10 +474,7 @@ class SemanticAnalyzer {
       if (spec.length <= 0) {
         _error(position, 'حجم القائمة يجب أن يكون أكبر من صفر');
       }
-      return _SemanticType.array(
-        spec.length,
-        _fromSpec(spec.elementType, position, active),
-      );
+      return _SemanticType.array(_fromSpec(spec.elementType, position, active));
     }
     if (spec is RecordTypeSpec) {
       final fields = <String, _SemanticType>{};
@@ -596,26 +593,20 @@ class SemanticAnalyzer {
 
 class _SemanticType {
   final String name;
-  final int? length;
   final _SemanticType? element;
   final Map<String, _SemanticType> fields;
 
-  const _SemanticType(
-    this.name, {
-    this.length,
-    this.element,
-    this.fields = const {},
-  });
+  const _SemanticType._(this.name, {this.element, this.fields = const {}});
 
-  const _SemanticType.integer() : this('صحيح');
-  const _SemanticType.real() : this('حقيقي');
-  const _SemanticType.boolean() : this('منطقي');
-  const _SemanticType.character() : this('حرفي');
-  const _SemanticType.string() : this('خيط_رمزي');
-  const _SemanticType.unknown() : this('مجهول');
-  const _SemanticType.named(String name) : this(name);
-  const _SemanticType.array(int length, _SemanticType element)
-    : this('قائمة', length: length, element: element);
+  const _SemanticType.integer() : this._('صحيح');
+  const _SemanticType.real() : this._('حقيقي');
+  const _SemanticType.boolean() : this._('منطقي');
+  const _SemanticType.character() : this._('حرفي');
+  const _SemanticType.string() : this._('خيط_رمزي');
+  const _SemanticType.unknown() : this._('مجهول');
+  const _SemanticType.named(String name) : this._(name);
+  const _SemanticType.array(_SemanticType element)
+    : this._('قائمة', element: element);
   const _SemanticType.record(Map<String, _SemanticType> fields)
-    : this('سجل', fields: fields);
+    : this._('سجل', fields: fields);
 }

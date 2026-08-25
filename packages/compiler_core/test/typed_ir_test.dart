@@ -22,6 +22,13 @@ void main() {
       ir.instructions.where((item) => item.opcode == IrOpcode.branchFalse),
       hasLength(1),
     );
+    final binary = ir.instructions.firstWhere(
+      (item) => item.opcode == IrOpcode.binary,
+    );
+    expect(binary.left, '1');
+    expect(binary.operator, '<=');
+    expect(binary.right, '2');
+    expect(binary.type, IrType.boolean);
     expect(ir.instructions.last.opcode, IrOpcode.returnOp);
     expect(ir.toJson()['diagnostics'], isEmpty);
   });
@@ -45,6 +52,23 @@ void main() {
       expect(ir.diagnostics.single, contains('غير معروفة'));
     },
   );
+
+  test('infers unary and temporary types in sequence', () {
+    final ir = TypedIrProgram.fromTac(const [
+      'entry:',
+      't0 = 2 + 3',
+      't1 = -t0',
+      't2 = ! صح',
+      'print t1',
+    ]);
+
+    expect(ir.isValid, isTrue);
+    final instructions = ir.instructions;
+    expect(instructions[1].type, IrType.integer);
+    expect(instructions[2].type, IrType.integer);
+    expect(instructions[3].type, IrType.boolean);
+    expect(instructions[4].type, IrType.integer);
+  });
 
   test('compiler exposes a validated intermediate representation', () {
     final result = const Compiler().compile('''برنامج اختبار {

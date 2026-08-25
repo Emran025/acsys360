@@ -27,7 +27,9 @@ class Document {
 
   bool get isDirty => text != savedText;
 
+  /// يطبق تعديلًا ذريًا واحدًا؛ التحقق يمنع الكتابة فوق snapshot قديم.
   Document edit(TextEdit change) {
+    _validateEdit(change);
     final nextText = text.replaceRange(
       change.offset,
       change.offset + change.before.length,
@@ -75,6 +77,18 @@ class Document {
       undoStack: [...undoStack, change],
       redoStack: redoStack.sublist(0, redoStack.length - 1),
     );
+  }
+
+  /// يحافظ على Document كمصدر الحقيقة الوحيد للنص وسجل undo/redo.
+  void _validateEdit(TextEdit change) {
+    if (change.offset < 0 || change.offset > text.length) {
+      throw RangeError.range(change.offset, 0, text.length, 'offset');
+    }
+    final end = change.offset + change.before.length;
+    if (end > text.length ||
+        text.substring(change.offset, end) != change.before) {
+      throw StateError('تعديل المستند لا يطابق النص الحالي');
+    }
   }
 
   Document markSaved() => Document(

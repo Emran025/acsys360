@@ -78,6 +78,7 @@ void main() {
     final response = jsonDecode(stdout) as Map<String, dynamic>;
     expect(response['success'], isTrue);
     expect(response['diagnostics'], isEmpty);
+    expect(response['executionOutput'], ['3']);
     final intermediateRepresentation =
         response['intermediateRepresentation'] as Map<String, dynamic>;
     expect(intermediateRepresentation['kind'], 'project');

@@ -14,6 +14,7 @@ class LineCommentEdit {
   });
 }
 
+/// ينفذ أمر التعليق السطري الوحيد في grammar: `//`، كتعديل واحد قابل للتراجع.
 class ToggleLineComment {
   const ToggleLineComment();
 

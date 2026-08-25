@@ -17,12 +17,16 @@ class Interpreter {
   ExecutionResult execute(
     ProgramNode program, {
     Iterable<String> input = const [],
+    Iterable<ProcedureDeclaration> externalProcedures = const [],
+    Map<String, TypeSpec> externalTypes = const {},
   }) {
     final output = <String>[];
     final diagnostics = <String>[];
     final environment = _Environment();
-    final procedures = <String, ProcedureDeclaration>{};
-    final types = <String, TypeSpec>{};
+    final procedures = <String, ProcedureDeclaration>{
+      for (final procedure in externalProcedures) procedure.name: procedure,
+    };
+    final types = <String, TypeSpec>{...externalTypes};
     final inputIterator = input.iterator;
     var steps = 0;
 

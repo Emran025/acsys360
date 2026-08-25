@@ -53,6 +53,8 @@ class ProjectCompiler {
         ),
     ];
     final externalSymbols = <String, Symbol>{};
+    final externalProcedures = <String, ProcedureDeclaration>{};
+    final externalTypes = <String, TypeSpec>{};
     for (final file in initialFiles) {
       for (final symbol
           in file.result.semantic?.symbols.values ?? const <Symbol>[]) {
@@ -60,11 +62,14 @@ class ProjectCompiler {
           externalSymbols.putIfAbsent(symbol.name, () => symbol);
         }
       }
+      for (final declaration in file.result.program?.declarations ?? const []) {
+        if (declaration is ProcedureDeclaration) {
+          externalProcedures.putIfAbsent(declaration.name, () => declaration);
+        } else if (declaration is TypeDeclaration) {
+          externalTypes.putIfAbsent(declaration.name, () => declaration.type);
+        }
+      }
     }
-    final externalProcedures = externalSymbols.values
-        .where((symbol) => symbol.kind == 'procedure')
-        .map((symbol) => symbol.name)
-        .toSet();
     final files = [
       for (final entry in sources.entries)
         ProjectFileResult(
@@ -72,15 +77,8 @@ class ProjectCompiler {
           result: compiler.compile(
             entry.value,
             externalSymbols: externalSymbols.values,
-            execute:
-                sources.length == 1 ||
-                !_containsExternalCall(
-                  initialFiles
-                      .firstWhere((file) => file.sourcePath == entry.key)
-                      .result
-                      .program,
-                  externalProcedures,
-                ),
+            externalProcedures: externalProcedures.values,
+            externalTypes: externalTypes,
           ),
         ),
     ];
@@ -110,45 +108,5 @@ class ProjectCompiler {
       files: files,
       projectDiagnostics: projectDiagnostics,
     );
-  }
-
-  bool _containsExternalCall(
-    ProgramNode? program,
-    Set<String> externalProcedures,
-  ) {
-    if (program == null || externalProcedures.isEmpty) return false;
-    return _containsExternalCallInNodes(program.statements, externalProcedures);
-  }
-
-  bool _containsExternalCallInNodes(
-    Iterable<AstNode> nodes,
-    Set<String> externalProcedures,
-  ) {
-    for (final node in nodes) {
-      if (node is CallStatement && externalProcedures.contains(node.name)) {
-        return true;
-      }
-      if (node is IfStatement &&
-          (_containsExternalCallInNodes(node.thenBranch, externalProcedures) ||
-              _containsExternalCallInNodes(
-                node.elseBranch,
-                externalProcedures,
-              ))) {
-        return true;
-      }
-      if (node is WhileStatement &&
-          _containsExternalCallInNodes(node.body, externalProcedures)) {
-        return true;
-      }
-      if (node is RepeatStatement &&
-          _containsExternalCallInNodes(node.body, externalProcedures)) {
-        return true;
-      }
-      if (node is RepeatUntilStatement &&
-          _containsExternalCallInNodes(node.body, externalProcedures)) {
-        return true;
-      }
-    }
-    return false;
   }
 }

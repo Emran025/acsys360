@@ -89,18 +89,31 @@ class TypedIrProgram {
   }) {
     final instructions = <IrInstruction>[];
     final diagnostics = <String>[];
+    final inferredTypes = <String, IrType>{};
     final labels = <String>{};
     final pendingTargets = <({String target, int line})>[];
 
     IrType typeOf(String value) {
-      if (symbolTypes.containsKey(value)) return symbolTypes[value]!;
-      if (RegExp(r'^-?[0-9]+$').hasMatch(value)) return IrType.integer;
-      if (RegExp(r'^-?[0-9]+\.[0-9]+$').hasMatch(value)) return IrType.real;
-      if (value == 'صح' || value == 'خطأ') return IrType.boolean;
-      if (value.startsWith('"') || value.startsWith('‘')) {
-        return value.startsWith('‘') ? IrType.character : IrType.string;
+      final normalized = value.trim();
+      if (symbolTypes.containsKey(normalized)) return symbolTypes[normalized]!;
+      if (inferredTypes.containsKey(normalized))
+        return inferredTypes[normalized]!;
+      final base = normalized.split(RegExp(r'[.\[]')).first.trim();
+      if (symbolTypes.containsKey(base)) return symbolTypes[base]!;
+      if (inferredTypes.containsKey(base)) return inferredTypes[base]!;
+      if (RegExp(r'^-?[0-9]+$').hasMatch(normalized)) return IrType.integer;
+      if (RegExp(r'^-?[0-9]+\.[0-9]+$').hasMatch(normalized)) {
+        return IrType.real;
+      }
+      if (normalized == 'صح' || normalized == 'خطأ') return IrType.boolean;
+      if (normalized.startsWith('"') || normalized.startsWith('‘')) {
+        return normalized.startsWith('‘') ? IrType.character : IrType.string;
       }
       return IrType.unknown;
+    }
+
+    void remember(String name, IrType type) {
+      if (type != IrType.unknown) inferredTypes[name] = type;
     }
 
     for (final raw in tac) {
@@ -158,12 +171,10 @@ class TypedIrProgram {
       }
       if (line.startsWith('read ')) {
         final value = line.substring(5).trim();
+        final type = typeOf(value);
+        remember(value, type);
         instructions.add(
-          IrInstruction(
-            opcode: IrOpcode.read,
-            result: value,
-            type: typeOf(value),
-          ),
+          IrInstruction(opcode: IrOpcode.read, result: value, type: type),
         );
         continue;
       }
@@ -182,15 +193,29 @@ class TypedIrProgram {
       }
       final result = line.substring(0, equals).trim();
       final expression = line.substring(equals + 3).trim();
+      final unary = _findUnary(expression);
+      if (unary != null) {
+        final type = unary.operator == '!'
+            ? IrType.boolean
+            : typeOf(unary.operand);
+        remember(result, type);
+        instructions.add(
+          IrInstruction(
+            opcode: IrOpcode.unary,
+            result: result,
+            left: unary.operand,
+            operator: unary.operator,
+            type: type,
+          ),
+        );
+        continue;
+      }
       final binary = _findBinary(expression);
       if (binary != null) {
         final leftType = typeOf(binary.left);
         final rightType = typeOf(binary.right);
-        final resultType = typeOf(result) == IrType.unknown
-            ? (leftType == IrType.real || rightType == IrType.real
-                  ? IrType.real
-                  : IrType.unknown)
-            : typeOf(result);
+        final resultType = _binaryType(binary.operator, leftType, rightType);
+        remember(result, resultType);
         instructions.add(
           IrInstruction(
             opcode: IrOpcode.binary,
@@ -202,14 +227,14 @@ class TypedIrProgram {
           ),
         );
       } else {
+        final type = typeOf(expression);
+        remember(result, type);
         instructions.add(
           IrInstruction(
             opcode: IrOpcode.assign,
             result: result,
             left: expression,
-            type: typeOf(result) == IrType.unknown
-                ? typeOf(expression)
-                : typeOf(result),
+            type: type,
           ),
         );
       }
@@ -227,6 +252,39 @@ class TypedIrProgram {
       List.unmodifiable(instructions),
       List.unmodifiable(diagnostics),
     );
+  }
+
+  static IrType _binaryType(String operator, IrType left, IrType right) {
+    if (const {
+      '==',
+      '!=',
+      '<',
+      '>',
+      '=<',
+      '=>',
+      '<=',
+      '>=',
+      '&&',
+      '||',
+    }.contains(operator)) {
+      return IrType.boolean;
+    }
+    if (left == IrType.string || right == IrType.string) {
+      return operator == '+' ? IrType.string : IrType.unknown;
+    }
+    if (left == IrType.real || right == IrType.real) return IrType.real;
+    if (left == IrType.integer && right == IrType.integer) {
+      return IrType.integer;
+    }
+    return IrType.unknown;
+  }
+
+  static _IrUnary? _findUnary(String expression) {
+    if (expression.length < 2) return null;
+    final operator = expression[0];
+    if (operator != '!' && operator != '-') return null;
+    final operand = expression.substring(1).trim();
+    return operand.isEmpty ? null : _IrUnary(operator, operand);
   }
 
   static _IrBinary? _findBinary(String expression) {
@@ -259,6 +317,12 @@ class TypedIrProgram {
     }
     return null;
   }
+}
+
+class _IrUnary {
+  final String operator;
+  final String operand;
+  const _IrUnary(this.operator, this.operand);
 }
 
 class _IrBinary {

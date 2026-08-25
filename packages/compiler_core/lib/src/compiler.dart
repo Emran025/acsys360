@@ -44,12 +44,15 @@ class CompilationResult {
   };
 }
 
+/// ينسق pipeline المترجم من Lexer حتى runtime، ولا ينتج مرحلة لاحقة من مصدر غير صالح.
 class Compiler {
   const Compiler();
 
   CompilationResult compile(
     String source, {
     Iterable<Symbol> externalSymbols = const [],
+    Iterable<ProcedureDeclaration> externalProcedures = const [],
+    Map<String, TypeSpec> externalTypes = const {},
     bool execute = true,
   }) {
     final lexical = Lexer(source).scan();
@@ -92,7 +95,11 @@ class Compiler {
         ? const AssemblyGenerator().generate(tac)
         : '';
     final executionResult = stageDiagnostics.isEmpty && execute
-        ? const Interpreter().execute(parsed.program!)
+        ? const Interpreter().execute(
+            parsed.program!,
+            externalProcedures: externalProcedures,
+            externalTypes: externalTypes,
+          )
         : const ExecutionResult();
     final allDiagnostics = [
       ...stageDiagnostics,

@@ -169,7 +169,7 @@ void main() {
       expect(result.executionOutput, isEmpty);
     },
   );
-  test('compiles every diverse academic example', () {
+  test('compiles every diverse academic success example', () {
     final files =
         Directory('../../examples')
             .listSync()
@@ -188,6 +188,23 @@ void main() {
             '${file.path}: ${result.diagnostics.map((item) => item.message).join(' | ')}',
       );
     }
+  });
+
+  test('keeps syntax and semantic error fixtures as negative examples', () {
+    final syntax = _parse(
+      File('../../examples/errors/11_syntax_error.arb').readAsStringSync(),
+    );
+    final semantic = _parse(
+      File('../../examples/errors/12_semantic_error.arb').readAsStringSync(),
+    );
+
+    expect(syntax.success, isFalse);
+    expect(syntax.diagnostics.map((item) => item.phase), contains('syntax'));
+    expect(semantic.success, isFalse);
+    expect(
+      semantic.diagnostics.map((item) => item.phase),
+      contains('semantic'),
+    );
   });
 }
 
