@@ -115,11 +115,19 @@ class _LineNumberedEditorState extends State<LineNumberedEditor> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
+            width: 118,
+            child: CodeMinimap(
+              controller: widget.controller,
+              scrollController: editorScrollController,
+              diagnostics: widget.diagnostics,
+            ),
+          ),
+          SizedBox(
             width: 54,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: colors.surfaceContainerHighest.withValues(alpha: .42),
-                border: Border(left: BorderSide(color: colors.outlineVariant)),
+                border: Border(right: BorderSide(color: colors.outlineVariant)),
               ),
               child: ListView.builder(
                 controller: gutterScrollController,
@@ -195,14 +203,6 @@ class _LineNumberedEditorState extends State<LineNumberedEditor> {
                   ),
                 ),
               ),
-            ),
-          ),
-          SizedBox(
-            width: 118,
-            child: CodeMinimap(
-              controller: widget.controller,
-              scrollController: editorScrollController,
-              diagnostics: widget.diagnostics,
             ),
           ),
         ],
