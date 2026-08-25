@@ -20,4 +20,6 @@ class CompilationResult {
       payload['symbolTable'] as List<dynamic>? ?? const [];
   Map<String, dynamic>? get syntaxTree =>
       payload['syntaxTree'] as Map<String, dynamic>?;
+  Map<String, dynamic>? get intermediateRepresentation =>
+      payload['intermediateRepresentation'] as Map<String, dynamic>?;
 }

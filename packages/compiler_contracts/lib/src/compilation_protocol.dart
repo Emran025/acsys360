@@ -1,4 +1,4 @@
-const protocolVersion = '0.4.0';
+const protocolVersion = '0.5.0';
 
 enum CompilationMode { active, project }
 
@@ -214,6 +214,7 @@ class CompilationResponse {
   final String assembly;
   final List<String> executionOutput;
   final List<String> artifacts;
+  final Map<String, Object?>? intermediateRepresentation;
 
   const CompilationResponse({
     required this.success,
@@ -225,6 +226,7 @@ class CompilationResponse {
     this.assembly = '',
     this.executionOutput = const [],
     this.artifacts = const [],
+    this.intermediateRepresentation,
   });
 
   Map<String, Object?> toJson() => {
@@ -238,6 +240,7 @@ class CompilationResponse {
     'assembly': assembly,
     'executionOutput': executionOutput,
     'artifacts': artifacts,
+    'intermediateRepresentation': intermediateRepresentation,
   };
 
   factory CompilationResponse.fromJson(Map<String, dynamic> json) {
@@ -261,6 +264,9 @@ class CompilationResponse {
       assembly: _requiredString(json, 'assembly'),
       executionOutput: _requiredStringList(json, 'executionOutput'),
       artifacts: _requiredStringList(json, 'artifacts'),
+      intermediateRepresentation: _optionalMap(
+        json['intermediateRepresentation'],
+      ),
     );
   }
 }
