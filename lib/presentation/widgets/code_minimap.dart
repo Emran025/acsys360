@@ -9,12 +9,14 @@ class CodeMinimap extends StatefulWidget {
   final TextEditingController controller;
   final ScrollController scrollController;
   final List<EditorDiagnostic> diagnostics;
+  final double fontScale;
 
   const CodeMinimap({
     super.key,
     required this.controller,
     required this.scrollController,
     this.diagnostics = const [],
+    this.fontScale = 1.0,
   });
 
   @override
@@ -78,6 +80,7 @@ class _CodeMinimapState extends State<CodeMinimap> {
               lines: lines,
               sections: sections,
               diagnostics: widget.diagnostics,
+              fontScale: widget.fontScale,
               selection: widget.controller.selection,
               scrollPosition: widget.scrollController.hasClients
                   ? widget.scrollController.position
@@ -131,9 +134,8 @@ List<_MinimapSection> _sections(List<String> lines) {
       }
       continue;
     }
-    final match = RegExp(
-      r'^(برنامج|اجراء|نوع|ثابت|متغير)\b(.*)',
-    ).firstMatch(trimmed);
+    final match = RegExp(r'^(برنامج|اجراء|نوع|ثابت|متغير)\b(.*)')
+        .firstMatch(trimmed);
     if (match == null) continue;
     final label = '${match.group(1)}${match.group(2)?.trim() ?? ''}'.trim();
     sections.add(_MinimapSection(line: index, label: label));
@@ -147,6 +149,7 @@ class _MinimapPainter extends CustomPainter {
   final List<_MinimapSection> sections;
   final List<EditorDiagnostic> diagnostics;
   final TextSelection selection;
+  final double fontScale;
   final ScrollPosition? scrollPosition;
   final ColorScheme colors;
 
@@ -155,6 +158,7 @@ class _MinimapPainter extends CustomPainter {
     required this.sections,
     required this.diagnostics,
     required this.selection,
+    required this.fontScale,
     required this.scrollPosition,
     required this.colors,
   });
@@ -221,7 +225,10 @@ class _MinimapPainter extends CustomPainter {
         .toDouble();
     final y = index * lineScale + math.max(0.0, (lineScale - 2) / 2).toDouble();
     final paint = Paint()..color = _lineColor(text).withValues(alpha: .82);
-    canvas.drawRect(Rect.fromLTWH(5 + indent * .35, y, width, 2), paint);
+    canvas.drawRect(
+      Rect.fromLTWH(5 + indent * .35, y, width, math.max(1.0, 2 * fontScale)),
+      paint,
+    );
   }
 
   void _paintSection(
@@ -252,9 +259,8 @@ class _MinimapPainter extends CustomPainter {
 
   Color _lineColor(String text) {
     if (text.startsWith('//')) return colors.onSurfaceVariant;
-    if (RegExp(
-      r'^(برنامج|اجراء|نوع|ثابت|متغير|اذا|والا|طالما|كرر|اعد)\b',
-    ).hasMatch(text)) {
+    if (RegExp(r'^(برنامج|اجراء|نوع|ثابت|متغير|اذا|والا|طالما|كرر|اعد)\b')
+        .hasMatch(text)) {
       return colors.primary;
     }
     if (RegExp(r'^(صحيح|حقيقي|منطقي|حرفي|خيط)').hasMatch(text)) {

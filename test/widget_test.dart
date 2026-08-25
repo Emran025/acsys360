@@ -1,6 +1,7 @@
 import 'package:acsys360/domain/entities/document.dart';
 import 'package:compiler_contracts/compiler_contracts.dart';
 import 'package:acsys360/domain/entities/editor_diagnostic.dart';
+import 'package:acsys360/domain/entities/source_token.dart';
 import 'package:acsys360/domain/entities/file_node.dart';
 import 'package:acsys360/domain/repositories/workspace_repository.dart';
 import 'package:acsys360/main.dart';
@@ -425,6 +426,31 @@ void main() {
     expect(find.byIcon(Icons.lightbulb_outline_rounded), findsOneWidget);
   });
 
+  testWidgets('keeps code input LTR inside the RTL editor shell', (
+    tester,
+  ) async {
+    final controller = ArabicCodeController(text: 'س = 1؛');
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Material(
+            child: SizedBox(
+              height: 180,
+              child: LineNumberedEditor(controller: controller, fontScale: 1.5),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.textDirection, TextDirection.ltr);
+    expect(field.textAlign, TextAlign.left);
+    expect(field.style?.fontSize, 15);
+  });
+
   testWidgets('highlights compiler-backed lexical categories', (tester) async {
     final controller = ArabicCodeController(
       text: 'برنامج صحيح صح 12 1.5 "نص" + // تعليق',
@@ -451,5 +477,53 @@ void main() {
         if (child.style?.color != null) child.style!.color,
     };
     expect(colors.length, greaterThanOrEqualTo(5));
+  });
+
+  testWidgets('semantic roles refine highlighting and diagnostics win', (
+    tester,
+  ) async {
+    final controller = ArabicCodeController(text: 'س = 1; ص');
+    controller.setSemanticRoles(const {'س': SourceTokenRole.constant});
+    controller.setDiagnostics([
+      const EditorDiagnostic(
+        severity: EditorDiagnosticSeverity.error,
+        phase: 'lexer',
+        code: 'L001',
+        message: 'رمز غير معروف',
+        sourcePath: 'main.arb',
+        offset: 6,
+        length: 1,
+        line: 1,
+        column: 7,
+      ),
+    ]);
+    late TextSpan span;
+    late ColorScheme scheme;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) {
+            scheme = Theme.of(context).colorScheme;
+            span = controller.buildTextSpan(
+              context: context,
+              style: const TextStyle(color: Colors.white),
+              withComposing: false,
+            );
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
+
+    final constantSpan = span.children!.whereType<TextSpan>().firstWhere(
+      (child) => child.text == 'س',
+    );
+    final diagnosticSpan = span.children!.whereType<TextSpan>().firstWhere(
+      (child) => child.text == 'ص',
+    );
+    expect(constantSpan.style?.color, scheme.secondary);
+    expect(diagnosticSpan.style?.decoration, TextDecoration.underline);
+    expect(diagnosticSpan.style?.decorationStyle, TextDecorationStyle.wavy);
   });
 }

@@ -13,6 +13,7 @@ class LineNumberedEditor extends StatefulWidget {
   final VoidCallback? onTap;
   final ValueChanged<EditorDiagnostic>? onDiagnosticTap;
   final KeyEventResult Function(FocusNode node, KeyEvent event)? onKeyEvent;
+  final double fontScale;
 
   const LineNumberedEditor({
     super.key,
@@ -24,6 +25,7 @@ class LineNumberedEditor extends StatefulWidget {
     this.onTap,
     this.onDiagnosticTap,
     this.onKeyEvent,
+    this.fontScale = 1.0,
   });
 
   @override
@@ -120,6 +122,7 @@ class _LineNumberedEditorState extends State<LineNumberedEditor> {
               controller: widget.controller,
               scrollController: editorScrollController,
               diagnostics: widget.diagnostics,
+              fontScale: widget.fontScale,
             ),
           ),
           SizedBox(
@@ -133,7 +136,7 @@ class _LineNumberedEditorState extends State<LineNumberedEditor> {
                 controller: gutterScrollController,
                 physics: const NeverScrollableScrollPhysics(),
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                itemExtent: 24,
+                itemExtent: 24 * widget.fontScale,
                 itemCount: lineCount,
                 itemBuilder: (context, index) {
                   final diagnostic = _diagnosticForLine(index + 1);
