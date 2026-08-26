@@ -28,7 +28,7 @@
 
 يستخدم `ArabicSyntaxHighlighter` Lexer الحقيقي من `compiler_core` لأنه يمنع تكرار قائمة الكلمات والعمليات في Flutter. يحوّل tokens إلى `SourceToken` ranges؛ ثم يضيف `ArabicCodeController` طبقة الأدوار الدلالية والتشخيص وghost للعرض فقط. التعليقات المعتمدة هي `//`، ولذلك لا يستخرج highlighter أو ToggleLineComment block comments غير موجودة في grammar.
 
-يحافظ TextField للكود على `TextDirection.ltr` داخل واجهة RTL لأن المؤشر وحركة الأسهم وHome/End ترتبط بترتيب النص البرمجي لا باتجاه لوحة الواجهة. التكبير عام عبر `MediaQuery.textScaler` مرة واحدة، ولا تضاعف LineNumberedEditor أو gutter حجم الخط فوقه.
+يحافظ TextField للكود على `TextDirection.ltr` داخل واجهة RTL لأن المؤشر وحركة الأسهم وHome/End ترتبط بترتيب النص البرمجي لا باتجاه لوحة الواجهة، لكنه يستخدم `TextAlign.right` حتى لا تُعرض السطور العربية من اليسار بصريًا. فصل الاتجاه عن المحاذاة هو التصحيح المطلوب: لا نعيد RTL الكامل إلى TextField ولا نترك المحاذاة left. التكبير عام عبر `MediaQuery.textScaler` مرة واحدة، ولا تضاعف LineNumberedEditor أو gutter حجم الخط فوقه.
 
 ### التعليقات والتنسيق
 

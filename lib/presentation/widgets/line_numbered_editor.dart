@@ -194,8 +194,10 @@ class _LineNumberedEditorState extends State<LineNumberedEditor> {
                   expands: true,
                   maxLines: null,
                   minLines: null,
+                  // LTR يحافظ على ترتيب المؤشر البرمجي، وright يضع السطر العربي
+                  // بصريًا في جهة الكتابة الصحيحة دون عكس حركة الأسهم.
                   textDirection: TextDirection.ltr,
-                  textAlign: TextAlign.left,
+                  textAlign: TextAlign.right,
                   cursorColor: colors.primary,
                   style: editorStyle,
                   decoration: const InputDecoration(
