@@ -125,12 +125,43 @@ class _LineNumberedEditorState extends State<LineNumberedEditor> {
               fontScale: widget.fontScale,
             ),
           ),
+          Expanded(
+            child: NotificationListener<ScrollNotification>(
+              onNotification: _syncGutter,
+              child: Focus(
+                onKeyEvent: widget.onKeyEvent,
+                child: TextField(
+                  key: const ValueKey('code-editor-field'),
+                  controller: widget.controller,
+                  focusNode: widget.focusNode,
+                  scrollController: editorScrollController,
+                  onChanged: widget.onChanged,
+                  onTap: widget.onTap,
+                  expands: true,
+                  maxLines: null,
+                  minLines: null,
+                  // RTL يجعل caret يتقدم مع الكتابة العربية؛ المحاذاة تتطابق معه.
+                  textDirection: TextDirection.rtl,
+                  textAlign: TextAlign.right,
+                  cursorColor: colors.primary,
+                  style: editorStyle,
+                  decoration: const InputDecoration(
+                    contentPadding: EdgeInsets.fromLTRB(18, 14, 18, 14),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                  ),
+                ),
+              ),
+            ),
+          ),
           SizedBox(
+            key: const ValueKey('code-gutter'),
             width: 54,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: colors.surfaceContainerHighest.withValues(alpha: .42),
-                border: Border(right: BorderSide(color: colors.outlineVariant)),
+                border: Border(left: BorderSide(color: colors.outlineVariant)),
               ),
               child: ListView.builder(
                 controller: gutterScrollController,
@@ -146,19 +177,6 @@ class _LineNumberedEditorState extends State<LineNumberedEditor> {
                         : () => widget.onDiagnosticTap!(diagnostic),
                     child: Row(
                       children: [
-                        if (diagnostic != null)
-                          Padding(
-                            padding: const EdgeInsetsDirectional.only(start: 3),
-                            child: Icon(
-                              Icons.lightbulb_outline_rounded,
-                              size: 14,
-                              color:
-                                  diagnostic.severity ==
-                                      EditorDiagnosticSeverity.error
-                                  ? colors.error
-                                  : colors.secondary,
-                            ),
-                          ),
                         Expanded(
                           child: Text(
                             '${index + 1}',
@@ -173,40 +191,23 @@ class _LineNumberedEditorState extends State<LineNumberedEditor> {
                             ),
                           ),
                         ),
+                        if (diagnostic != null)
+                          Padding(
+                            padding: const EdgeInsetsDirectional.only(end: 3),
+                            child: Icon(
+                              Icons.lightbulb_outline_rounded,
+                              size: 14,
+                              color:
+                                  diagnostic.severity ==
+                                      EditorDiagnosticSeverity.error
+                                  ? colors.error
+                                  : colors.secondary,
+                            ),
+                          ),
                       ],
                     ),
                   );
                 },
-              ),
-            ),
-          ),
-          Expanded(
-            child: NotificationListener<ScrollNotification>(
-              onNotification: _syncGutter,
-              child: Focus(
-                onKeyEvent: widget.onKeyEvent,
-                child: TextField(
-                  controller: widget.controller,
-                  focusNode: widget.focusNode,
-                  scrollController: editorScrollController,
-                  onChanged: widget.onChanged,
-                  onTap: widget.onTap,
-                  expands: true,
-                  maxLines: null,
-                  minLines: null,
-                  // LTR يحافظ على ترتيب المؤشر البرمجي، وright يضع السطر العربي
-                  // بصريًا في جهة الكتابة الصحيحة دون عكس حركة الأسهم.
-                  textDirection: TextDirection.ltr,
-                  textAlign: TextAlign.right,
-                  cursorColor: colors.primary,
-                  style: editorStyle,
-                  decoration: const InputDecoration(
-                    contentPadding: EdgeInsets.fromLTRB(18, 14, 18, 14),
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                  ),
-                ),
               ),
             ),
           ),

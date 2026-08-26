@@ -107,9 +107,7 @@ void main() {
     expect(find.text(r'الأول\nالثاني'), findsNothing);
   });
 
-  testWidgets('aligns Arabic code right without reversing editor direction', (
-    tester,
-  ) async {
+  testWidgets('uses Arabic direction and right-aligns code', (tester) async {
     final textController = TextEditingController(text: 'برنامج اختبار {}.');
     addTearDown(textController.dispose);
 
@@ -126,8 +124,54 @@ void main() {
     );
 
     final textField = tester.widget<TextField>(find.byType(TextField));
-    expect(textField.textDirection, TextDirection.ltr);
+    expect(textField.textDirection, TextDirection.rtl);
     expect(textField.textAlign, TextAlign.right);
+    expect(
+      tester.getCenter(find.bySemanticsLabel('خريطة مصغرة للكود')).dx,
+      lessThan(
+        tester.getCenter(find.byKey(const ValueKey('code-editor-field'))).dx,
+      ),
+    );
+    expect(
+      tester.getCenter(find.byKey(const ValueKey('code-gutter'))).dx,
+      greaterThan(
+        tester.getCenter(find.byKey(const ValueKey('code-editor-field'))).dx,
+      ),
+    );
+  });
+
+  testWidgets('moves Arabic caret with logical text positions', (tester) async {
+    final textController = TextEditingController(text: 'اطبع("السلام")');
+    addTearDown(textController.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Material(
+          child: SizedBox(
+            width: 800,
+            height: 400,
+            child: LineNumberedEditor(controller: textController),
+          ),
+        ),
+      ),
+    );
+
+    final state = tester.state<EditableTextState>(find.byType(EditableText));
+    final render = state.renderEditable;
+    textController.selection = TextSelection.collapsed(
+      offset: textController.text.length,
+    );
+    await tester.pump();
+    final endX = render
+        .getLocalRectForCaret(textController.selection.extent)
+        .left;
+    textController.selection = const TextSelection.collapsed(offset: 0);
+    await tester.pump();
+    final startX = render
+        .getLocalRectForCaret(textController.selection.extent)
+        .left;
+
+    expect(endX, lessThan(startX));
   });
 
   testWidgets('opens an Arabic source document', (tester) async {
@@ -157,7 +201,7 @@ void main() {
       findsAtLeastNWidgets(2),
     );
     final field = tester.widget<TextField>(find.byType(TextField));
-    expect(field.textDirection, TextDirection.ltr);
+    expect(field.textDirection, TextDirection.rtl);
   });
 
   testWidgets('renders a navigable code minimap', (tester) async {
@@ -545,7 +589,7 @@ void main() {
     expect(find.byIcon(Icons.lightbulb_outline_rounded), findsOneWidget);
   });
 
-  testWidgets('keeps code input LTR inside the RTL editor shell', (
+  testWidgets('keeps code input RTL inside the RTL editor shell', (
     tester,
   ) async {
     final controller = ArabicCodeController(text: 'س = 1؛');
@@ -565,7 +609,7 @@ void main() {
     );
 
     final field = tester.widget<TextField>(find.byType(TextField));
-    expect(field.textDirection, TextDirection.ltr);
+    expect(field.textDirection, TextDirection.rtl);
     expect(field.textAlign, TextAlign.right);
     expect(field.style?.fontSize, 15);
   });
