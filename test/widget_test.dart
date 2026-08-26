@@ -537,6 +537,62 @@ void main() {
     expect(textFieldController.selection.extentOffset, 1);
   });
 
+  testWidgets('normalizes a blank-area tap to the end of its line', (
+    tester,
+  ) async {
+    final textController = TextEditingController(text: 'سعيد\nاطبع');
+    addTearDown(textController.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Material(
+          child: SizedBox(
+            width: 800,
+            height: 240,
+            child: LineNumberedEditor(controller: textController),
+          ),
+        ),
+      ),
+    );
+
+    textController.selection = const TextSelection.collapsed(
+      offset: 5,
+      affinity: TextAffinity.upstream,
+    );
+    await tester.pump();
+
+    expect(textController.selection.extentOffset, 4);
+    expect(textController.selection.affinity, TextAffinity.downstream);
+  });
+
+  testWidgets('moves arrows by visual direction in the Arabic editor', (
+    tester,
+  ) async {
+    final controller = EditorController(
+      repository: FakeWorkspaceRepository(),
+      rootPath: '.',
+    );
+    await controller.open('main.arb');
+    controller.edit(
+      const TextEdit(
+        offset: 0,
+        before: 'برنامج اختبار {}.',
+        after: 'سعيد\nاطبع',
+      ),
+    );
+
+    await tester.pumpWidget(ArabicEditorApp(controller: controller));
+    await tester.pump();
+    final field = find.byType(TextField);
+    await tester.tap(field);
+    final textFieldController = tester.widget<TextField>(field).controller!;
+    textFieldController.selection = const TextSelection.collapsed(offset: 4);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    expect(textFieldController.selection.extentOffset, 5);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    expect(textFieldController.selection.extentOffset, 4);
+  });
+
   testWidgets('toggles line comments through the editor shortcut', (
     tester,
   ) async {
