@@ -117,112 +117,129 @@ class _LineNumberedEditorState extends State<LineNumberedEditor> {
       height: 1.6,
       color: colors.onSurface,
     );
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colors.surface,
-        border: Border.all(color: colors.outlineVariant.withValues(alpha: .55)),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        textDirection: TextDirection.ltr,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            width: 118,
-            child: CodeMinimap(
-              controller: widget.controller,
-              scrollController: editorScrollController,
-              diagnostics: widget.diagnostics,
-              fontScale: widget.fontScale,
+    return ScrollConfiguration(
+      behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+      child: Scrollbar(
+        controller: editorScrollController,
+        thumbVisibility: true,
+        scrollbarOrientation: ScrollbarOrientation.left,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colors.surface,
+            border: Border.all(
+              color: colors.outlineVariant.withValues(alpha: .55),
             ),
+            borderRadius: BorderRadius.circular(8),
           ),
-          Expanded(
-            child: NotificationListener<ScrollNotification>(
-              onNotification: _syncGutter,
-              child: Focus(
-                onKeyEvent: widget.onKeyEvent,
-                child: TextField(
-                  key: const ValueKey('code-editor-field'),
+          child: Row(
+            textDirection: TextDirection.ltr,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                width: 118,
+                child: CodeMinimap(
                   controller: widget.controller,
-                  focusNode: widget.focusNode,
                   scrollController: editorScrollController,
-                  onChanged: widget.onChanged,
-                  onTap: widget.onTap,
-                  expands: true,
-                  maxLines: null,
-                  minLines: null,
-                  // RTL يجعل caret يتقدم مع الكتابة العربية؛ المحاذاة تتطابق معه.
-                  textDirection: TextDirection.rtl,
-                  textAlign: TextAlign.right,
-                  cursorColor: colors.primary,
-                  style: editorStyle,
-                  decoration: const InputDecoration(
-                    contentPadding: EdgeInsets.fromLTRB(18, 14, 18, 14),
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
+                  diagnostics: widget.diagnostics,
+                  fontScale: widget.fontScale,
+                ),
+              ),
+              Expanded(
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: _syncGutter,
+                  child: Focus(
+                    onKeyEvent: widget.onKeyEvent,
+                    child: TextField(
+                      key: const ValueKey('code-editor-field'),
+                      controller: widget.controller,
+                      focusNode: widget.focusNode,
+                      scrollController: editorScrollController,
+                      onChanged: widget.onChanged,
+                      onTap: widget.onTap,
+                      expands: true,
+                      maxLines: null,
+                      minLines: null,
+                      // RTL يجعل caret يتقدم مع الكتابة العربية؛ المحاذاة تتطابق معه.
+                      textDirection: TextDirection.rtl,
+                      textAlign: TextAlign.right,
+                      cursorColor: colors.primary,
+                      style: editorStyle,
+                      decoration: const InputDecoration(
+                        contentPadding: EdgeInsets.fromLTRB(18, 14, 18, 14),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
-          SizedBox(
-            key: const ValueKey('code-gutter'),
-            width: 54,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: colors.surfaceContainerHighest.withValues(alpha: .42),
-                border: Border(left: BorderSide(color: colors.outlineVariant)),
-              ),
-              child: ListView.builder(
-                controller: gutterScrollController,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                itemExtent: 24 * widget.fontScale,
-                itemCount: lineCount,
-                itemBuilder: (context, index) {
-                  final diagnostic = _diagnosticForLine(index + 1);
-                  return InkWell(
-                    onTap: diagnostic == null || widget.onDiagnosticTap == null
-                        ? null
-                        : () => widget.onDiagnosticTap!(diagnostic),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            '${index + 1}',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 12,
-                              height: 2,
-                              color: diagnostic == null
-                                  ? colors.onSurfaceVariant
-                                  : colors.error,
-                            ),
-                          ),
-                        ),
-                        if (diagnostic != null)
-                          Padding(
-                            padding: const EdgeInsetsDirectional.only(end: 3),
-                            child: Icon(
-                              Icons.lightbulb_outline_rounded,
-                              size: 14,
-                              color:
-                                  diagnostic.severity ==
-                                      EditorDiagnosticSeverity.error
-                                  ? colors.error
-                                  : colors.secondary,
-                            ),
-                          ),
-                      ],
+              SizedBox(
+                key: const ValueKey('code-gutter'),
+                width: 54,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: colors.surfaceContainerHighest.withValues(
+                      alpha: .42,
                     ),
-                  );
-                },
+                    border: Border(
+                      left: BorderSide(color: colors.outlineVariant),
+                    ),
+                  ),
+                  child: ListView.builder(
+                    controller: gutterScrollController,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    itemExtent: 24 * widget.fontScale,
+                    itemCount: lineCount,
+                    itemBuilder: (context, index) {
+                      final diagnostic = _diagnosticForLine(index + 1);
+                      return InkWell(
+                        onTap:
+                            diagnostic == null || widget.onDiagnosticTap == null
+                            ? null
+                            : () => widget.onDiagnosticTap!(diagnostic),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${index + 1}',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 12,
+                                  height: 2,
+                                  color: diagnostic == null
+                                      ? colors.onSurfaceVariant
+                                      : colors.error,
+                                ),
+                              ),
+                            ),
+                            if (diagnostic != null)
+                              Padding(
+                                padding: const EdgeInsetsDirectional.only(
+                                  end: 3,
+                                ),
+                                child: Icon(
+                                  Icons.lightbulb_outline_rounded,
+                                  size: 14,
+                                  color:
+                                      diagnostic.severity ==
+                                          EditorDiagnosticSeverity.error
+                                      ? colors.error
+                                      : colors.secondary,
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

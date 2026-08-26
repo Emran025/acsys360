@@ -229,6 +229,33 @@ void main() {
     await tester.pump();
   });
 
+  testWidgets('places one scrollbar to the left of the minimap', (
+    tester,
+  ) async {
+    final controller = TextEditingController(
+      text: List.generate(40, (index) => 'السطر $index').join('\n'),
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Material(
+          child: SizedBox(
+            width: 800,
+            height: 240,
+            child: LineNumberedEditor(controller: controller),
+          ),
+        ),
+      ),
+    );
+
+    final scrollbars = find.byType(Scrollbar);
+    expect(scrollbars, findsOneWidget);
+    final scrollbar = tester.widget<Scrollbar>(scrollbars);
+    expect(scrollbar.scrollbarOrientation, ScrollbarOrientation.left);
+    expect(scrollbar.thumbVisibility, isTrue);
+  });
+
   testWidgets('renders miniature token strokes in the minimap', (tester) async {
     final controller = ArabicCodeController(
       text: 'برنامج سعيد {\n  اطبع("السلام")؛\n  س = 42؛',
