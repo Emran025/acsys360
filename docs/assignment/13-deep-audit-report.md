@@ -28,7 +28,7 @@
 
 يستخدم `ArabicSyntaxHighlighter` Lexer الحقيقي من `compiler_core` لأنه يمنع تكرار قائمة الكلمات والعمليات في Flutter. يحوّل tokens إلى `SourceToken` ranges؛ ثم يضيف `ArabicCodeController` طبقة الأدوار الدلالية والتشخيص وghost للعرض فقط. التعليقات المعتمدة هي `//`، ولذلك لا يستخرج highlighter أو ToggleLineComment block comments غير موجودة في grammar.
 
-كانت المحاولة السابقة تستخدم `TextDirection.ltr` مع `TextAlign.right` لعزل حركة المؤشر عن محاذاة السطر، لكنها أثبتت في اختبار caret أن موضع النهاية قد يعود إلى الحافة اليمنى عند النص العربي المختلط. التصحيح النهائي يستخدم `TextDirection.rtl` مع `TextAlign.right`؛ فتتحرك مواضع caret مع الإدخال العربي، بينما تظل المواضع المنطقية داخل `TextEditingValue` هي مصدر الأسهم وHome/End. أصبح ترتيب العرض صريحًا: Minimap يسار مساحة الكود، وgutter أرقام الأسطر يمينها. التكبير عام عبر `MediaQuery.textScaler` مرة واحدة، ولا تضاعف LineNumberedEditor أو gutter حجم الخط فوقه.
+كانت المحاولة السابقة تستخدم `TextDirection.ltr` مع `TextAlign.right` لعزل حركة المؤشر عن محاذاة السطر، لكنها أثبتت في اختبار caret أن موضع النهاية قد يعود إلى الحافة اليمنى عند النص العربي المختلط. التصحيح النهائي يستخدم `TextDirection.rtl` مع `TextAlign.right`؛ فتتحرك مواضع caret مع الإدخال العربي. ويطبّع `LineNumberedEditor` حالة hit-testing التي تعيد newline بــ`TextAffinity.upstream` عند النقر في الفراغ إلى نهاية السطر السابق. كما يعكس EditorShell السهمين الأيسر والأيمن بصريًا في RTL، مع إبقاء selection offsets وShift للتحديد. أصبح ترتيب العرض صريحًا: Minimap يسار مساحة الكود، وgutter أرقام الأسطر يمينها. التكبير عام عبر `MediaQuery.textScaler` مرة واحدة، ولا تضاعف LineNumberedEditor أو gutter حجم الخط فوقه.
 
 ### التعليقات والتنسيق
 

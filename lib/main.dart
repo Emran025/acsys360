@@ -288,6 +288,17 @@ class _EditorShellState extends State<EditorShell> {
     final key = event.logicalKey;
     final hardware = HardwareKeyboard.instance;
     final hasCompletion = widget.controller.currentCompletion != null;
+    if ((key == LogicalKeyboardKey.arrowLeft ||
+            key == LogicalKeyboardKey.arrowRight) &&
+        !hardware.isControlPressed &&
+        !hardware.isMetaPressed &&
+        !hardware.isAltPressed) {
+      if (hasCompletion) widget.controller.clearAssist();
+      return _moveCaretVisually(
+        moveLeft: key == LogicalKeyboardKey.arrowLeft,
+        extend: hardware.isShiftPressed,
+      );
+    }
     if (hasCompletion && _dismissesCompletion(key, hardware)) {
       widget.controller.clearAssist();
       if (key == LogicalKeyboardKey.enter &&
@@ -339,6 +350,30 @@ class _EditorShellState extends State<EditorShell> {
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
+  }
+
+  KeyEventResult _moveCaretVisually({
+    required bool moveLeft,
+    required bool extend,
+  }) {
+    final value = textController.value;
+    final selection = value.selection;
+    if (!selection.isValid) return KeyEventResult.ignored;
+
+    // In an Arabic field, physical left advances the logical offset.
+    final delta = moveLeft ? 1 : -1;
+    final target = (selection.extentOffset + delta)
+        .clamp(0, value.text.length)
+        .toInt();
+    final nextSelection = extend
+        ? selection.copyWith(extentOffset: target)
+        : selection.isCollapsed
+        ? TextSelection.collapsed(offset: target)
+        : TextSelection.collapsed(
+            offset: moveLeft ? selection.end : selection.start,
+          );
+    textController.value = value.copyWith(selection: nextSelection);
+    return KeyEventResult.handled;
   }
 
   bool _dismissesCompletion(LogicalKeyboardKey key, HardwareKeyboard hardware) {

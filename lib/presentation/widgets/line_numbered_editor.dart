@@ -67,7 +67,18 @@ class _LineNumberedEditorState extends State<LineNumberedEditor> {
   void _handleControllerChange() {
     final next = _lineCount(widget.controller.text);
     if (next != lineCount && mounted) setState(() => lineCount = next);
-    final selection = widget.controller.selection;
+    var selection = widget.controller.selection;
+    if (selection.isCollapsed && selection.affinity == TextAffinity.upstream) {
+      final offset = selection.extentOffset;
+      final text = widget.controller.text;
+      if (offset > 0 && offset <= text.length && text[offset - 1] == '\n') {
+        selection = TextSelection.collapsed(
+          offset: offset - 1,
+          affinity: TextAffinity.downstream,
+        );
+        widget.controller.selection = selection;
+      }
+    }
     if (selection != lastSelection) {
       lastSelection = selection;
       widget.onSelectionChanged?.call(selection);
