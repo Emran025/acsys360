@@ -107,6 +107,29 @@ void main() {
     expect(find.text(r'الأول\nالثاني'), findsNothing);
   });
 
+  testWidgets('aligns Arabic code right without reversing editor direction', (
+    tester,
+  ) async {
+    final textController = TextEditingController(text: 'برنامج اختبار {}.');
+    addTearDown(textController.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Material(
+          child: SizedBox(
+            width: 800,
+            height: 400,
+            child: LineNumberedEditor(controller: textController),
+          ),
+        ),
+      ),
+    );
+
+    final textField = tester.widget<TextField>(find.byType(TextField));
+    expect(textField.textDirection, TextDirection.ltr);
+    expect(textField.textAlign, TextAlign.right);
+  });
+
   testWidgets('opens an Arabic source document', (tester) async {
     final controller = EditorController(
       repository: FakeWorkspaceRepository(),
@@ -543,7 +566,7 @@ void main() {
 
     final field = tester.widget<TextField>(find.byType(TextField));
     expect(field.textDirection, TextDirection.ltr);
-    expect(field.textAlign, TextAlign.left);
+    expect(field.textAlign, TextAlign.right);
     expect(field.style?.fontSize, 15);
   });
 
