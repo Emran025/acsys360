@@ -11,6 +11,7 @@ import 'package:acsys360/presentation/widgets/arabic_code_controller.dart';
 import 'package:acsys360/presentation/widgets/code_minimap.dart';
 import 'package:acsys360/presentation/widgets/line_numbered_editor.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -226,6 +227,37 @@ void main() {
     expect(tester.getCenter(minimap).dx, lessThan(tester.getCenter(editor).dx));
     await tester.tap(minimap, warnIfMissed: false);
     await tester.pump();
+  });
+
+  testWidgets('renders miniature token strokes in the minimap', (tester) async {
+    final controller = ArabicCodeController(
+      text: 'برنامج سعيد {\n  اطبع("السلام")؛\n  س = 42؛',
+    );
+    addTearDown(controller.dispose);
+
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Material(
+          child: SizedBox(
+            width: 180,
+            height: 240,
+            child: CodeMinimap(
+              controller: controller,
+              scrollController: scrollController,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final painter = tester.renderObject<RenderCustomPaint>(
+      find.byKey(const ValueKey('minimap-code-painter')),
+    );
+    expect(painter.painter, isNotNull);
+    expect(painter.size.width, greaterThan(0));
+    expect(painter.size.height, greaterThan(0));
   });
 
   testWidgets('jumps to a distant line from the minimap', (tester) async {

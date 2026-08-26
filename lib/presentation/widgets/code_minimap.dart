@@ -76,6 +76,7 @@ class _CodeMinimapState extends State<CodeMinimap> {
             border: Border(right: BorderSide(color: colors.outlineVariant)),
           ),
           child: CustomPaint(
+            key: const ValueKey('minimap-code-painter'),
             painter: _MinimapPainter(
               lines: lines,
               sections: sections,
@@ -115,6 +116,11 @@ class _MinimapSection {
   final int line;
   final String label;
   const _MinimapSection({required this.line, required this.label});
+}
+
+class _MiniToken {
+  final String text;
+  const _MiniToken(this.text);
 }
 
 List<_MinimapSection> _sections(List<String> lines) {
@@ -218,18 +224,62 @@ class _MinimapPainter extends CustomPainter {
   }
 
   void _paintLine(Canvas canvas, Size size, int index, double lineScale) {
-    final text = lines[index].trimRight();
+    final sourceLine = lines[index];
+    final text = sourceLine.trimRight();
     if (text.isEmpty) return;
-    final indent = lines[index].length - lines[index].trimLeft().length;
-    final width = math
-        .min(size.width - 8, math.max(5.0, (text.length * .9) + indent * .8))
-        .toDouble();
-    final y = index * lineScale + math.max(0.0, (lineScale - 2) / 2).toDouble();
-    final paint = Paint()..color = _lineColor(text).withValues(alpha: .82);
-    canvas.drawRect(
-      Rect.fromLTWH(5 + indent * .35, y, width, math.max(1.0, 2 * fontScale)),
-      paint,
-    );
+
+    final indent = sourceLine.length - sourceLine.trimLeft().length;
+    final tokens = _miniTokens(text);
+    final gap = math.min(1.0, lineScale * .12).toDouble();
+    final indentWidth = math.min(size.width * .18, indent * 1.2).toDouble();
+    final widths = tokens
+        .map((token) => math.max(3.0, token.text.length * .95 * fontScale))
+        .toList();
+    final rawWidth =
+        widths.fold<double>(indentWidth, (sum, width) => sum + width) +
+        math.max(0, tokens.length - 1) * gap;
+    final available = math.max(6.0, size.width - 8).toDouble();
+    final compression = rawWidth > available ? available / rawWidth : 1.0;
+    final barHeight = math.max(1.5, math.min(4.0, lineScale * .42)).toDouble();
+    final y = index * lineScale + math.max(0.0, (lineScale - barHeight) / 2);
+    var x = size.width - 4;
+
+    // The first logical token is anchored at the right, matching Arabic lines.
+    for (var tokenIndex = 0; tokenIndex < tokens.length; tokenIndex++) {
+      final width = widths[tokenIndex] * compression;
+      x -= width;
+      canvas.drawRect(
+        Rect.fromLTWH(x, y, width, barHeight),
+        Paint()
+          ..color = _tokenColor(tokens[tokenIndex].text).withValues(alpha: .86),
+      );
+      x -= gap * compression;
+    }
+  }
+
+  List<_MiniToken> _miniTokens(String text) {
+    final matches = RegExp(
+      r'//.*|"(?:\\.|[^"\\])*"|\d+(?:\.\d+)?|[A-Za-zء-ي_][A-Za-z0-9ء-ي_]*|[^\s]',
+    ).allMatches(text);
+    return [for (final match in matches) _MiniToken(match.group(0) ?? '')];
+  }
+
+  Color _tokenColor(String token) {
+    if (token.startsWith('//')) return colors.onSurfaceVariant;
+    if (token.startsWith('"')) return colors.secondary;
+    if (RegExp(r'^\d').hasMatch(token)) return colors.error;
+    if (RegExp(
+      r'^(برنامج|اجراء|نوع|ثابت|متغير|اذا|والا|طالما|كرر|اعد)$',
+    ).hasMatch(token)) {
+      return colors.primary;
+    }
+    if (RegExp(r'^(صحيح|حقيقي|منطقي|حرفي|خيط)$').hasMatch(token)) {
+      return colors.tertiary;
+    }
+    if (RegExp(r'^[{}()\[\];،؛,.+*/=<>:-]$').hasMatch(token)) {
+      return colors.outline;
+    }
+    return colors.onSurfaceVariant;
   }
 
   void _paintSection(
@@ -256,21 +306,6 @@ class _MinimapPainter extends CustomPainter {
       ellipsis: '…',
     )..layout(maxWidth: size.width - 10);
     painter.paint(canvas, Offset(5, y + 3));
-  }
-
-  Color _lineColor(String text) {
-    if (text.startsWith('//')) return colors.onSurfaceVariant;
-    if (RegExp(
-      r'^(برنامج|اجراء|نوع|ثابت|متغير|اذا|والا|طالما|كرر|اعد)\b',
-    ).hasMatch(text)) {
-      return colors.primary;
-    }
-    if (RegExp(r'^(صحيح|حقيقي|منطقي|حرفي|خيط)').hasMatch(text)) {
-      return colors.tertiary;
-    }
-    if (RegExp(r'\"|‘|’').hasMatch(text)) return colors.secondary;
-    if (RegExp(r'\d').hasMatch(text)) return colors.error;
-    return colors.onSurfaceVariant;
   }
 
   Rect? _viewport(Size size, int lineCount) {
