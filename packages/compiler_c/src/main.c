@@ -1,5 +1,8 @@
+#include "asm_x86_64.h"
 #include "lexer.h"
+#include "parser.h"
 #include "protocol.h"
+#include "semantic.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,6 +38,31 @@ int main(int argc, char **argv) {
     free(payload);
     return result;
   }
+  if (argc == 2 && strcmp(argv[1], "--asm") == 0) {
+    char *source = read_stdin();
+    if (source == NULL) return 70;
+    CLexResult lexical;
+    CParseResult parsed;
+    CSemanticResult semantic;
+    CAssemblyResult assembly;
+    const int lex_status = c_lex(source, &lexical);
+    const int parse_status = lex_status ? c_parse(&lexical, &parsed) : 0;
+    const int semantic_status = parse_status && parsed.program != NULL
+        ? c_analyze_semantics(parsed.program, &semantic)
+        : 0;
+    const int assembly_status = semantic_status
+        ? c_generate_nasm_x86_64(parsed.program, &semantic, &assembly)
+        : 0;
+    if (assembly_status && assembly.diagnostic_count == 0U) {
+      fputs(assembly.text, stdout);
+    }
+    if (assembly_status) c_assembly_result_free(&assembly);
+    if (semantic_status) c_semantic_result_free(&semantic);
+    if (parse_status) c_parse_result_free(&parsed);
+    if (lex_status) c_lex_result_free(&lexical);
+    free(source);
+    return assembly_status && lex_status && parse_status && semantic_status ? 0 : 1;
+  }
   if (argc == 2 && strcmp(argv[1], "--lex") == 0) {
     char *source = read_stdin();
     if (source == NULL) return 70;
@@ -54,6 +82,6 @@ int main(int argc, char **argv) {
     free(source);
     return success ? 0 : 70;
   }
-  fputs("usage: arabicc_c --protocol | --lex\n", stderr);
+  fputs("usage: arabicc_c --protocol | --lex | --asm\\n", stderr);
   return 64;
 }
