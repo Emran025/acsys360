@@ -497,7 +497,7 @@ static CAstNode *parse_if_statement(Parser *parser, const CToken *start) {
     c_ast_free(node);
     return NULL;
   }
-  if (match(parser, ";")) return node;
+  (void)match(parser, ";");
   if (match(parser, "والا")) {
     if (match(parser, "اذا")) {
       CAstNode *nested = parse_if_statement(parser, current(parser));
