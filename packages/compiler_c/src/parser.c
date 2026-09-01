@@ -108,6 +108,35 @@ static CTypeSpec *named_type(const char *name) {
 
 static CAstNode *parse_expression(Parser *parser);
 
+static int parse_selectors(Parser *parser, CAstNodeList *selectors) {
+  while (match(parser, "[") || match(parser, ".")) {
+    const CToken *marker = &parser->tokens->items[parser->index - 1U];
+    if (marker->lexeme[0] == '[') {
+      CAstNode *index = parse_expression(parser);
+      if (index == NULL || !expect(parser, "]", "القوس ]") ||
+          !list_push(selectors, index)) {
+        c_ast_free(index);
+        return 0;
+      }
+    } else {
+      const CToken *field = current(parser);
+      if (field->kind != C_TOKEN_IDENTIFIER) {
+        (void)add_error(parser, "متوقع اسم الحقل");
+        return 0;
+      }
+      CAstNode *field_node = new_node(C_AST_VARIABLE_REFERENCE, field);
+      if (field_node == NULL) return 0;
+      field_node->data.reference.name = copy_string(field->lexeme);
+      if (field_node->data.reference.name == NULL || !list_push(selectors, field_node)) {
+        c_ast_free(field_node);
+        return 0;
+      }
+      advance_token(parser);
+    }
+  }
+  return 1;
+}
+
 static CTypeSpec *parse_type_spec(Parser *parser) {
   const CToken *token = current(parser);
   if (match(parser, "قائمة")) {
@@ -208,7 +237,8 @@ static CAstNode *parse_primary(Parser *parser) {
     CAstNode *node = new_node(C_AST_VARIABLE_REFERENCE, token);
     if (node == NULL) return NULL;
     node->data.reference.name = copy_string(token->lexeme);
-    if (node->data.reference.name == NULL) {
+    if (node->data.reference.name == NULL ||
+        !parse_selectors(parser, &node->data.reference.selectors)) {
       c_ast_free(node);
       return NULL;
     }
@@ -678,10 +708,25 @@ static CAstNode *parse_statement(Parser *parser) {
       parser->index--;
       return parse_call_statement(parser, start);
     }
-    if (!expect(parser, "=", "علامة الإسناد =")) return NULL;
+    CAstNodeList selectors = {0};
+    if (!parse_selectors(parser, &selectors) ||
+        !expect(parser, "=", "علامة الإسناد =")) {
+      for (size_t index = 0U; index < selectors.count; index++) {
+        c_ast_free(selectors.items[index]);
+      }
+      free(selectors.items);
+      return NULL;
+    }
     node = new_node(C_AST_ASSIGNMENT, start);
-    if (node == NULL) return NULL;
+    if (node == NULL) {
+      for (size_t index = 0U; index < selectors.count; index++) {
+        c_ast_free(selectors.items[index]);
+      }
+      free(selectors.items);
+      return NULL;
+    }
     node->data.assignment.name = copy_string(start->lexeme);
+    node->data.assignment.selectors = selectors;
     node->data.assignment.expression = parse_expression(parser);
     if (node->data.assignment.name == NULL ||
         node->data.assignment.expression == NULL ||
