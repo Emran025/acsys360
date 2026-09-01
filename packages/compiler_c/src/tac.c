@@ -78,35 +78,76 @@ static int expression(const CAstNode *node, CTacResult *result, size_t *temporar
   }
 }
 
+static int statements(const CAstNodeList *list, CTacResult *result, size_t *temporary,
+                       size_t *label) {
+  for (size_t index = 0U; index < list->count; index++) {
+    const CAstNode *statement = list->items[index];
+    if (statement->kind == C_AST_EMPTY) continue;
+    if (statement->kind == C_AST_ASSIGNMENT) {
+      char value[128];
+      if (!expression(statement->data.assignment.expression, result, temporary, value, sizeof(value)) ||
+          !push_line(result, "%s = %s", statement->data.assignment.name, value)) return 0;
+    } else if (statement->kind == C_AST_PRINT) {
+      for (size_t value_index = 0U; value_index < statement->data.print.values.count; value_index++) {
+        char value[128];
+        if (!expression(statement->data.print.values.items[value_index], result, temporary, value, sizeof(value)) ||
+            !push_line(result, "print %s", value)) return 0;
+      }
+    } else if (statement->kind == C_AST_CALL) {
+      if (!push_line(result, "call %s", statement->data.call.name)) return 0;
+    } else if (statement->kind == C_AST_IF) {
+      char condition[128];
+      const size_t else_label = (*label)++;
+      const size_t end_label = (*label)++;
+      if (!expression(statement->data.conditional.condition, result, temporary, condition, sizeof(condition)) ||
+          !push_line(result, "ifFalse %s goto L%zu", condition, else_label) ||
+          !statements(&statement->data.conditional.then_branch, result, temporary, label) ||
+          !push_line(result, "goto L%zu", end_label) ||
+          !push_line(result, "L%zu:", else_label) ||
+          !statements(&statement->data.conditional.else_branch, result, temporary, label) ||
+          !push_line(result, "L%zu:", end_label)) return 0;
+    } else if (statement->kind == C_AST_WHILE) {
+      char condition[128];
+      const size_t begin_label = (*label)++;
+      const size_t end_label = (*label)++;
+      if (!push_line(result, "L%zu:", begin_label) ||
+          !expression(statement->data.loop.condition, result, temporary, condition, sizeof(condition)) ||
+          !push_line(result, "ifFalse %s goto L%zu", condition, end_label) ||
+          !statements(&statement->data.loop.body, result, temporary, label) ||
+          !push_line(result, "goto L%zu", begin_label) ||
+          !push_line(result, "L%zu:", end_label)) return 0;
+    } else if (statement->kind == C_AST_REPEAT) {
+      char from[128]; char to[128];
+      const size_t begin_label = (*label)++;
+      const size_t end_label = (*label)++;
+      if (!expression(statement->data.repeat.from, result, temporary, from, sizeof(from)) ||
+          !expression(statement->data.repeat.to, result, temporary, to, sizeof(to)) ||
+          !push_line(result, "%s = %s", statement->data.repeat.variable, from) ||
+          !push_line(result, "L%zu:", begin_label) ||
+          !push_line(result, "if %s > %s goto L%zu", statement->data.repeat.variable, to, end_label) ||
+          !statements(&statement->data.repeat.body, result, temporary, label) ||
+          !push_line(result, "%s = %s + 1", statement->data.repeat.variable, statement->data.repeat.variable) ||
+          !push_line(result, "goto L%zu", begin_label) ||
+          !push_line(result, "L%zu:", end_label)) return 0;
+    } else if (statement->kind == C_AST_PROCEDURE_DECLARATION) {
+      if (!push_line(result, "%s:", statement->data.procedure.name) ||
+          !statements(&statement->data.procedure.body, result, temporary, label) ||
+          !push_line(result, "return")) return 0;
+    } else {
+      return 0;
+    }
+  }
+  return 1;
+}
+
 int c_generate_tac(const CAstNode *program, CTacResult *result) {
   if (program == NULL || result == NULL || program->kind != C_AST_PROGRAM) return 0;
   memset(result, 0, sizeof(*result));
   size_t temporary = 0U;
-  for (size_t index = 0U; index < program->data.program.statements.count; index++) {
-    const CAstNode *statement = program->data.program.statements.items[index];
-    if (statement->kind == C_AST_ASSIGNMENT) {
-      char value[128];
-      if (!expression(statement->data.assignment.expression, result, &temporary,
-                      value, sizeof(value)) ||
-          !push_line(result, "%s = %s", statement->data.assignment.name, value)) {
-        (void)diagnostic(result, "تعذر توليد TAC للإسناد");
-        return 1;
-      }
-    } else if (statement->kind == C_AST_PRINT) {
-      for (size_t value_index = 0U;
-           value_index < statement->data.print.values.count; value_index++) {
-        char value[128];
-        if (!expression(statement->data.print.values.items[value_index], result,
-                        &temporary, value, sizeof(value)) ||
-            !push_line(result, "print %s", value)) {
-          (void)diagnostic(result, "تعذر توليد TAC للطباعة");
-          return 1;
-        }
-      }
-    } else if (statement->kind != C_AST_EMPTY) {
-      (void)diagnostic(result, "تعليمة غير مدعومة في TAC C الحالية");
-      return 1;
-    }
+  size_t label = 0U;
+  if (!statements(&program->data.program.statements, result, &temporary, &label)) {
+    (void)diagnostic(result, "تعليمة غير مدعومة في TAC C الحالية");
+    return 1;
   }
   return 1;
 }
