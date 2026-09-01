@@ -1,0 +1,362 @@
+#include "parser.h"
+
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct {
+  const CLexResult *tokens;
+  size_t index;
+  CParseResult *result;
+} Parser;
+
+static char *copy_string(const char *value) {
+  const size_t length = strlen(value);
+  char *copy = malloc(length + 1U);
+  if (copy == NULL) return NULL;
+  memcpy(copy, value, length + 1U);
+  return copy;
+}
+
+static int add_error(Parser *parser, const char *format, ...) {
+  if (parser->result->diagnostic_count == parser->result->diagnostic_capacity) {
+    const size_t capacity = parser->result->diagnostic_capacity == 0U
+        ? 4U
+        : parser->result->diagnostic_capacity * 2U;
+    char **items = realloc(parser->result->diagnostics,
+                           capacity * sizeof(*items));
+    if (items == NULL) return 0;
+    parser->result->diagnostics = items;
+    parser->result->diagnostic_capacity = capacity;
+  }
+  char buffer[256];
+  va_list arguments;
+  va_start(arguments, format);
+  (void)vsnprintf(buffer, sizeof(buffer), format, arguments);
+  va_end(arguments);
+  parser->result->diagnostics[parser->result->diagnostic_count] =
+      copy_string(buffer);
+  if (parser->result->diagnostics[parser->result->diagnostic_count] == NULL) {
+    return 0;
+  }
+  parser->result->diagnostic_count++;
+  return 1;
+}
+
+static const CToken *current(const Parser *parser) {
+  if (parser->index >= parser->tokens->count) {
+    return &parser->tokens->items[parser->tokens->count - 1U];
+  }
+  return &parser->tokens->items[parser->index];
+}
+
+static int check(const Parser *parser, const char *lexeme) {
+  return strcmp(current(parser)->lexeme, lexeme) == 0;
+}
+
+static int match(Parser *parser, const char *lexeme) {
+  if (!check(parser, lexeme)) return 0;
+  parser->index++;
+  return 1;
+}
+
+static const CToken *advance_token(Parser *parser) {
+  const CToken *token = current(parser);
+  if (parser->index + 1U < parser->tokens->count) parser->index++;
+  return token;
+}
+
+static int expect(Parser *parser, const char *lexeme, const char *description) {
+  if (match(parser, lexeme)) return 1;
+  const CToken *token = current(parser);
+  (void)add_error(parser, "متوقع %s عند السطر %zu والعمود %zu، ووجد %s",
+                  description, token->line, token->column, token->lexeme);
+  return 0;
+}
+
+static CAstNode *new_node(CAstKind kind, const CToken *token) {
+  CAstNode *node = calloc(1U, sizeof(*node));
+  if (node == NULL) return NULL;
+  node->kind = kind;
+  node->offset = token->offset;
+  node->line = token->line;
+  node->column = token->column;
+  return node;
+}
+
+static int list_push(CAstNodeList *list, CAstNode *node) {
+  CAstNode **items = realloc(list->items,
+                             (list->count + 1U) * sizeof(*items));
+  if (items == NULL) return 0;
+  list->items = items;
+  list->items[list->count++] = node;
+  return 1;
+}
+
+static CTypeSpec *named_type(const char *name) {
+  CTypeSpec *type = calloc(1U, sizeof(*type));
+  if (type == NULL) return NULL;
+  type->kind = C_TYPE_NAMED;
+  type->name = copy_string(name);
+  if (type->name == NULL) {
+    free(type);
+    return NULL;
+  }
+  return type;
+}
+
+static CAstNode *parse_expression(Parser *parser);
+
+static CAstNode *parse_primary(Parser *parser) {
+  const CToken *token = current(parser);
+  if (token->kind == C_TOKEN_INTEGER || token->kind == C_TOKEN_REAL ||
+      token->kind == C_TOKEN_STRING || token->kind == C_TOKEN_CHARACTER ||
+      token->kind == C_TOKEN_BOOLEAN) {
+    advance_token(parser);
+    CAstNode *node = new_node(C_AST_LITERAL, token);
+    if (node == NULL) return NULL;
+    node->data.literal.value = copy_string(token->lexeme);
+    node->data.literal.literal_kind = token->kind;
+    if (node->data.literal.value == NULL) {
+      c_ast_free(node);
+      return NULL;
+    }
+    return node;
+  }
+  if (token->kind == C_TOKEN_IDENTIFIER) {
+    advance_token(parser);
+    CAstNode *node = new_node(C_AST_VARIABLE_REFERENCE, token);
+    if (node == NULL) return NULL;
+    node->data.reference.name = copy_string(token->lexeme);
+    if (node->data.reference.name == NULL) {
+      c_ast_free(node);
+      return NULL;
+    }
+    return node;
+  }
+  if (match(parser, "(")) {
+    CAstNode *node = parse_expression(parser);
+    (void)expect(parser, ")", "القوس )");
+    return node;
+  }
+  (void)add_error(parser, "القيمة غير صالحة داخل التعبير عند السطر %zu",
+                  token->line);
+  advance_token(parser);
+  return NULL;
+}
+
+static CAstNode *parse_unary(Parser *parser) {
+  if (check(parser, "!") || check(parser, "-") || check(parser, "+")) {
+    const CToken *operator = advance_token(parser);
+    CAstNode *node = new_node(C_AST_UNARY, operator);
+    if (node == NULL) return NULL;
+    node->data.unary.operator = copy_string(operator->lexeme);
+    node->data.unary.operand = parse_unary(parser);
+    if (node->data.unary.operator == NULL || node->data.unary.operand == NULL) {
+      c_ast_free(node);
+      return NULL;
+    }
+    return node;
+  }
+  return parse_primary(parser);
+}
+
+static CAstNode *parse_binary(Parser *parser, int multiplication) {
+  CAstNode *left = parse_unary(parser);
+  while (check(parser, multiplication ? "*" : "+") ||
+         check(parser, multiplication ? "/" : "-") ||
+         (multiplication && check(parser, "%"))) {
+    const CToken *operator = advance_token(parser);
+    CAstNode *right = parse_unary(parser);
+    CAstNode *node = new_node(C_AST_BINARY, operator);
+    if (node == NULL || right == NULL || left == NULL) {
+      c_ast_free(node);
+      c_ast_free(left);
+      c_ast_free(right);
+      return NULL;
+    }
+    node->data.binary.left = left;
+    node->data.binary.operator = copy_string(operator->lexeme);
+    node->data.binary.right = right;
+    if (node->data.binary.operator == NULL) {
+      c_ast_free(node);
+      return NULL;
+    }
+    left = node;
+  }
+  return left;
+}
+
+static CAstNode *parse_expression(Parser *parser) {
+  CAstNode *left = parse_binary(parser, 1);
+  while (check(parser, "+") || check(parser, "-")) {
+    const CToken *operator = advance_token(parser);
+    CAstNode *right = parse_binary(parser, 1);
+    CAstNode *node = new_node(C_AST_BINARY, operator);
+    if (node == NULL || right == NULL || left == NULL) {
+      c_ast_free(node);
+      c_ast_free(left);
+      c_ast_free(right);
+      return NULL;
+    }
+    node->data.binary.left = left;
+    node->data.binary.operator = copy_string(operator->lexeme);
+    node->data.binary.right = right;
+    if (node->data.binary.operator == NULL) {
+      c_ast_free(node);
+      return NULL;
+    }
+    left = node;
+  }
+  return left;
+}
+
+static CAstNode *parse_variable(Parser *parser, const CToken *start) {
+  char **names = NULL;
+  size_t count = 0U;
+  do {
+    const CToken *name = current(parser);
+    if (name->kind != C_TOKEN_IDENTIFIER) {
+      (void)add_error(parser, "متوقع اسم المتغير");
+      free(names);
+      return NULL;
+    }
+    char **next = realloc(names, (count + 1U) * sizeof(*next));
+    if (next == NULL) {
+      free(names);
+      return NULL;
+    }
+    names = next;
+    names[count] = copy_string(name->lexeme);
+    if (names[count] == NULL) {
+      for (size_t index = 0U; index < count; index++) free(names[index]);
+      free(names);
+      return NULL;
+    }
+    count++;
+    advance_token(parser);
+  } while (match(parser, ","));
+  if (!expect(parser, ":", "النقطتين :")) goto fail;
+  const CToken *type_token = current(parser);
+  if (type_token->kind != C_TOKEN_IDENTIFIER &&
+      type_token->kind != C_TOKEN_KEYWORD) {
+    (void)add_error(parser, "متوقع نوع المتغير");
+    goto fail;
+  }
+  advance_token(parser);
+  if (!expect(parser, ";", "الفاصلة المنقوطة ;")) goto fail;
+  CAstNode *node = new_node(C_AST_VARIABLE_DECLARATION, start);
+  if (node == NULL) goto fail;
+  node->data.variable.names = names;
+  node->data.variable.name_count = count;
+  node->data.variable.type = named_type(type_token->lexeme);
+  if (node->data.variable.type == NULL) {
+    c_ast_free(node);
+    return NULL;
+  }
+  return node;
+fail:
+  for (size_t index = 0U; index < count; index++) free(names[index]);
+  free(names);
+  return NULL;
+}
+
+static CAstNode *parse_statement(Parser *parser) {
+  const CToken *start = current(parser);
+  CAstNode *node = NULL;
+  if (match(parser, ";")) return new_node(C_AST_EMPTY, start);
+  if (match(parser, "اطبع")) {
+    node = new_node(C_AST_PRINT, start);
+    if (node == NULL) return NULL;
+    if (!expect(parser, "(", "القوس (")) goto fail;
+    if (!check(parser, ")")) {
+      do {
+        CAstNode *value = parse_expression(parser);
+        if (value == NULL || !list_push(&node->data.print.values, value)) {
+          c_ast_free(value);
+          goto fail;
+        }
+      } while (match(parser, ","));
+    }
+    if (!expect(parser, ")", "القوس )") ||
+        !expect(parser, ";", "الفاصلة المنقوطة ;")) goto fail;
+    return node;
+  }
+  if (start->kind == C_TOKEN_IDENTIFIER) {
+    advance_token(parser);
+    if (!expect(parser, "=", "علامة الإسناد =")) return NULL;
+    node = new_node(C_AST_ASSIGNMENT, start);
+    if (node == NULL) return NULL;
+    node->data.assignment.name = copy_string(start->lexeme);
+    node->data.assignment.expression = parse_expression(parser);
+    if (node->data.assignment.name == NULL ||
+        node->data.assignment.expression == NULL ||
+        !expect(parser, ";", "الفاصلة المنقوطة ;")) {
+      c_ast_free(node);
+      return NULL;
+    }
+    return node;
+  }
+  (void)add_error(parser, "تعليمة غير متوقعة: %s", start->lexeme);
+  advance_token(parser);
+  return NULL;
+fail:
+  c_ast_free(node);
+  return NULL;
+}
+
+int c_parse(const CLexResult *tokens, CParseResult *result) {
+  if (tokens == NULL || result == NULL || tokens->count == 0U) return 0;
+  memset(result, 0, sizeof(*result));
+  Parser parser = {.tokens = tokens, .result = result};
+  const CToken *start = current(&parser);
+  if (!expect(&parser, "برنامج", "الكلمة برنامج")) return 1;
+  const CToken *name = current(&parser);
+  if (name->kind != C_TOKEN_IDENTIFIER) {
+    (void)add_error(&parser, "متوقع اسم البرنامج");
+    return 1;
+  }
+  advance_token(&parser);
+  (void)match(&parser, ";");
+  if (!expect(&parser, "{", "القوس {") ) return 1;
+  CAstNode *program = new_node(C_AST_PROGRAM, start);
+  if (program == NULL) return 0;
+  program->data.program.name = copy_string(name->lexeme);
+  if (program->data.program.name == NULL) {
+    c_ast_free(program);
+    return 0;
+  }
+  while (!check(&parser, "}") && current(&parser)->kind != C_TOKEN_EOF) {
+    CAstNode *node;
+    if (match(&parser, "متغير")) {
+      node = parse_variable(&parser, start);
+    } else {
+      node = parse_statement(&parser);
+    }
+    if (node == NULL || !list_push(
+        (node != NULL && node->kind == C_AST_VARIABLE_DECLARATION)
+            ? &program->data.program.declarations
+            : &program->data.program.statements,
+        node)) {
+      c_ast_free(node);
+      break;
+    }
+  }
+  if (!expect(&parser, "}", "القوس }") || !expect(&parser, ".", "النقطة .")) {
+    c_ast_free(program);
+    return 1;
+  }
+  result->program = program;
+  return 1;
+}
+
+void c_parse_result_free(CParseResult *result) {
+  if (result == NULL) return;
+  c_ast_free(result->program);
+  for (size_t index = 0U; index < result->diagnostic_count; index++) {
+    free(result->diagnostics[index]);
+  }
+  free(result->diagnostics);
+  memset(result, 0, sizeof(*result));
+}
