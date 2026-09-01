@@ -1,0 +1,151 @@
+#include "semantic.h"
+
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct {
+  CSemanticResult *result;
+} Analyzer;
+
+static char *duplicate(const char *value) {
+  const size_t length = strlen(value);
+  char *copy = malloc(length + 1U);
+  if (copy == NULL) return NULL;
+  memcpy(copy, value, length + 1U);
+  return copy;
+}
+
+static int diagnostic(Analyzer *analyzer, const char *format, ...) {
+  CSemanticResult *result = analyzer->result;
+  if (result->diagnostic_count == result->diagnostic_capacity) {
+    const size_t capacity = result->diagnostic_capacity == 0U
+        ? 4U
+        : result->diagnostic_capacity * 2U;
+    char **items = realloc(result->diagnostics, capacity * sizeof(*items));
+    if (items == NULL) return 0;
+    result->diagnostics = items;
+    result->diagnostic_capacity = capacity;
+  }
+  char buffer[256];
+  va_list arguments;
+  va_start(arguments, format);
+  (void)vsnprintf(buffer, sizeof(buffer), format, arguments);
+  va_end(arguments);
+  result->diagnostics[result->diagnostic_count] = duplicate(buffer);
+  if (result->diagnostics[result->diagnostic_count] == NULL) return 0;
+  result->diagnostic_count++;
+  return 1;
+}
+
+static const CSymbol *find_symbol(const CSemanticResult *result,
+                                  const char *name) {
+  for (size_t index = 0U; index < result->count; index++) {
+    if (strcmp(result->items[index].name, name) == 0) return &result->items[index];
+  }
+  return NULL;
+}
+
+static int add_symbol(Analyzer *analyzer, const char *name, const char *type,
+                      const CAstNode *node) {
+  CSemanticResult *result = analyzer->result;
+  if (find_symbol(result, name) != NULL) {
+    return diagnostic(analyzer, "تعريف مكرر للرمز: %s", name);
+  }
+  if (result->count == result->capacity) {
+    const size_t capacity = result->capacity == 0U ? 8U : result->capacity * 2U;
+    CSymbol *items = realloc(result->items, capacity * sizeof(*items));
+    if (items == NULL) return 0;
+    result->items = items;
+    result->capacity = capacity;
+  }
+  CSymbol *symbol = &result->items[result->count++];
+  symbol->name = duplicate(name);
+  symbol->type = duplicate(type);
+  symbol->offset = node->offset;
+  symbol->line = node->line;
+  symbol->column = node->column;
+  if (symbol->name == NULL || symbol->type == NULL) return 0;
+  return 1;
+}
+
+static int check_node(Analyzer *analyzer, const CAstNode *node);
+
+static int check_list(Analyzer *analyzer, const CAstNodeList *list) {
+  for (size_t index = 0U; index < list->count; index++) {
+    if (!check_node(analyzer, list->items[index])) return 0;
+  }
+  return 1;
+}
+
+static int check_expression(Analyzer *analyzer, const CAstNode *node) {
+  if (node == NULL) return 0;
+  switch (node->kind) {
+    case C_AST_LITERAL:
+      return 1;
+    case C_AST_VARIABLE_REFERENCE:
+      if (find_symbol(analyzer->result, node->data.reference.name) == NULL) {
+        return diagnostic(analyzer, "رمز غير معرف: %s",
+                          node->data.reference.name);
+      }
+      return 1;
+    case C_AST_BINARY:
+      return check_expression(analyzer, node->data.binary.left) &&
+          check_expression(analyzer, node->data.binary.right);
+    case C_AST_UNARY:
+      return check_expression(analyzer, node->data.unary.operand);
+    default:
+      return diagnostic(analyzer, "عقدة غير صالحة داخل التعبير");
+  }
+}
+
+static int check_node(Analyzer *analyzer, const CAstNode *node) {
+  if (node == NULL) return 0;
+  switch (node->kind) {
+    case C_AST_VARIABLE_DECLARATION:
+      for (size_t index = 0U; index < node->data.variable.name_count; index++) {
+        if (!add_symbol(analyzer, node->data.variable.names[index],
+                        node->data.variable.type->name, node)) return 0;
+      }
+      return 1;
+    case C_AST_ASSIGNMENT:
+      if (find_symbol(analyzer->result, node->data.assignment.name) == NULL) {
+        return diagnostic(analyzer, "رمز غير معرف: %s",
+                          node->data.assignment.name);
+      }
+      return check_expression(analyzer, node->data.assignment.expression);
+    case C_AST_PRINT:
+      for (size_t index = 0U; index < node->data.print.values.count; index++) {
+        if (!check_expression(analyzer, node->data.print.values.items[index])) return 0;
+      }
+      return 1;
+    case C_AST_EMPTY:
+      return 1;
+    default:
+      return diagnostic(analyzer, "تعليمة غير مدعومة في Semantic C الحالية");
+  }
+}
+
+int c_analyze_semantics(const CAstNode *program, CSemanticResult *result) {
+  if (program == NULL || result == NULL || program->kind != C_AST_PROGRAM) return 0;
+  memset(result, 0, sizeof(*result));
+  Analyzer analyzer = {.result = result};
+  if (!check_list(&analyzer, &program->data.program.declarations)) return 0;
+  if (!check_list(&analyzer, &program->data.program.statements)) return 0;
+  return 1;
+}
+
+void c_semantic_result_free(CSemanticResult *result) {
+  if (result == NULL) return;
+  for (size_t index = 0U; index < result->count; index++) {
+    free(result->items[index].name);
+    free(result->items[index].type);
+  }
+  for (size_t index = 0U; index < result->diagnostic_count; index++) {
+    free(result->diagnostics[index]);
+  }
+  free(result->items);
+  free(result->diagnostics);
+  memset(result, 0, sizeof(*result));
+}
