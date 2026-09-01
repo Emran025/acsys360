@@ -149,6 +149,8 @@ static int emit_statements(const CAstNodeList *list, const CSemanticResult *sema
           !append(text, length, capacity, "    mov rcx, rax\n    mov rax, [rbp-%d]\n    cmp rax, rcx\n    j%s L%zu\n", slot, descending ? "l" : "g", end_label) ||
           !emit_statements(&statement->data.repeat.body, semantic, result, text, length, capacity, label) ||
           !append(text, length, capacity, "    mov rax, [rbp-%d]\n    %s rax, 1\n    mov [rbp-%d], rax\n    jmp L%zu\nL%zu:\n", slot, descending ? "sub" : "add", slot, begin_label, end_label)) return 0;
+    } else if (statement->kind == C_AST_CALL) {
+      if (!append(text, length, capacity, "    call %s\n", statement->data.call.name)) return 0;
     } else if (statement->kind == C_AST_WHILE) {
       const size_t begin_label = (*label)++; const size_t end_label = (*label)++;
       if (!append(text, length, capacity, "L%zu:\n", begin_label) ||
@@ -191,7 +193,22 @@ int c_generate_nasm_x86_64(const CAstNode *program,
   if (!emit_statements(&program->data.program.statements, semantic, result,
                        &result->text, &length, &capacity, &label)) return 1;
   if (!append(&result->text, &length, &capacity,
-              "    xor eax, eax\n    leave\n    ret\n"
+              "    xor eax, eax\n    leave\n    ret\n")) {
+    c_assembly_result_free(result);
+    return 0;
+  }
+  for (size_t index = 0U; index < program->data.program.declarations.count; index++) {
+    const CAstNode *declaration = program->data.program.declarations.items[index];
+    if (declaration->kind != C_AST_PROCEDURE_DECLARATION) continue;
+    if (!append(&result->text, &length, &capacity, "%s:\n", declaration->data.procedure.name) ||
+        !emit_statements(&declaration->data.procedure.body, semantic, result,
+                         &result->text, &length, &capacity, &label) ||
+        !append(&result->text, &length, &capacity, "    ret\n")) {
+      c_assembly_result_free(result);
+      return 0;
+    }
+  }
+  if (!append(&result->text, &length, &capacity,
               "section .note.GNU-stack noalloc noexec nowrite progbits\n")) {
     c_assembly_result_free(result);
     return 0;

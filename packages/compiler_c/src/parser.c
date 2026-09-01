@@ -781,7 +781,8 @@ int c_parse(const CLexResult *tokens, CParseResult *result) {
     if (node == NULL || !list_push(
         (node != NULL && (node->kind == C_AST_VARIABLE_DECLARATION ||
                           node->kind == C_AST_CONSTANT_DECLARATION ||
-                          node->kind == C_AST_TYPE_DECLARATION))
+                          node->kind == C_AST_TYPE_DECLARATION ||
+                          node->kind == C_AST_PROCEDURE_DECLARATION))
             ? &program->data.program.declarations
             : &program->data.program.statements,
         node)) {
