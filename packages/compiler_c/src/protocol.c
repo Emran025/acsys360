@@ -58,6 +58,26 @@ static char *json_value(const char **cursor) {
   return value;
 }
 
+static char *extract_named_string(const char *payload, const char *name) {
+  char needle[96];
+  (void)snprintf(needle, sizeof(needle), "\"%s\"", name);
+  const char *cursor = strstr(payload, needle);
+  if (cursor == NULL) return NULL;
+  cursor = strchr(cursor, ':');
+  if (cursor == NULL) return NULL;
+  cursor++;
+  return json_value(&cursor);
+}
+
+static char *extract_first_path(const char *payload) {
+  const char *cursor = strstr(payload, "\"sourcePaths\"");
+  if (cursor == NULL) return NULL;
+  cursor = strchr(cursor, '[');
+  if (cursor == NULL) return NULL;
+  cursor++;
+  return json_value(&cursor);
+}
+
 static int extract_first_source(const char *payload, char **path, char **source) {
   const char *section = strstr(payload, "\"sourceTexts\"");
   if (section == NULL) return 0;
@@ -72,6 +92,39 @@ static int extract_first_source(const char *payload, char **path, char **source)
   cursor++;
   *source = json_value(&cursor);
   if (*source == NULL) { free(*path); *path = NULL; return 0; }
+  return 1;
+}
+
+static int load_request_source(const char *payload, char **path, char **source) {
+  if (extract_first_source(payload, path, source)) return 1;
+  *path = extract_first_path(payload);
+  if (*path == NULL) return 0;
+  char *root = extract_named_string(payload, "rootPath");
+  if (root == NULL) { free(*path); *path = NULL; return 0; }
+  size_t length = strlen(root) + strlen(*path) + 2U;
+  char *filename = malloc(length);
+  if (filename == NULL) { free(root); free(*path); *path = NULL; return 0; }
+  (void)snprintf(filename, length, "%s/%s", root, *path);
+  FILE *file = fopen(filename, "rb");
+  free(root);
+  free(filename);
+  if (file == NULL) { free(*path); *path = NULL; return 0; }
+  size_t capacity = 1024U;
+  size_t used = 0U;
+  *source = malloc(capacity);
+  if (*source == NULL) { fclose(file); free(*path); *path = NULL; return 0; }
+  int character;
+  while ((character = fgetc(file)) != EOF) {
+    if (used + 1U >= capacity) {
+      capacity *= 2U;
+      char *next = realloc(*source, capacity);
+      if (next == NULL) { fclose(file); free(*source); *source = NULL; free(*path); *path = NULL; return 0; }
+      *source = next;
+    }
+    (*source)[used++] = (char)character;
+  }
+  fclose(file);
+  (*source)[used] = '\0';
   return 1;
 }
 
@@ -183,7 +236,7 @@ static void emit_tokens(const CLexResult *lexical) {
 int c_run_protocol(const char *payload) {
   char *source_path = NULL;
   char *source = NULL;
-  if (payload == NULL || !extract_first_source(payload, &source_path, &source)) {
+  if (payload == NULL || !load_request_source(payload, &source_path, &source)) {
     fputs("{\"protocolVersion\":\"0.5.0\",\"success\":false,\"diagnostics\":[", stdout);
     emit_diagnostic("protocol", "P002", "يجب أن يحتوي الطلب على sourceTexts صالح", "");
     fputs("]}\n", stdout);
