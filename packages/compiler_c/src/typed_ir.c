@@ -124,36 +124,62 @@ static CIrType infer(const CAstNode *node, const CSemanticResult *semantic,
   return C_IR_UNKNOWN;
 }
 
+static int build_statements(const CAstNodeList *list, const CSemanticResult *semantic,
+                             CTypedIrResult *result, size_t *temporary, size_t *label) {
+  for (size_t index = 0U; index < list->count; index++) {
+    const CAstNode *statement = list->items[index];
+    if (statement->kind == C_AST_EMPTY) continue;
+    if (statement->kind == C_AST_ASSIGNMENT) {
+      char value[128];
+      const CIrType type = infer(statement->data.assignment.expression, semantic, result, temporary, value, sizeof(value));
+      if (type == C_IR_UNKNOWN || !push_line(result, "store %s: %s <- %s", statement->data.assignment.name, c_ir_type_name(type), value)) return 0;
+    } else if (statement->kind == C_AST_PRINT) {
+      for (size_t value_index = 0U; value_index < statement->data.print.values.count; value_index++) {
+        char value[128];
+        const CIrType type = infer(statement->data.print.values.items[value_index], semantic, result, temporary, value, sizeof(value));
+        if (type == C_IR_UNKNOWN || !push_line(result, "print %s: %s", c_ir_type_name(type), value)) return 0;
+      }
+    } else if (statement->kind == C_AST_IF) {
+      char condition[128];
+      const CIrType type = infer(statement->data.conditional.condition, semantic, result, temporary, condition, sizeof(condition));
+      const size_t else_label = (*label)++; const size_t end_label = (*label)++;
+      if (type == C_IR_UNKNOWN || !push_line(result, "ifFalse %s goto L%zu", condition, else_label) ||
+          !build_statements(&statement->data.conditional.then_branch, semantic, result, temporary, label) ||
+          !push_line(result, "goto L%zu", end_label) || !push_line(result, "L%zu:", else_label) ||
+          !build_statements(&statement->data.conditional.else_branch, semantic, result, temporary, label) ||
+          !push_line(result, "L%zu:", end_label)) return 0;
+    } else if (statement->kind == C_AST_WHILE) {
+      char condition[128]; const size_t begin_label = (*label)++; const size_t end_label = (*label)++;
+      if (!push_line(result, "L%zu:", begin_label) ||
+          infer(statement->data.loop.condition, semantic, result, temporary, condition, sizeof(condition)) == C_IR_UNKNOWN ||
+          !push_line(result, "ifFalse %s goto L%zu", condition, end_label) ||
+          !build_statements(&statement->data.loop.body, semantic, result, temporary, label) ||
+          !push_line(result, "goto L%zu", begin_label) || !push_line(result, "L%zu:", end_label)) return 0;
+    } else if (statement->kind == C_AST_REPEAT) {
+      char from[128]; char to[128]; const size_t begin_label = (*label)++; const size_t end_label = (*label)++;
+      if (infer(statement->data.repeat.from, semantic, result, temporary, from, sizeof(from)) == C_IR_UNKNOWN ||
+          infer(statement->data.repeat.to, semantic, result, temporary, to, sizeof(to)) == C_IR_UNKNOWN ||
+          !push_line(result, "store %s: integer <- %s", statement->data.repeat.variable, from) ||
+          !push_line(result, "L%zu:", begin_label) || !push_line(result, "if %s > %s goto L%zu", statement->data.repeat.variable, to, end_label) ||
+          !build_statements(&statement->data.repeat.body, semantic, result, temporary, label) ||
+          !push_line(result, "goto L%zu", begin_label) || !push_line(result, "L%zu:", end_label)) return 0;
+    } else if (statement->kind != C_AST_CALL) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
 int c_build_typed_ir(const CAstNode *program, const CSemanticResult *semantic,
                      CTypedIrResult *result) {
   if (program == NULL || semantic == NULL || result == NULL ||
       program->kind != C_AST_PROGRAM) return 0;
   memset(result, 0, sizeof(*result));
   size_t temporary = 0U;
-  for (size_t index = 0U; index < program->data.program.statements.count; index++) {
-    const CAstNode *statement = program->data.program.statements.items[index];
-    if (statement->kind == C_AST_ASSIGNMENT) {
-      char value[128];
-      const CIrType type = infer(statement->data.assignment.expression, semantic,
-                                 result, &temporary, value, sizeof(value));
-      if (type == C_IR_UNKNOWN ||
-          !push_line(result, "store %s: %s <- %s",
-                     statement->data.assignment.name, c_ir_type_name(type), value)) {
-        return 1;
-      }
-    } else if (statement->kind == C_AST_PRINT) {
-      for (size_t value_index = 0U;
-           value_index < statement->data.print.values.count; value_index++) {
-        char value[128];
-        const CIrType type = infer(statement->data.print.values.items[value_index],
-                                   semantic, result, &temporary, value,
-                                   sizeof(value));
-        if (type == C_IR_UNKNOWN ||
-            !push_line(result, "print %s: %s", c_ir_type_name(type), value)) {
-          return 1;
-        }
-      }
-    }
+  size_t label = 0U;
+  if (!build_statements(&program->data.program.statements, semantic, result, &temporary, &label)) {
+    (void)push_diagnostic(result, "تعليمة غير مدعومة في Typed IR C الحالية");
+    return 1;
   }
   return 1;
 }
