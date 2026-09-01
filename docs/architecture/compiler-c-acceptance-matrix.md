@@ -12,7 +12,7 @@
 |---|---|---|---|
 | C17 build | بناء نظيف مع `-Wall -Wextra -Werror -pedantic` | CMake على Linux وCI | منجز للـmilestone الحالي |
 | Lexer | جميع الكلمات والرموز والتعليقات والـspans مطابقة للمرجع | golden token fixtures | جزئي |
-| Parser/AST | كل declarations/statements/expressions وقيم AST ومواضعها مطابقة | parser fixtures وAST JSON golden | جزئي |
+| Parser/AST | كل declarations/statements/expressions وقيم AST ومواضعها مطابقة | parser fixtures وAST JSON golden | fixtures السليمة مكتملة؛ AST golden جزئي |
 | Diagnostics | نفس phase/code/severity/span والمعنى، مع رفض المصدر غير الصحيح | negative fixtures | جزئي |
 | Semantic/scopes | aliases، records، procedures، parameters، returns، arrays، project symbols | semantic matrix | جزئي |
 | TAC | temporaries، calls، branches، loops، labels، control-flow | TAC golden | جزئي |
@@ -20,14 +20,14 @@
 | Runtime | نفس execution output وحدود الخطوات والأخطاء | parity fixtures | غير منجز |
 | NASM | x86-64 NASM صحيح وقابل للتجميع والربط والتشغيل | `nasm` + `gcc` native test | integer subset فقط |
 | Project mode | ملفات متعددة وexternal procedures/types وentry path | multi-file fixtures | غير منجز |
-| Protocol compile | قراءة `CompilationRequest` وإرجاع كل حقول `CompilationResponse` | protocol round-trip tests | غير منجز؛ stub يرفض عمدًا |
+| Protocol compile | قراءة `CompilationRequest` وإرجاع كل حقول `CompilationResponse` | CTest protocol smoke وDart bundle smoke | أساس v0.5.0 منجز؛ multi-file وserialization الكامل جزئي |
 | Protocol assist | completion/help بنفس الحقول والاستبدالات | assist parity tests | غير منجز |
 | Flutter adapter | `ProcessCompilerRepository` يستخدم C دون تغيير domain/presentation | editor integration tests | غير منجز |
 | Release | executable C مضمّن في Windows/Linux/macOS مع smoke tests | release matrix | غير منجز |
 
 ## ما هو منجز فعليًا الآن
 
-المسار C الحالي مستقل وحقيقي: Lexer، AST، Parser محدود، Semantic محدود، TAC محدود، Typed IR محدود، وNASM backend محدود. ثبتت الاختبارات أن برنامجًا integer صغيرًا يولد Assembly، ويُجمع بـNASM، ويُربط، ويعمل على Linux. هذه النتيجة لا تعني اكتمال البديل.
+المسار C الحالي مستقل وحقيقي: Lexer، AST، Parser يغطي fixtures السليمة العشرة، Semantic للتعريفات والتدفق والاستدعاءات، protocol v0.5.0 أساسي، وNASM backend integer محدود. ثبتت الاختبارات أن برنامجًا integer صغيرًا يولد Assembly، ويُجمع بـNASM، ويُربط، ويعمل على Linux. هذه النتيجة لا تعني اكتمال البديل.
 
 ## ترتيب الإغلاق الإلزامي
 
