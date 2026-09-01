@@ -58,6 +58,14 @@ static char *json_value(const char **cursor) {
   return value;
 }
 
+static int has_protocol_v05(const char *payload) {
+  return strstr(payload, "\"protocolVersion\":\"0.5.0\"") != NULL;
+}
+
+static int has_source_paths(const char *payload) {
+  return strstr(payload, "\"sourcePaths\"") != NULL;
+}
+
 static char *extract_named_string(const char *payload, const char *name) {
   char needle[96];
   (void)snprintf(needle, sizeof(needle), "\"%s\"", name);
@@ -236,9 +244,10 @@ static void emit_tokens(const CLexResult *lexical) {
 int c_run_protocol(const char *payload) {
   char *source_path = NULL;
   char *source = NULL;
-  if (payload == NULL || !load_request_source(payload, &source_path, &source)) {
+  if (payload == NULL || !has_protocol_v05(payload) || !has_source_paths(payload) ||
+      !load_request_source(payload, &source_path, &source)) {
     fputs("{\"protocolVersion\":\"0.5.0\",\"success\":false,\"diagnostics\":[", stdout);
-    emit_diagnostic("protocol", "P002", "يجب أن يحتوي الطلب على sourceTexts صالح", "");
+    emit_diagnostic("protocol", "P002", "طلب Compilation غير صالح أو غير مكتمل", "");
     fputs("]}\n", stdout);
     return 64;
   }
