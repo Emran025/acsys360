@@ -36,6 +36,19 @@ jobs:
         working-directory: packages/compiler_contracts
         run: dart test
 
+  compiler-c:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build C compiler milestone
+        working-directory: packages/compiler_c
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel
+      - name: Test C compiler milestone
+        working-directory: packages/compiler_c
+        run: ctest --test-dir build --output-on-failure
+
   editor:
     runs-on: ubuntu-latest
     steps:
@@ -54,7 +67,7 @@ jobs:
       - run: flutter test
 
   desktop-build:
-    needs: [compiler-core, editor]
+    needs: [compiler-core, compiler-c, editor]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
