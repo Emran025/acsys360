@@ -1,1 +1,0 @@
-/usr/bin/cc -O3 -DNDEBUG CMakeFiles/arabicc_c.dir/src/main.c.o CMakeFiles/arabicc_c.dir/src/protocol.c.o CMakeFiles/arabicc_c.dir/src/lexer.c.o -o arabicc_c 

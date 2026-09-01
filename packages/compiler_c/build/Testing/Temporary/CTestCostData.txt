@@ -1,2 +1,0 @@
-arabicc_c_lexer_test 4 0.000235349
----
