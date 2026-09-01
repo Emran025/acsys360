@@ -39,3 +39,5 @@ add_test(NAME arabicc_c_typed_ir_test COMMAND arabicc_c_typed_ir_test)
 add_executable(arabicc_c_asm_test tests/asm_test.c src/lexer.c src/ast.c src/parser.c src/semantic.c src/tac.c src/typed_ir.c src/asm_x86_64.c)
 target_include_directories(arabicc_c_asm_test PRIVATE include)
 add_test(NAME arabicc_c_asm_test COMMAND arabicc_c_asm_test)
+add_test(NAME arabicc_c_protocol_smoke
+  COMMAND ${CMAKE_SOURCE_DIR}/../../tools/verify_compiler_c_protocol.sh $<TARGET_FILE:arabicc_c>)
