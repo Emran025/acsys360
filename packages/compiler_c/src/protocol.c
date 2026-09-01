@@ -249,7 +249,9 @@ static void emit_symbols(const CSemanticResult *semantic) {
     if (i != 0U) putchar(',');
     fputs("{\"name\":", stdout); json_string(semantic->items[i].name);
     fputs(",\"type\":", stdout); json_string(semantic->items[i].type);
-    fputs(",\"kind\":\"variable\"}", stdout);
+    fputs(",\"kind\":\"variable\",\"span\":{\"sourcePath\":\"\",\"offset\":", stdout);
+    printf("%zu,\"line\":%zu,\"column\":%zu,\"length\":0}}", semantic->items[i].offset,
+           semantic->items[i].line, semantic->items[i].column);
   }
   putchar(']');
 }
