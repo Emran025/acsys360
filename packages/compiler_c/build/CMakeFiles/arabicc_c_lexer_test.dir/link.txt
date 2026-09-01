@@ -1,0 +1,1 @@
+/usr/bin/cc -O3 -DNDEBUG CMakeFiles/arabicc_c_lexer_test.dir/tests/lexer_test.c.o CMakeFiles/arabicc_c_lexer_test.dir/src/lexer.c.o -o arabicc_c_lexer_test 
