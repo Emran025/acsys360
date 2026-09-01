@@ -267,13 +267,62 @@ static CAstNode *parse_binary(Parser *parser, int multiplication) {
   return left;
 }
 
-static CAstNode *parse_expression(Parser *parser) {
+static CAstNode *parse_additive(Parser *parser) {
   CAstNode *left = parse_binary(parser, 1);
   while (check(parser, "+") || check(parser, "-")) {
     const CToken *operator = advance_token(parser);
     CAstNode *right = parse_binary(parser, 1);
     CAstNode *node = new_node(C_AST_BINARY, operator);
     if (node == NULL || right == NULL || left == NULL) {
+      c_ast_free(node);
+      c_ast_free(left);
+      c_ast_free(right);
+      return NULL;
+    }
+    node->data.binary.left = left;
+    node->data.binary.operator = copy_string(operator->lexeme);
+    node->data.binary.right = right;
+    if (node->data.binary.operator == NULL) {
+      c_ast_free(node);
+      return NULL;
+    }
+    left = node;
+  }
+  return left;
+}
+
+static CAstNode *parse_comparison(Parser *parser) {
+  CAstNode *left = parse_additive(parser);
+  while (check(parser, "==") || check(parser, "!=") || check(parser, "<") ||
+         check(parser, "<=") || check(parser, ">") || check(parser, ">=")) {
+    const CToken *operator = advance_token(parser);
+    CAstNode *right = parse_additive(parser);
+    CAstNode *node = new_node(C_AST_BINARY, operator);
+    if (node == NULL || left == NULL || right == NULL) {
+      c_ast_free(node);
+      c_ast_free(left);
+      c_ast_free(right);
+      return NULL;
+    }
+    node->data.binary.left = left;
+    node->data.binary.operator = copy_string(operator->lexeme);
+    node->data.binary.right = right;
+    if (node->data.binary.operator == NULL) {
+      c_ast_free(node);
+      return NULL;
+    }
+    left = node;
+  }
+  return left;
+}
+
+static CAstNode *parse_expression(Parser *parser) {
+  CAstNode *left = parse_comparison(parser);
+  while (check(parser, "&&") || check(parser, "||")) {
+    const CToken *operator = advance_token(parser);
+    CAstNode *right = parse_comparison(parser);
+    CAstNode *node = new_node(C_AST_BINARY, operator);
+    if (node == NULL || left == NULL || right == NULL) {
       c_ast_free(node);
       c_ast_free(left);
       c_ast_free(right);
