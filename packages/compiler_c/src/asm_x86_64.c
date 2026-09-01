@@ -137,6 +137,18 @@ static int emit_statements(const CAstNodeList *list, const CSemanticResult *sema
           !append(text, length, capacity, "    jmp L%zu\nL%zu:\n", end_label, else_label) ||
           !emit_statements(&statement->data.conditional.else_branch, semantic, result, text, length, capacity, label) ||
           !append(text, length, capacity, "L%zu:\n", end_label)) return 0;
+    } else if (statement->kind == C_AST_REPEAT) {
+      const size_t begin_label = (*label)++; const size_t end_label = (*label)++;
+      const int descending = statement->data.repeat.step != NULL &&
+          statement->data.repeat.step->kind == C_AST_UNARY &&
+          strcmp(statement->data.repeat.step->data.unary.operator, "-") == 0;
+      const int slot = slot_for(semantic, statement->data.repeat.variable);
+      if (slot == 0 || !emit_expression(statement->data.repeat.from, semantic, text, length, capacity) ||
+          !append(text, length, capacity, "    mov [rbp-%d], rax\nL%zu:\n", slot, begin_label) ||
+          !emit_expression(statement->data.repeat.to, semantic, text, length, capacity) ||
+          !append(text, length, capacity, "    mov rcx, rax\n    mov rax, [rbp-%d]\n    cmp rax, rcx\n    j%s L%zu\n", slot, descending ? "l" : "g", end_label) ||
+          !emit_statements(&statement->data.repeat.body, semantic, result, text, length, capacity, label) ||
+          !append(text, length, capacity, "    mov rax, [rbp-%d]\n    %s rax, 1\n    mov [rbp-%d], rax\n    jmp L%zu\nL%zu:\n", slot, descending ? "sub" : "add", slot, begin_label, end_label)) return 0;
     } else if (statement->kind == C_AST_WHILE) {
       const size_t begin_label = (*label)++; const size_t end_label = (*label)++;
       if (!append(text, length, capacity, "L%zu:\n", begin_label) ||
