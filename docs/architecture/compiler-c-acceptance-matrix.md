@@ -15,8 +15,8 @@
 | Parser/AST | كل declarations/statements/expressions وقيم AST ومواضعها مطابقة | parser fixtures وAST JSON golden | fixtures السليمة مكتملة؛ AST golden جزئي |
 | Diagnostics | نفس phase/code/severity/span والمعنى، مع رفض المصدر غير الصحيح | negative fixtures | جزئي |
 | Semantic/scopes | aliases، records، procedures، parameters، returns، arrays، project symbols | semantic matrix | جزئي |
-| TAC | temporaries، calls، branches، loops، labels، control-flow | TAC golden | جزئي |
-| Typed IR | primitive/compound types وconversion وcontrol-flow validation | typed IR golden | جزئي |
+| TAC | temporaries، calls، branches، loops، labels، control-flow | CTest وTAC generation على AST | control-flow الأساسي منجز؛ golden parity جزئي |
+| Typed IR | primitive/compound types وconversion وcontrol-flow validation | CTest وTyped IR generation | control-flow الأساسي منجز؛ compound types وgolden parity جزئي |
 | Runtime | نفس execution output وحدود الخطوات والأخطاء | parity fixtures | غير منجز |
 | NASM | x86-64 NASM صحيح وقابل للتجميع والربط والتشغيل | `nasm` + `gcc` native test | integer subset فقط |
 | Project mode | ملفات متعددة وexternal procedures/types وentry path | multi-file fixtures | غير منجز |
