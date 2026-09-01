@@ -3,6 +3,7 @@
 #include "lexer.h"
 #include "parser.h"
 #include "semantic.h"
+#include "ast.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -87,6 +88,83 @@ static void emit_diagnostic(const char *phase, const char *code, const char *mes
   fputs(",\"offset\":0,\"line\":1,\"column\":1,\"length\":0}}", stdout);
 }
 
+typedef struct {
+  char *name;
+  long value;
+} RuntimeValue;
+
+static int eval_expression(const CAstNode *node, RuntimeValue *values, size_t count, long *out) {
+  if (node == NULL || out == NULL) return 0;
+  if (node->kind == C_AST_LITERAL && node->data.literal.literal_kind == C_TOKEN_INTEGER) {
+    char *end = NULL;
+    *out = strtol(node->data.literal.value, &end, 10);
+    return end != node->data.literal.value && *end == '\0';
+  }
+  if (node->kind == C_AST_VARIABLE_REFERENCE && node->data.reference.selectors.count == 0U) {
+    for (size_t i = 0U; i < count; i++) {
+      if (strcmp(values[i].name, node->data.reference.name) == 0) { *out = values[i].value; return 1; }
+    }
+    return 0;
+  }
+  if (node->kind == C_AST_BINARY) {
+    long left = 0; long right = 0;
+    if (!eval_expression(node->data.binary.left, values, count, &left) ||
+        !eval_expression(node->data.binary.right, values, count, &right)) return 0;
+    if (strcmp(node->data.binary.operator, "+") == 0) *out = left + right;
+    else if (strcmp(node->data.binary.operator, "-") == 0) *out = left - right;
+    else if (strcmp(node->data.binary.operator, "*") == 0) *out = left * right;
+    else if (strcmp(node->data.binary.operator, "/") == 0 && right != 0) *out = left / right;
+    else return 0;
+    return 1;
+  }
+  return 0;
+}
+
+static int emit_execution(const CAstNode *program, const CSemanticResult *semantic) {
+  RuntimeValue *values = calloc(semantic->count, sizeof(*values));
+  if (values == NULL) return 0;
+  for (size_t i = 0U; i < semantic->count; i++) {
+    values[i].name = semantic->items[i].name;
+    values[i].value = 0;
+  }
+  putchar('[');
+  int first = 1;
+  for (size_t i = 0U; i < program->data.program.statements.count; i++) {
+    const CAstNode *statement = program->data.program.statements.items[i];
+    if (statement->kind == C_AST_ASSIGNMENT && statement->data.assignment.selectors.count == 0U) {
+      long value = 0;
+      if (eval_expression(statement->data.assignment.expression, values, semantic->count, &value)) {
+        for (size_t j = 0U; j < semantic->count; j++) {
+          if (strcmp(values[j].name, statement->data.assignment.name) == 0) values[j].value = value;
+        }
+      }
+    } else if (statement->kind == C_AST_PRINT) {
+      for (size_t j = 0U; j < statement->data.print.values.count; j++) {
+        long value = 0;
+        if (eval_expression(statement->data.print.values.items[j], values, semantic->count, &value)) {
+          if (!first) putchar(',');
+          printf("\"%ld\"", value);
+          first = 0;
+        }
+      }
+    }
+  }
+  putchar(']');
+  free(values);
+  return 1;
+}
+
+static void emit_symbols(const CSemanticResult *semantic) {
+  putchar('[');
+  for (size_t i = 0U; i < semantic->count; i++) {
+    if (i != 0U) putchar(',');
+    fputs("{\"name\":", stdout); json_string(semantic->items[i].name);
+    fputs(",\"type\":", stdout); json_string(semantic->items[i].type);
+    fputs(",\"kind\":\"variable\"}", stdout);
+  }
+  putchar(']');
+}
+
 static void emit_tokens(const CLexResult *lexical) {
   putchar('[');
   for (size_t i = 0U; i < lexical->count; i++) {
@@ -145,7 +223,11 @@ int c_run_protocol(const char *payload) {
     json_string(source_path);
     putchar('}');
   } else fputs("null", stdout);
-  fputs(",\"symbolTable\":[],\"threeAddressCode\":[],\"assembly\":\"\",\"executionOutput\":[],\"artifacts\":[],\"intermediateRepresentation\":{\"kind\":\"program\",\"sourcePath\":", stdout);
+  fputs(",\"symbolTable\":", stdout);
+  if (semantic_ok) emit_symbols(&semantic); else fputs("[]", stdout);
+  fputs(",\"threeAddressCode\":[],\"assembly\":\"\",\"executionOutput\":", stdout);
+  if (semantic_ok && parse_ok && parsed.program != NULL) emit_execution(parsed.program, &semantic); else fputs("[]", stdout);
+  fputs(",\"artifacts\":[],\"intermediateRepresentation\":{\"kind\":\"program\",\"sourcePath\":", stdout);
   json_string(source_path);
   fputs("}}\n", stdout);
 
