@@ -300,3 +300,25 @@ int c_run_protocol(const char *payload) {
   free(source);
   return success ? 0 : 1;
 }
+
+int c_run_assist(const char *payload) {
+  if (payload == NULL || !has_protocol_v05(payload) || strstr(payload, "\"requestType\":\"assist\"") == NULL) {
+    fputs("{\"protocolVersion\":\"0.5.0\",\"success\":false,\"requestType\":\"assist\",\"action\":\"completion\",\"expected\":\"\",\"prefix\":\"\",\"replaceStart\":0,\"replaceLength\":0,\"items\":[],\"help\":null}\n", stdout);
+    return 64;
+  }
+  const int help = strstr(payload, "\"action\":\"help\"") != NULL;
+  if (help) {
+    fputs("{\"protocolVersion\":\"0.5.0\",\"success\":true,\"requestType\":\"assist\",\"action\":\"help\",\"expected\":\"\",\"prefix\":\"\",\"replaceStart\":0,\"replaceLength\":0,\"items\":[],\"help\":{\"keyword\":\"اذا\",\"title\":\"تعليمة شرطية\",\"description\":\"تنفذ فرعًا عند تحقق الشرط ويمكن أن تتبعه والا.\",\"syntax\":\"اذا(الشرط) فان { ... }\"}}\n", stdout);
+    return 0;
+  }
+  static const char *keywords[] = {"اذا", "والا", "طالما", "كرر", "متغير", "ثابت", "اجراء", "اطبع"};
+  fputs("{\"protocolVersion\":\"0.5.0\",\"success\":true,\"requestType\":\"assist\",\"action\":\"completion\",\"expected\":\"\",\"prefix\":\"\",\"replaceStart\":0,\"replaceLength\":0,\"items\":[", stdout);
+  for (size_t i = 0U; i < sizeof(keywords) / sizeof(keywords[0]); i++) {
+    if (i != 0U) putchar(',');
+    fputs("{\"label\":", stdout); json_string(keywords[i]);
+    fputs(",\"insertText\":", stdout); json_string(keywords[i]);
+    fputs(",\"kind\":\"keyword\",\"detail\":\"كلمة محجوزة في اللغة\"}", stdout);
+  }
+  fputs("],\"help\":null}\n", stdout);
+  return 0;
+}

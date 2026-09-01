@@ -31,6 +31,13 @@ static char *read_stdin(void) {
 }
 
 int main(int argc, char **argv) {
+  if (argc == 2 && strcmp(argv[1], "--assist") == 0) {
+    char *payload = read_stdin();
+    if (payload == NULL) return 70;
+    const int result = c_run_assist(payload);
+    free(payload);
+    return result;
+  }
   if (argc == 2 && strcmp(argv[1], "--protocol") == 0) {
     char *payload = read_stdin();
     if (payload == NULL) return 70;
@@ -82,6 +89,6 @@ int main(int argc, char **argv) {
     free(source);
     return success ? 0 : 70;
   }
-  fputs("usage: arabicc_c --protocol | --lex | --asm\\n", stderr);
+  fputs("usage: arabicc_c --protocol | --assist | --lex | --asm\\n", stderr);
   return 64;
 }

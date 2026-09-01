@@ -2,5 +2,6 @@
 #define ARABICC_PROTOCOL_H
 
 int c_run_protocol(const char *payload);
+int c_run_assist(const char *payload);
 
 #endif
