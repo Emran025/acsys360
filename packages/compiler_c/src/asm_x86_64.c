@@ -113,7 +113,16 @@ static int emit_expression(const CAstNode *node, const CSemanticResult *semantic
   return 0;
 }
 
-static int emit_statements(const CAstNodeList *list, const CSemanticResult *semantic,
+static const CAstNode *find_procedure(const CAstNode *program, const char *name) {
+  for (size_t index = 0U; index < program->data.program.declarations.count; index++) {
+    const CAstNode *declaration = program->data.program.declarations.items[index];
+    if (declaration->kind == C_AST_PROCEDURE_DECLARATION &&
+        strcmp(declaration->data.procedure.name, name) == 0) return declaration;
+  }
+  return NULL;
+}
+
+static int emit_statements(const CAstNode *program, const CAstNodeList *list, const CSemanticResult *semantic,
                            CAssemblyResult *result, char **text, size_t *length,
                            size_t *capacity, size_t *label) {
   for (size_t index = 0U; index < list->count; index++) {
@@ -133,9 +142,9 @@ static int emit_statements(const CAstNodeList *list, const CSemanticResult *sema
       const size_t else_label = (*label)++; const size_t end_label = (*label)++;
       if (!emit_expression(statement->data.conditional.condition, semantic, text, length, capacity) ||
           !append(text, length, capacity, "    test rax, rax\n    jz L%zu\n", else_label) ||
-          !emit_statements(&statement->data.conditional.then_branch, semantic, result, text, length, capacity, label) ||
+          !emit_statements(program, &statement->data.conditional.then_branch, semantic, result, text, length, capacity, label) ||
           !append(text, length, capacity, "    jmp L%zu\nL%zu:\n", end_label, else_label) ||
-          !emit_statements(&statement->data.conditional.else_branch, semantic, result, text, length, capacity, label) ||
+          !emit_statements(program, &statement->data.conditional.else_branch, semantic, result, text, length, capacity, label) ||
           !append(text, length, capacity, "L%zu:\n", end_label)) return 0;
     } else if (statement->kind == C_AST_REPEAT) {
       const size_t begin_label = (*label)++; const size_t end_label = (*label)++;
@@ -147,16 +156,25 @@ static int emit_statements(const CAstNodeList *list, const CSemanticResult *sema
           !append(text, length, capacity, "    mov [rbp-%d], rax\nL%zu:\n", slot, begin_label) ||
           !emit_expression(statement->data.repeat.to, semantic, text, length, capacity) ||
           !append(text, length, capacity, "    mov rcx, rax\n    mov rax, [rbp-%d]\n    cmp rax, rcx\n    j%s L%zu\n", slot, descending ? "l" : "g", end_label) ||
-          !emit_statements(&statement->data.repeat.body, semantic, result, text, length, capacity, label) ||
+          !emit_statements(program, &statement->data.repeat.body, semantic, result, text, length, capacity, label) ||
           !append(text, length, capacity, "    mov rax, [rbp-%d]\n    %s rax, 1\n    mov [rbp-%d], rax\n    jmp L%zu\nL%zu:\n", slot, descending ? "sub" : "add", slot, begin_label, end_label)) return 0;
     } else if (statement->kind == C_AST_CALL) {
+      const CAstNode *procedure = find_procedure(program, statement->data.call.name);
+      if (procedure == NULL || statement->data.call.arguments.count > procedure->data.procedure.parameter_count) return 0;
+      for (size_t argument = 0U; argument < statement->data.call.arguments.count; argument++) {
+        const CParameter *parameter = &procedure->data.procedure.parameters[argument];
+        if (parameter->by_reference) return 0;
+        if (!emit_expression(statement->data.call.arguments.items[argument], semantic, text, length, capacity)) return 0;
+        const int parameter_slot = slot_for(semantic, parameter->name);
+        if (parameter_slot == 0 || !append(text, length, capacity, "    mov [rbp-%d], rax\n", parameter_slot)) return 0;
+      }
       if (!append(text, length, capacity, "    call %s\n", statement->data.call.name)) return 0;
     } else if (statement->kind == C_AST_WHILE) {
       const size_t begin_label = (*label)++; const size_t end_label = (*label)++;
       if (!append(text, length, capacity, "L%zu:\n", begin_label) ||
           !emit_expression(statement->data.loop.condition, semantic, text, length, capacity) ||
           !append(text, length, capacity, "    test rax, rax\n    jz L%zu\n", end_label) ||
-          !emit_statements(&statement->data.loop.body, semantic, result, text, length, capacity, label) ||
+          !emit_statements(program, &statement->data.loop.body, semantic, result, text, length, capacity, label) ||
           !append(text, length, capacity, "    jmp L%zu\nL%zu:\n", begin_label, end_label)) return 0;
     } else {
       (void)diagnostic(result, "تعليمة غير مدعومة في NASM backend الحالي");
@@ -190,7 +208,7 @@ int c_generate_nasm_x86_64(const CAstNode *program,
     return 0;
   }
   size_t label = 0U;
-  if (!emit_statements(&program->data.program.statements, semantic, result,
+  if (!emit_statements(program, &program->data.program.statements, semantic, result,
                        &result->text, &length, &capacity, &label)) return 1;
   if (!append(&result->text, &length, &capacity,
               "    xor eax, eax\n    leave\n    ret\n")) {
@@ -201,7 +219,7 @@ int c_generate_nasm_x86_64(const CAstNode *program,
     const CAstNode *declaration = program->data.program.declarations.items[index];
     if (declaration->kind != C_AST_PROCEDURE_DECLARATION) continue;
     if (!append(&result->text, &length, &capacity, "%s:\n", declaration->data.procedure.name) ||
-        !emit_statements(&declaration->data.procedure.body, semantic, result,
+        !emit_statements(program, &declaration->data.procedure.body, semantic, result,
                          &result->text, &length, &capacity, &label) ||
         !append(&result->text, &length, &capacity, "    ret\n")) {
       c_assembly_result_free(result);
