@@ -165,14 +165,8 @@ static int check_node(Analyzer *analyzer, const CAstNode *node) {
           return 0;
         }
       }
-      const int valid = check_list(analyzer, &node->data.procedure.body);
-      while (analyzer->result->count > saved_count) {
-        const size_t position = analyzer->result->count - 1U;
-        free(analyzer->result->items[position].name);
-        free(analyzer->result->items[position].type);
-        analyzer->result->count--;
-      }
-      return valid;
+      (void)saved_count;
+      return check_list(analyzer, &node->data.procedure.body);
     }
     case C_AST_PRINT:
       for (size_t index = 0U; index < node->data.print.values.count; index++) {
