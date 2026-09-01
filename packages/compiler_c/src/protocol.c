@@ -4,6 +4,9 @@
 #include "parser.h"
 #include "semantic.h"
 #include "ast.h"
+#include "tac.h"
+#include "typed_ir.h"
+#include "asm_x86_64.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -251,6 +254,15 @@ static void emit_symbols(const CSemanticResult *semantic) {
   putchar(']');
 }
 
+static void emit_lines(char **items, size_t count) {
+  putchar('[');
+  for (size_t index = 0U; index < count; index++) {
+    if (index != 0U) putchar(',');
+    json_string(items[index]);
+  }
+  putchar(']');
+}
+
 static void emit_tokens(const CLexResult *lexical) {
   putchar('[');
   for (size_t i = 0U; i < lexical->count; i++) {
@@ -284,9 +296,17 @@ int c_run_protocol(const char *payload) {
   const int parse_ok = lex_ok && c_parse(&lexical, &parsed);
   const int semantic_ok = parse_ok && parsed.program != NULL &&
       c_analyze_semantics(parsed.program, &semantic);
+  CTacResult tac = {0};
+  CTypedIrResult typed_ir = {0};
+  CAssemblyResult assembly = {0};
+  const int tac_ok = semantic_ok && c_generate_tac(parsed.program, &tac);
+  const int typed_ir_ok = semantic_ok && c_build_typed_ir(parsed.program, &semantic, &typed_ir);
+  const int assembly_ok = semantic_ok && c_generate_nasm_x86_64(parsed.program, &semantic, &assembly);
   const int success = lex_ok && parse_ok && semantic_ok &&
       lexical.diagnostic_count == 0U && parsed.diagnostic_count == 0U &&
-      semantic.diagnostic_count == 0U;
+      semantic.diagnostic_count == 0U && tac_ok && tac.diagnostic_count == 0U &&
+      typed_ir_ok && typed_ir.diagnostic_count == 0U && assembly_ok &&
+      assembly.diagnostic_count == 0U;
 
   printf("{\"protocolVersion\":\"0.5.0\",\"success\":%s,\"diagnostics\":[",
          success ? "true" : "false");
@@ -312,12 +332,21 @@ int c_run_protocol(const char *payload) {
   } else fputs("null", stdout);
   fputs(",\"symbolTable\":", stdout);
   if (semantic_ok) emit_symbols(&semantic); else fputs("[]", stdout);
-  fputs(",\"threeAddressCode\":[],\"assembly\":\"\",\"executionOutput\":", stdout);
+  fputs(",\"threeAddressCode\":", stdout);
+  if (tac_ok) emit_lines(tac.items, tac.count); else fputs("[]", stdout);
+  fputs(",\"assembly\":", stdout);
+  if (assembly_ok && assembly.text != NULL) json_string(assembly.text); else fputs("\"\"", stdout);
+  fputs(",\"executionOutput\":", stdout);
   if (semantic_ok && parse_ok && parsed.program != NULL) emit_execution(parsed.program, &semantic); else fputs("[]", stdout);
-  fputs(",\"artifacts\":[],\"intermediateRepresentation\":{\"kind\":\"program\",\"sourcePath\":", stdout);
+  fputs(",\"artifacts\":[],\"intermediateRepresentation\":{\"kind\":\"typed-ir\",\"items\":", stdout);
+  if (typed_ir_ok) emit_lines(typed_ir.items, typed_ir.count); else fputs("[]", stdout);
+  fputs(",\"sourcePath\":", stdout);
   json_string(source_path);
   fputs("}}\n", stdout);
 
+  c_assembly_result_free(&assembly);
+  c_typed_ir_result_free(&typed_ir);
+  c_tac_result_free(&tac);
   if (semantic_ok) c_semantic_result_free(&semantic);
   if (parse_ok) c_parse_result_free(&parsed);
   if (lex_ok) c_lex_result_free(&lexical);
