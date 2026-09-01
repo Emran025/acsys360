@@ -437,10 +437,81 @@ fail:
   return NULL;
 }
 
+static CAstNode *parse_statement(Parser *parser);
+
+static int parse_block(Parser *parser, CAstNodeList *body) {
+  if (!expect(parser, "{", "القوس {")) return 0;
+  while (!check(parser, "}") && current(parser)->kind != C_TOKEN_EOF) {
+    CAstNode *statement = parse_statement(parser);
+    if (statement == NULL || !list_push(body, statement)) {
+      c_ast_free(statement);
+      return 0;
+    }
+  }
+  return expect(parser, "}", "القوس }");
+}
+
+static CAstNode *parse_if_statement(Parser *parser, const CToken *start) {
+  CAstNode *node = new_node(C_AST_IF, start);
+  if (node == NULL || !expect(parser, "(", "القوس (")) {
+    c_ast_free(node);
+    return NULL;
+  }
+  node->data.conditional.condition = parse_expression(parser);
+  if (node->data.conditional.condition == NULL ||
+      !expect(parser, ")", "القوس )") || !expect(parser, "فان", "الكلمة فان") ||
+      !parse_block(parser, &node->data.conditional.then_branch)) {
+    c_ast_free(node);
+    return NULL;
+  }
+  if (match(parser, ";")) return node;
+  if (match(parser, "والا")) {
+    if (match(parser, "اذا")) {
+      CAstNode *nested = parse_if_statement(parser, current(parser));
+      if (nested == NULL || !list_push(&node->data.conditional.else_branch, nested)) {
+        c_ast_free(nested);
+        c_ast_free(node);
+        return NULL;
+      }
+    } else if (!parse_block(parser, &node->data.conditional.else_branch)) {
+      c_ast_free(node);
+      return NULL;
+    }
+    (void)match(parser, ";");
+  }
+  return node;
+}
+
+static CAstNode *parse_while_statement(Parser *parser, const CToken *start) {
+  CAstNode *node = new_node(C_AST_WHILE, start);
+  if (node == NULL || !expect(parser, "(", "القوس (")) {
+    c_ast_free(node);
+    return NULL;
+  }
+  node->data.loop.condition = parse_expression(parser);
+  if (node->data.loop.condition == NULL || !expect(parser, ")", "القوس )")) {
+    c_ast_free(node);
+    return NULL;
+  }
+  (void)match(parser, "استمر");
+  if (!parse_block(parser, &node->data.loop.body)) {
+    c_ast_free(node);
+    return NULL;
+  }
+  (void)match(parser, ";");
+  return node;
+}
+
 static CAstNode *parse_statement(Parser *parser) {
   const CToken *start = current(parser);
   CAstNode *node = NULL;
   if (match(parser, ";")) return new_node(C_AST_EMPTY, start);
+  if (match(parser, "اذا")) {
+    return parse_if_statement(parser, start);
+  }
+  if (match(parser, "طالما")) {
+    return parse_while_statement(parser, start);
+  }
   if (match(parser, "اطبع")) {
     node = new_node(C_AST_PRINT, start);
     if (node == NULL) return NULL;
