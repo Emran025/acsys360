@@ -86,21 +86,41 @@ static char *extract_first_path(const char *payload) {
   return json_value(&cursor);
 }
 
-static int extract_first_source(const char *payload, char **path, char **source) {
+static int extract_source_at(const char *payload, size_t wanted, char **path, char **source) {
   const char *section = strstr(payload, "\"sourceTexts\"");
   if (section == NULL) return 0;
   const char *cursor = strchr(section, ':');
   if (cursor == NULL) return 0;
-  cursor = strchr(cursor, '"');
+  cursor = strchr(cursor, '{');
   if (cursor == NULL) return 0;
-  *path = json_value(&cursor);
-  if (*path == NULL) return 0;
-  cursor = skip_space(cursor);
-  if (*cursor != ':') { free(*path); *path = NULL; return 0; }
   cursor++;
-  *source = json_value(&cursor);
-  if (*source == NULL) { free(*path); *path = NULL; return 0; }
-  return 1;
+  size_t index = 0U;
+  while (*cursor != '\0') {
+    cursor = skip_space(cursor);
+    if (*cursor == '}') return 0;
+    char *candidate_path = json_value(&cursor);
+    if (candidate_path == NULL) return 0;
+    cursor = skip_space(cursor);
+    if (*cursor != ':') { free(candidate_path); return 0; }
+    cursor++;
+    char *candidate_source = json_value(&cursor);
+    if (candidate_source == NULL) { free(candidate_path); return 0; }
+    if (index == wanted) {
+      *path = candidate_path;
+      *source = candidate_source;
+      return 1;
+    }
+    free(candidate_path);
+    free(candidate_source);
+    index++;
+    cursor = skip_space(cursor);
+    if (*cursor == ',') cursor++;
+  }
+  return 0;
+}
+
+static int extract_first_source(const char *payload, char **path, char **source) {
+  return extract_source_at(payload, 0U, path, source);
 }
 
 static int load_request_source(const char *payload, char **path, char **source) {
