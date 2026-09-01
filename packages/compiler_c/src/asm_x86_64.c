@@ -138,7 +138,7 @@ static int emit_statements(const CAstNodeList *list, const CSemanticResult *sema
           !emit_statements(&statement->data.conditional.else_branch, semantic, result, text, length, capacity, label) ||
           !append(text, length, capacity, "L%zu:\n", end_label)) return 0;
     } else if (statement->kind == C_AST_WHILE) {
-      const size_t begin_label = (*label)++; const size_t end_label = (*label++);
+      const size_t begin_label = (*label)++; const size_t end_label = (*label)++;
       if (!append(text, length, capacity, "L%zu:\n", begin_label) ||
           !emit_expression(statement->data.loop.condition, semantic, text, length, capacity) ||
           !append(text, length, capacity, "    test rax, rax\n    jz L%zu\n", end_label) ||
