@@ -108,6 +108,85 @@ static CTypeSpec *named_type(const char *name) {
 
 static CAstNode *parse_expression(Parser *parser);
 
+static CTypeSpec *parse_type_spec(Parser *parser) {
+  const CToken *token = current(parser);
+  if (match(parser, "قائمة")) {
+    if (!expect(parser, "[", "القوس [")) return NULL;
+    const CToken *length = current(parser);
+    if (length->kind != C_TOKEN_INTEGER) {
+      (void)add_error(parser, "متوقع طول القائمة");
+      return NULL;
+    }
+    const size_t count = (size_t)strtoull(length->lexeme, NULL, 10);
+    advance_token(parser);
+    if (!expect(parser, "]", "القوس ]") || !expect(parser, "من", "الكلمة من")) {
+      return NULL;
+    }
+    CTypeSpec *type = calloc(1U, sizeof(*type));
+    if (type == NULL) return NULL;
+    type->kind = C_TYPE_ARRAY;
+    type->length = count;
+    type->element_type = parse_type_spec(parser);
+    if (type->element_type == NULL) {
+      c_type_free(type);
+      return NULL;
+    }
+    return type;
+  }
+  if (match(parser, "سجل")) {
+    CTypeSpec *type = calloc(1U, sizeof(*type));
+    if (type == NULL) return NULL;
+    type->kind = C_TYPE_RECORD;
+    if (!expect(parser, "{", "القوس {") ) {
+      c_type_free(type);
+      return NULL;
+    }
+    while (!check(parser, "}") && current(parser)->kind != C_TOKEN_EOF) {
+      const CToken *field = current(parser);
+      if (field->kind != C_TOKEN_IDENTIFIER) {
+        (void)add_error(parser, "متوقع اسم حقل");
+        c_type_free(type);
+        return NULL;
+      }
+      CField *fields = realloc(type->fields.items,
+          (type->fields.count + 1U) * sizeof(*fields));
+      if (fields == NULL) {
+        c_type_free(type);
+        return NULL;
+      }
+      type->fields.items = fields;
+      type->fields.items[type->fields.count].name = copy_string(field->lexeme);
+      advance_token(parser);
+      if (!expect(parser, ":", "النقطتين :")) {
+        c_type_free(type);
+        return NULL;
+      }
+      type->fields.items[type->fields.count].type = parse_type_spec(parser);
+      if (type->fields.items[type->fields.count].name == NULL ||
+          type->fields.items[type->fields.count].type == NULL) {
+        c_type_free(type);
+        return NULL;
+      }
+      type->fields.count++;
+      if (!expect(parser, ";", "الفاصلة المنقوطة ;")) {
+        c_type_free(type);
+        return NULL;
+      }
+    }
+    if (!expect(parser, "}", "القوس }") ) {
+      c_type_free(type);
+      return NULL;
+    }
+    return type;
+  }
+  if (token->kind != C_TOKEN_IDENTIFIER && token->kind != C_TOKEN_KEYWORD) {
+    (void)add_error(parser, "متوقع نوع");
+    return NULL;
+  }
+  advance_token(parser);
+  return named_type(token->lexeme);
+}
+
 static CAstNode *parse_primary(Parser *parser) {
   const CToken *token = current(parser);
   if (token->kind == C_TOKEN_INTEGER || token->kind == C_TOKEN_REAL ||
@@ -238,19 +317,19 @@ static CAstNode *parse_variable(Parser *parser, const CToken *start) {
     advance_token(parser);
   } while (match(parser, ","));
   if (!expect(parser, ":", "النقطتين :")) goto fail;
-  const CToken *type_token = current(parser);
-  if (type_token->kind != C_TOKEN_IDENTIFIER &&
-      type_token->kind != C_TOKEN_KEYWORD) {
-    (void)add_error(parser, "متوقع نوع المتغير");
+  CTypeSpec *type = parse_type_spec(parser);
+  if (type == NULL || !expect(parser, ";", "الفاصلة المنقوطة ;")) {
+    c_type_free(type);
     goto fail;
   }
-  advance_token(parser);
-  if (!expect(parser, ";", "الفاصلة المنقوطة ;")) goto fail;
   CAstNode *node = new_node(C_AST_VARIABLE_DECLARATION, start);
-  if (node == NULL) goto fail;
+  if (node == NULL) {
+    c_type_free(type);
+    goto fail;
+  }
   node->data.variable.names = names;
   node->data.variable.name_count = count;
-  node->data.variable.type = named_type(type_token->lexeme);
+  node->data.variable.type = type;
   if (node->data.variable.type == NULL) {
     c_ast_free(node);
     return NULL;
