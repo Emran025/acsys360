@@ -438,11 +438,14 @@ fail:
 }
 
 static CAstNode *parse_statement(Parser *parser);
+static CAstNode *parse_variable(Parser *parser, const CToken *start);
 
 static int parse_block(Parser *parser, CAstNodeList *body) {
   if (!expect(parser, "{", "القوس {")) return 0;
   while (!check(parser, "}") && current(parser)->kind != C_TOKEN_EOF) {
-    CAstNode *statement = parse_statement(parser);
+    CAstNode *statement = match(parser, "متغير")
+        ? parse_variable(parser, current(parser))
+        : parse_statement(parser);
     if (statement == NULL || !list_push(body, statement)) {
       c_ast_free(statement);
       return 0;
@@ -478,6 +481,95 @@ static CAstNode *parse_if_statement(Parser *parser, const CToken *start) {
       return NULL;
     }
     (void)match(parser, ";");
+  }
+  return node;
+}
+
+static CAstNode *parse_procedure(Parser *parser, const CToken *start) {
+  CAstNode *node = new_node(C_AST_PROCEDURE_DECLARATION, start);
+  const CToken *name = current(parser);
+  if (node == NULL || name->kind != C_TOKEN_IDENTIFIER) {
+    c_ast_free(node);
+    (void)add_error(parser, "متوقع اسم الإجراء");
+    return NULL;
+  }
+  node->data.procedure.name = copy_string(name->lexeme);
+  advance_token(parser);
+  if (node->data.procedure.name == NULL || !expect(parser, "(", "القوس (")) {
+    c_ast_free(node);
+    return NULL;
+  }
+  while (!check(parser, ")") && current(parser)->kind != C_TOKEN_EOF) {
+    int by_reference = 0;
+    if (match(parser, "بالمرجع")) by_reference = 1;
+    else if (!match(parser, "بالقيمة")) {
+      (void)add_error(parser, "متوقع بالقيمة أو بالمرجع");
+      c_ast_free(node);
+      return NULL;
+    }
+    const CToken *parameter = current(parser);
+    if (parameter->kind != C_TOKEN_IDENTIFIER) {
+      (void)add_error(parser, "متوقع اسم المعامل");
+      c_ast_free(node);
+      return NULL;
+    }
+    CParameter *items = realloc(node->data.procedure.parameters,
+        (node->data.procedure.parameter_count + 1U) * sizeof(*items));
+    if (items == NULL) {
+      c_ast_free(node);
+      return NULL;
+    }
+    node->data.procedure.parameters = items;
+    CParameter *item = &items[node->data.procedure.parameter_count];
+    item->name = copy_string(parameter->lexeme);
+    item->by_reference = by_reference;
+    advance_token(parser);
+    if (!expect(parser, ":", "النقطتين :")) {
+      c_ast_free(node);
+      return NULL;
+    }
+    item->type = parse_type_spec(parser);
+    if (item->name == NULL || item->type == NULL) {
+      c_ast_free(node);
+      return NULL;
+    }
+    node->data.procedure.parameter_count++;
+    if (!match(parser, ";") && !match(parser, ",") && !check(parser, ")")) {
+      (void)add_error(parser, "متوقع فاصل المعاملات");
+      c_ast_free(node);
+      return NULL;
+    }
+  }
+  if (!expect(parser, ")", "القوس )") || !expect(parser, ";", "الفاصلة المنقوطة ;") ||
+      !parse_block(parser, &node->data.procedure.body)) {
+    c_ast_free(node);
+    return NULL;
+  }
+  (void)match(parser, ";");
+  return node;
+}
+
+static CAstNode *parse_call_statement(Parser *parser, const CToken *start) {
+  CAstNode *node = new_node(C_AST_CALL, start);
+  if (node == NULL) return NULL;
+  node->data.call.name = copy_string(start->lexeme);
+  if (node->data.call.name == NULL || !expect(parser, "(", "القوس (")) {
+    c_ast_free(node);
+    return NULL;
+  }
+  if (!check(parser, ")")) {
+    do {
+      CAstNode *argument = parse_expression(parser);
+      if (argument == NULL || !list_push(&node->data.call.arguments, argument)) {
+        c_ast_free(argument);
+        c_ast_free(node);
+        return NULL;
+      }
+    } while (match(parser, ","));
+  }
+  if (!expect(parser, ")", "القوس )") || !expect(parser, ";", "الفاصلة المنقوطة ;")) {
+    c_ast_free(node);
+    return NULL;
   }
   return node;
 }
@@ -577,7 +669,15 @@ static CAstNode *parse_statement(Parser *parser) {
     return node;
   }
   if (start->kind == C_TOKEN_IDENTIFIER) {
+    if (current(parser)->kind == C_TOKEN_IDENTIFIER) {
+      const CToken *next = current(parser);
+      (void)next;
+    }
     advance_token(parser);
+    if (match(parser, "(")) {
+      parser->index--;
+      return parse_call_statement(parser, start);
+    }
     if (!expect(parser, "=", "علامة الإسناد =")) return NULL;
     node = new_node(C_AST_ASSIGNMENT, start);
     if (node == NULL) return NULL;
@@ -628,6 +728,8 @@ int c_parse(const CLexResult *tokens, CParseResult *result) {
       node = parse_constant(&parser, start);
     } else if (match(&parser, "نوع")) {
       node = parse_type_declaration(&parser, start);
+    } else if (match(&parser, "اجراء")) {
+      node = parse_procedure(&parser, start);
     } else {
       node = parse_statement(&parser);
     }
