@@ -291,6 +291,53 @@ static CAstNode *parse_expression(Parser *parser) {
   return left;
 }
 
+static CAstNode *parse_constant(Parser *parser, const CToken *start) {
+  const CToken *name = current(parser);
+  if (name->kind != C_TOKEN_IDENTIFIER) {
+    (void)add_error(parser, "متوقع اسم الثابت");
+    return NULL;
+  }
+  advance_token(parser);
+  if (!expect(parser, "=", "علامة الإسناد =")) return NULL;
+  CAstNode *node = new_node(C_AST_CONSTANT_DECLARATION, start);
+  if (node == NULL) return NULL;
+  node->data.constant.name = copy_string(name->lexeme);
+  node->data.constant.value = parse_expression(parser);
+  if (node->data.constant.name == NULL || node->data.constant.value == NULL ||
+      !expect(parser, ";", "الفاصلة المنقوطة ;")) {
+    c_ast_free(node);
+    return NULL;
+  }
+  return node;
+}
+
+static CAstNode *parse_type_declaration(Parser *parser, const CToken *start) {
+  const CToken *name = current(parser);
+  if (name->kind != C_TOKEN_IDENTIFIER) {
+    (void)add_error(parser, "متوقع اسم النوع");
+    return NULL;
+  }
+  advance_token(parser);
+  if (!expect(parser, "=", "علامة الإسناد =")) return NULL;
+  CTypeSpec *type = parse_type_spec(parser);
+  if (type == NULL || !expect(parser, ";", "الفاصلة المنقوطة ;")) {
+    c_type_free(type);
+    return NULL;
+  }
+  CAstNode *node = new_node(C_AST_TYPE_DECLARATION, start);
+  if (node == NULL) {
+    c_type_free(type);
+    return NULL;
+  }
+  node->data.type_declaration.name = copy_string(name->lexeme);
+  node->data.type_declaration.type = type;
+  if (node->data.type_declaration.name == NULL) {
+    c_ast_free(node);
+    return NULL;
+  }
+  return node;
+}
+
 static CAstNode *parse_variable(Parser *parser, const CToken *start) {
   char **names = NULL;
   size_t count = 0U;
@@ -410,11 +457,17 @@ int c_parse(const CLexResult *tokens, CParseResult *result) {
     CAstNode *node;
     if (match(&parser, "متغير")) {
       node = parse_variable(&parser, start);
+    } else if (match(&parser, "ثابت")) {
+      node = parse_constant(&parser, start);
+    } else if (match(&parser, "نوع")) {
+      node = parse_type_declaration(&parser, start);
     } else {
       node = parse_statement(&parser);
     }
     if (node == NULL || !list_push(
-        (node != NULL && node->kind == C_AST_VARIABLE_DECLARATION)
+        (node != NULL && (node->kind == C_AST_VARIABLE_DECLARATION ||
+                          node->kind == C_AST_CONSTANT_DECLARATION ||
+                          node->kind == C_AST_TYPE_DECLARATION))
             ? &program->data.program.declarations
             : &program->data.program.statements,
         node)) {
