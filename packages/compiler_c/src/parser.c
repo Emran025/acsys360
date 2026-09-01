@@ -482,6 +482,50 @@ static CAstNode *parse_if_statement(Parser *parser, const CToken *start) {
   return node;
 }
 
+static CAstNode *parse_repeat_statement(Parser *parser, const CToken *start) {
+  CAstNode *node = new_node(C_AST_REPEAT, start);
+  if (node == NULL || !expect(parser, "(", "القوس (")) {
+    c_ast_free(node);
+    return NULL;
+  }
+  const CToken *variable = current(parser);
+  if (variable->kind != C_TOKEN_IDENTIFIER) {
+    (void)add_error(parser, "متوقع متغير التكرار");
+    c_ast_free(node);
+    return NULL;
+  }
+  node->data.repeat.variable = copy_string(variable->lexeme);
+  advance_token(parser);
+  if (node->data.repeat.variable == NULL || !expect(parser, "=", "علامة =")) {
+    c_ast_free(node);
+    return NULL;
+  }
+  node->data.repeat.from = parse_expression(parser);
+  if (node->data.repeat.from == NULL || !expect(parser, "الى", "الكلمة الى")) {
+    c_ast_free(node);
+    return NULL;
+  }
+  node->data.repeat.to = parse_expression(parser);
+  if (node->data.repeat.to == NULL) {
+    c_ast_free(node);
+    return NULL;
+  }
+  if (match(parser, "اضف")) {
+    node->data.repeat.step = parse_expression(parser);
+    if (node->data.repeat.step == NULL) {
+      c_ast_free(node);
+      return NULL;
+    }
+  }
+  if (!expect(parser, ")", "القوس )") ||
+      !parse_block(parser, &node->data.repeat.body)) {
+    c_ast_free(node);
+    return NULL;
+  }
+  (void)match(parser, ";");
+  return node;
+}
+
 static CAstNode *parse_while_statement(Parser *parser, const CToken *start) {
   CAstNode *node = new_node(C_AST_WHILE, start);
   if (node == NULL || !expect(parser, "(", "القوس (")) {
@@ -511,6 +555,9 @@ static CAstNode *parse_statement(Parser *parser) {
   }
   if (match(parser, "طالما")) {
     return parse_while_statement(parser, start);
+  }
+  if (match(parser, "كرر")) {
+    return parse_repeat_statement(parser, start);
   }
   if (match(parser, "اطبع")) {
     node = new_node(C_AST_PRINT, start);
