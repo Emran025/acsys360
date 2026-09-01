@@ -18,7 +18,7 @@
 | TAC | temporaries، calls، branches، loops، labels، control-flow | CTest وTAC generation على AST | control-flow الأساسي منجز؛ golden parity جزئي |
 | Typed IR | primitive/compound types وconversion وcontrol-flow validation | CTest وTyped IR generation | control-flow الأساسي منجز؛ compound types وgolden parity جزئي |
 | Runtime | نفس execution output وحدود الخطوات والأخطاء | parity fixtures | غير منجز |
-| NASM | x86-64 NASM صحيح وقابل للتجميع والربط والتشغيل | `nasm` + `gcc` native test على arithmetic وif | integer + comparison/control-flow subset؛ الأنواع المركبة والإجراءات متبقية |
+| NASM | x86-64 NASM صحيح وقابل للتجميع والربط والتشغيل | `nasm` + `gcc` native test على arithmetic وif وrepeat | integer + comparison/control-flow/repeat subset؛ الأنواع المركبة والإجراءات متبقية |
 | Project mode | ملفات متعددة وexternal procedures/types وentry path | multi-file fixtures | غير منجز |
 | Protocol compile | قراءة `CompilationRequest` وإرجاع كل حقول `CompilationResponse` | CTest protocol smoke وDart bundle smoke | أساس v0.5.0 منجز؛ multi-file وserialization الكامل جزئي |
 | Protocol assist | completion/help بنفس الحقول والاستبدالات | C executable `--assist` contract smoke؛ parity التفصيلي متبقٍ | endpoint منجز؛ parity جزئي |
