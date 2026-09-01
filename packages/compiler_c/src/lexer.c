@@ -144,6 +144,12 @@ static int is_punctuation(unsigned char value) {
       value == '.' || value == ':';
 }
 
+static int is_arabic_punctuation(const char *source, size_t offset) {
+  const unsigned char first = (unsigned char)source[offset];
+  const unsigned char second = (unsigned char)source[offset + 1U];
+  return first == 0xD8U && (second == 0x8CU || second == 0x9BU);
+}
+
 static int is_operator_char(unsigned char value) {
   return value == '+' || value == '-' || value == '*' || value == '/' ||
       value == '%' || value == '\\' || value == '^' || value == '!' ||
@@ -267,10 +273,19 @@ int c_lex(const char *source, CLexResult *result) {
                              start_logical, logical_offset, start_line, start_column)) return 0;
       continue;
     }
-    if (is_punctuation((unsigned char)source[offset])) {
+    if (is_punctuation((unsigned char)source[offset]) ||
+        is_arabic_punctuation(source, offset)) {
+      const int is_arabic = is_arabic_punctuation(source, offset);
       advance(source, &offset, &logical_offset, &line, &column);
       if (!push_simple_token(source, result, C_TOKEN_PUNCTUATION, start, offset,
                              start_logical, logical_offset, start_line, start_column)) return 0;
+      if (is_arabic) {
+        CToken *token = &result->items[result->count - 1U];
+        free(token->lexeme);
+        token->lexeme = duplicate_string(
+            (unsigned char)source[start + 1U] == 0x9BU ? ";" : ",");
+        if (token->lexeme == NULL) return 0;
+      }
       continue;
     }
     if (is_operator_char((unsigned char)source[offset])) {
