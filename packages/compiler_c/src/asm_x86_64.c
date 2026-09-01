@@ -98,8 +98,58 @@ static int emit_expression(const CAstNode *node, const CSemanticResult *semantic
       return append(text, length, capacity,
                     "    cqo\n    idiv rcx\n");
     }
+    const char *condition = NULL;
+    if (strcmp(node->data.binary.operator, ">") == 0) condition = "g";
+    else if (strcmp(node->data.binary.operator, "<") == 0) condition = "l";
+    else if (strcmp(node->data.binary.operator, ">=") == 0) condition = "ge";
+    else if (strcmp(node->data.binary.operator, "<=") == 0) condition = "le";
+    else if (strcmp(node->data.binary.operator, "==") == 0) condition = "e";
+    else if (strcmp(node->data.binary.operator, "!=") == 0) condition = "ne";
+    if (condition != NULL) {
+      return append(text, length, capacity,
+                    "    cmp rax, rcx\n    set%s al\n    movzx rax, al\n", condition);
+    }
   }
   return 0;
+}
+
+static int emit_statements(const CAstNodeList *list, const CSemanticResult *semantic,
+                           CAssemblyResult *result, char **text, size_t *length,
+                           size_t *capacity, size_t *label) {
+  for (size_t index = 0U; index < list->count; index++) {
+    const CAstNode *statement = list->items[index];
+    if (statement->kind == C_AST_EMPTY) continue;
+    if (statement->kind == C_AST_ASSIGNMENT) {
+      if (statement->data.assignment.selectors.count != 0U ||
+          !emit_expression(statement->data.assignment.expression, semantic, text, length, capacity)) return 0;
+      const int slot = slot_for(semantic, statement->data.assignment.name);
+      if (slot == 0 || !append(text, length, capacity, "    mov [rbp-%d], rax\n", slot)) return 0;
+    } else if (statement->kind == C_AST_PRINT) {
+      for (size_t value = 0U; value < statement->data.print.values.count; value++) {
+        if (!emit_expression(statement->data.print.values.items[value], semantic, text, length, capacity) ||
+            !append(text, length, capacity, "    mov rsi, rax\n    lea rdi, [rel fmt_int]\n    xor eax, eax\n    call printf\n")) return 0;
+      }
+    } else if (statement->kind == C_AST_IF) {
+      const size_t else_label = (*label)++; const size_t end_label = (*label)++;
+      if (!emit_expression(statement->data.conditional.condition, semantic, text, length, capacity) ||
+          !append(text, length, capacity, "    test rax, rax\n    jz L%zu\n", else_label) ||
+          !emit_statements(&statement->data.conditional.then_branch, semantic, result, text, length, capacity, label) ||
+          !append(text, length, capacity, "    jmp L%zu\nL%zu:\n", end_label, else_label) ||
+          !emit_statements(&statement->data.conditional.else_branch, semantic, result, text, length, capacity, label) ||
+          !append(text, length, capacity, "L%zu:\n", end_label)) return 0;
+    } else if (statement->kind == C_AST_WHILE) {
+      const size_t begin_label = (*label)++; const size_t end_label = (*label++);
+      if (!append(text, length, capacity, "L%zu:\n", begin_label) ||
+          !emit_expression(statement->data.loop.condition, semantic, text, length, capacity) ||
+          !append(text, length, capacity, "    test rax, rax\n    jz L%zu\n", end_label) ||
+          !emit_statements(&statement->data.loop.body, semantic, result, text, length, capacity, label) ||
+          !append(text, length, capacity, "    jmp L%zu\nL%zu:\n", begin_label, end_label)) return 0;
+    } else {
+      (void)diagnostic(result, "تعليمة غير مدعومة في NASM backend الحالي");
+      return 0;
+    }
+  }
+  return 1;
 }
 
 int c_generate_nasm_x86_64(const CAstNode *program,
@@ -125,39 +175,9 @@ int c_generate_nasm_x86_64(const CAstNode *program,
     c_assembly_result_free(result);
     return 0;
   }
-  for (size_t index = 0U; index < program->data.program.statements.count; index++) {
-    const CAstNode *statement = program->data.program.statements.items[index];
-    if (statement->kind == C_AST_ASSIGNMENT) {
-      if (!emit_expression(statement->data.assignment.expression, semantic,
-                           &result->text, &length, &capacity)) {
-        (void)diagnostic(result, "تعذر تحويل تعبير الإسناد إلى NASM integer");
-        return 1;
-      }
-      const int slot = slot_for(semantic, statement->data.assignment.name);
-      if (slot == 0 || !append(&result->text, &length, &capacity,
-                               "    mov [rbp-%d], rax\n", slot)) {
-        (void)diagnostic(result, "متغير الإسناد غير موجود في stack layout");
-        return 1;
-      }
-    } else if (statement->kind == C_AST_PRINT) {
-      for (size_t value_index = 0U;
-           value_index < statement->data.print.values.count; value_index++) {
-        if (!emit_expression(statement->data.print.values.items[value_index],
-                             semantic, &result->text, &length, &capacity) ||
-            !append(&result->text, &length, &capacity,
-                    "    mov rsi, rax\n"
-                    "    lea rdi, [rel fmt_int]\n"
-                    "    xor eax, eax\n"
-                    "    call printf\n")) {
-          (void)diagnostic(result, "تعذر تحويل print إلى NASM integer");
-          return 1;
-        }
-      }
-    } else if (statement->kind != C_AST_EMPTY) {
-      (void)diagnostic(result, "تعليمة غير مدعومة في NASM backend الحالي");
-      return 1;
-    }
-  }
+  size_t label = 0U;
+  if (!emit_statements(&program->data.program.statements, semantic, result,
+                       &result->text, &length, &capacity, &label)) return 1;
   if (!append(&result->text, &length, &capacity,
               "    xor eax, eax\n    leave\n    ret\n"
               "section .note.GNU-stack noalloc noexec nowrite progbits\n")) {
