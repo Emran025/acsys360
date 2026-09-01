@@ -1,0 +1,12 @@
+examples/01_arithmetic.arb lex=1 parse=1 ast=yes diagnostics=0
+examples/02_declarations.arb lex=1 parse=1 ast=no diagnostics=2
+examples/03_condition.arb lex=1 parse=1 ast=no diagnostics=2
+examples/04_while.arb lex=1 parse=1 ast=no diagnostics=2
+examples/05_repeat_up.arb lex=1 parse=1 ast=no diagnostics=2
+examples/06_repeat_down.arb lex=1 parse=1 ast=no diagnostics=2
+examples/07_procedure_value.arb lex=1 parse=1 ast=no diagnostics=2
+examples/08_procedure_reference.arb lex=1 parse=1 ast=no diagnostics=2
+examples/09_array_record.arb lex=1 parse=1 ast=no diagnostics=2
+examples/10_combined.arb lex=1 parse=1 ast=no diagnostics=2
+examples/errors/11_syntax_error.arb lex=1 parse=1 ast=no diagnostics=2
+examples/errors/12_semantic_error.arb lex=1 parse=1 ast=yes diagnostics=0
