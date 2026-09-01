@@ -1,5 +1,0 @@
-/home/ubuntu/acsys360/packages/compiler_c/build/CMakeFiles/arabicc_c.dir
-/home/ubuntu/acsys360/packages/compiler_c/build/CMakeFiles/arabicc_c_lexer_test.dir
-/home/ubuntu/acsys360/packages/compiler_c/build/CMakeFiles/test.dir
-/home/ubuntu/acsys360/packages/compiler_c/build/CMakeFiles/edit_cache.dir
-/home/ubuntu/acsys360/packages/compiler_c/build/CMakeFiles/rebuild_cache.dir
