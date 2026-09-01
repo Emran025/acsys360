@@ -1,0 +1,168 @@
+#include "typed_ir.h"
+
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+static char *duplicate(const char *value) {
+  const size_t length = strlen(value);
+  char *copy = malloc(length + 1U);
+  if (copy == NULL) return NULL;
+  memcpy(copy, value, length + 1U);
+  return copy;
+}
+
+static int push_line(CTypedIrResult *result, const char *format, ...) {
+  char buffer[256];
+  va_list arguments;
+  va_start(arguments, format);
+  const int written = vsnprintf(buffer, sizeof(buffer), format, arguments);
+  va_end(arguments);
+  if (written < 0 || (size_t)written >= sizeof(buffer)) return 0;
+  if (result->count == result->capacity) {
+    const size_t capacity = result->capacity == 0U ? 8U : result->capacity * 2U;
+    char **items = realloc(result->items, capacity * sizeof(*items));
+    if (items == NULL) return 0;
+    result->items = items;
+    result->capacity = capacity;
+  }
+  result->items[result->count] = duplicate(buffer);
+  if (result->items[result->count] == NULL) return 0;
+  result->count++;
+  return 1;
+}
+
+static int push_diagnostic(CTypedIrResult *result, const char *message) {
+  char **items = realloc(result->diagnostics,
+                         (result->diagnostic_count + 1U) * sizeof(*items));
+  if (items == NULL) return 0;
+  result->diagnostics = items;
+  result->diagnostics[result->diagnostic_count] = duplicate(message);
+  if (result->diagnostics[result->diagnostic_count] == NULL) return 0;
+  result->diagnostic_count++;
+  return 1;
+}
+
+static CIrType literal_type(CTokenKind kind) {
+  switch (kind) {
+    case C_TOKEN_INTEGER: return C_IR_INTEGER;
+    case C_TOKEN_REAL: return C_IR_REAL;
+    case C_TOKEN_BOOLEAN: return C_IR_BOOLEAN;
+    case C_TOKEN_CHARACTER: return C_IR_CHARACTER;
+    case C_TOKEN_STRING: return C_IR_STRING;
+    default: return C_IR_UNKNOWN;
+  }
+}
+
+const char *c_ir_type_name(CIrType type) {
+  switch (type) {
+    case C_IR_INTEGER: return "integer";
+    case C_IR_REAL: return "real";
+    case C_IR_BOOLEAN: return "boolean";
+    case C_IR_CHARACTER: return "character";
+    case C_IR_STRING: return "string";
+    case C_IR_UNKNOWN: return "unknown";
+  }
+  return "unknown";
+}
+
+static CIrType symbol_type(const CSemanticResult *semantic, const char *name) {
+  for (size_t index = 0U; index < semantic->count; index++) {
+    if (strcmp(semantic->items[index].name, name) != 0) continue;
+    if (strcmp(semantic->items[index].type, "حقيقي") == 0) return C_IR_REAL;
+    if (strcmp(semantic->items[index].type, "منطقي") == 0) return C_IR_BOOLEAN;
+    if (strcmp(semantic->items[index].type, "حرفي") == 0) return C_IR_CHARACTER;
+    if (strcmp(semantic->items[index].type, "خيط_رمزي") == 0) return C_IR_STRING;
+    return C_IR_INTEGER;
+  }
+  return C_IR_UNKNOWN;
+}
+
+static CIrType infer(const CAstNode *node, const CSemanticResult *semantic,
+                     CTypedIrResult *result, size_t *temporary, char *value,
+                     size_t value_size) {
+  if (node == NULL) return C_IR_UNKNOWN;
+  if (node->kind == C_AST_LITERAL) {
+    (void)snprintf(value, value_size, "%s", node->data.literal.value);
+    return literal_type(node->data.literal.literal_kind);
+  }
+  if (node->kind == C_AST_VARIABLE_REFERENCE) {
+    (void)snprintf(value, value_size, "%s", node->data.reference.name);
+    return symbol_type(semantic, node->data.reference.name);
+  }
+  if (node->kind == C_AST_UNARY) {
+    char operand[128];
+    const CIrType type = infer(node->data.unary.operand, semantic, result,
+                               temporary, operand, sizeof(operand));
+    if (type == C_IR_UNKNOWN) return type;
+    const size_t current = (*temporary)++;
+    if (!push_line(result, "t%zu: %s = %s%s", current, c_ir_type_name(type),
+                   node->data.unary.operator, operand)) return C_IR_UNKNOWN;
+    (void)snprintf(value, value_size, "t%zu", current);
+    return type;
+  }
+  if (node->kind == C_AST_BINARY) {
+    char left[128];
+    char right[128];
+    const CIrType left_type = infer(node->data.binary.left, semantic, result,
+                                    temporary, left, sizeof(left));
+    const CIrType right_type = infer(node->data.binary.right, semantic, result,
+                                     temporary, right, sizeof(right));
+    if (left_type == C_IR_UNKNOWN || right_type == C_IR_UNKNOWN ||
+        left_type != right_type) {
+      (void)push_diagnostic(result, "أنواع غير متوافقة داخل العملية الثنائية");
+      return C_IR_UNKNOWN;
+    }
+    const size_t current = (*temporary)++;
+    if (!push_line(result, "t%zu: %s = %s %s %s", current,
+                   c_ir_type_name(left_type), left, node->data.binary.operator,
+                   right)) return C_IR_UNKNOWN;
+    (void)snprintf(value, value_size, "t%zu", current);
+    return left_type;
+  }
+  return C_IR_UNKNOWN;
+}
+
+int c_build_typed_ir(const CAstNode *program, const CSemanticResult *semantic,
+                     CTypedIrResult *result) {
+  if (program == NULL || semantic == NULL || result == NULL ||
+      program->kind != C_AST_PROGRAM) return 0;
+  memset(result, 0, sizeof(*result));
+  size_t temporary = 0U;
+  for (size_t index = 0U; index < program->data.program.statements.count; index++) {
+    const CAstNode *statement = program->data.program.statements.items[index];
+    if (statement->kind == C_AST_ASSIGNMENT) {
+      char value[128];
+      const CIrType type = infer(statement->data.assignment.expression, semantic,
+                                 result, &temporary, value, sizeof(value));
+      if (type == C_IR_UNKNOWN ||
+          !push_line(result, "store %s: %s <- %s",
+                     statement->data.assignment.name, c_ir_type_name(type), value)) {
+        return 1;
+      }
+    } else if (statement->kind == C_AST_PRINT) {
+      for (size_t value_index = 0U;
+           value_index < statement->data.print.values.count; value_index++) {
+        char value[128];
+        const CIrType type = infer(statement->data.print.values.items[value_index],
+                                   semantic, result, &temporary, value,
+                                   sizeof(value));
+        if (type == C_IR_UNKNOWN ||
+            !push_line(result, "print %s: %s", c_ir_type_name(type), value)) {
+          return 1;
+        }
+      }
+    }
+  }
+  return 1;
+}
+
+void c_typed_ir_result_free(CTypedIrResult *result) {
+  if (result == NULL) return;
+  for (size_t index = 0U; index < result->count; index++) free(result->items[index]);
+  for (size_t index = 0U; index < result->diagnostic_count; index++) free(result->diagnostics[index]);
+  free(result->items);
+  free(result->diagnostics);
+  memset(result, 0, sizeof(*result));
+}
