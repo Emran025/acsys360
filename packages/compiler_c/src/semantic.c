@@ -7,6 +7,7 @@
 
 typedef struct {
   CSemanticResult *result;
+  const CAstNode *program;
 } Analyzer;
 
 static char *duplicate(const char *value) {
@@ -71,6 +72,21 @@ static int add_symbol(Analyzer *analyzer, const char *name, const char *type,
 }
 
 static int check_node(Analyzer *analyzer, const CAstNode *node);
+static int check_expression(Analyzer *analyzer, const CAstNode *node);
+
+static const CAstNode *find_procedure(const Analyzer *analyzer, const char *name) {
+  const CAstNodeList *declarations = &analyzer->program->data.program.declarations;
+  for (size_t index = 0U; index < declarations->count; index++) {
+    const CAstNode *node = declarations->items[index];
+    if (node->kind == C_AST_PROCEDURE_DECLARATION &&
+        strcmp(node->data.procedure.name, name) == 0) return node;
+  }
+  return NULL;
+}
+
+static int check_condition(Analyzer *analyzer, const CAstNode *condition) {
+  return check_expression(analyzer, condition);
+}
 
 static int check_list(Analyzer *analyzer, const CAstNodeList *list) {
   for (size_t index = 0U; index < list->count; index++) {
@@ -115,6 +131,32 @@ static int check_node(Analyzer *analyzer, const CAstNode *node) {
                           node->data.assignment.name);
       }
       return check_expression(analyzer, node->data.assignment.expression);
+    case C_AST_CALL:
+      if (find_procedure(analyzer, node->data.call.name) == NULL) {
+        return diagnostic(analyzer, "اجراء غير معرف: %s", node->data.call.name);
+      }
+      for (size_t index = 0U; index < node->data.call.arguments.count; index++) {
+        if (!check_expression(analyzer, node->data.call.arguments.items[index])) return 0;
+      }
+      return 1;
+    case C_AST_IF:
+      return check_condition(analyzer, node->data.conditional.condition) &&
+          check_list(analyzer, &node->data.conditional.then_branch) &&
+          check_list(analyzer, &node->data.conditional.else_branch);
+    case C_AST_WHILE:
+      return check_condition(analyzer, node->data.loop.condition) &&
+          check_list(analyzer, &node->data.loop.body);
+    case C_AST_REPEAT:
+      return check_expression(analyzer, node->data.repeat.from) &&
+          check_expression(analyzer, node->data.repeat.to) &&
+          (node->data.repeat.step == NULL ||
+           check_expression(analyzer, node->data.repeat.step)) &&
+          check_list(analyzer, &node->data.repeat.body);
+    case C_AST_REPEAT_UNTIL:
+      return check_list(analyzer, &node->data.repeat_until.body) &&
+          check_condition(analyzer, node->data.repeat_until.condition);
+    case C_AST_PROCEDURE_DECLARATION:
+      return 1;
     case C_AST_PRINT:
       for (size_t index = 0U; index < node->data.print.values.count; index++) {
         if (!check_expression(analyzer, node->data.print.values.items[index])) return 0;
@@ -130,7 +172,7 @@ static int check_node(Analyzer *analyzer, const CAstNode *node) {
 int c_analyze_semantics(const CAstNode *program, CSemanticResult *result) {
   if (program == NULL || result == NULL || program->kind != C_AST_PROGRAM) return 0;
   memset(result, 0, sizeof(*result));
-  Analyzer analyzer = {.result = result};
+  Analyzer analyzer = {.result = result, .program = program};
   if (!check_list(&analyzer, &program->data.program.declarations)) return 0;
   if (!check_list(&analyzer, &program->data.program.statements)) return 0;
   return 1;
