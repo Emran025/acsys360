@@ -21,8 +21,8 @@
 | NASM | x86-64 NASM صحيح وقابل للتجميع والربط والتشغيل | `nasm` + `gcc` native test | integer subset فقط |
 | Project mode | ملفات متعددة وexternal procedures/types وentry path | multi-file fixtures | غير منجز |
 | Protocol compile | قراءة `CompilationRequest` وإرجاع كل حقول `CompilationResponse` | CTest protocol smoke وDart bundle smoke | أساس v0.5.0 منجز؛ multi-file وserialization الكامل جزئي |
-| Protocol assist | completion/help بنفس الحقول والاستبدالات | assist parity tests | غير منجز |
-| Flutter adapter | `ProcessCompilerRepository` يستخدم C دون تغيير domain/presentation | editor integration tests | غير منجز |
+| Protocol assist | completion/help بنفس الحقول والاستبدالات | C executable `--assist` contract smoke؛ parity التفصيلي متبقٍ | endpoint منجز؛ parity جزئي |
+| Flutter adapter | `ProcessCompilerRepository` يستخدم C دون تغيير domain/presentation | editor integration tests وDart bundle smoke | executable متوافق مع smoke؛ اختيار bundle والتكامل النهائي متبقٍ |
 | Release | executable C مضمّن في Windows/Linux/macOS مع smoke tests | release matrix | غير منجز |
 
 ## ما هو منجز فعليًا الآن
