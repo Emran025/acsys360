@@ -54,13 +54,17 @@ static int diagnostic(CAssemblyResult *result, const char *message) {
   return 1;
 }
 
-static int slot_for(const CSemanticResult *semantic, const char *name) {
+static const CSymbol *symbol_for(const CSemanticResult *semantic, const char *name) {
   for (size_t index = 0U; index < semantic->count; index++) {
-    if (strcmp(semantic->items[index].name, name) == 0) {
-      return (int)((index + 1U) * 8U);
-    }
+    if (strcmp(semantic->items[index].name, name) == 0) return &semantic->items[index];
   }
-  return 0;
+  return NULL;
+}
+
+static int slot_for(const CSemanticResult *semantic, const char *name) {
+  const CSymbol *symbol = symbol_for(semantic, name);
+  if (symbol == NULL) return 0;
+  return (int)(((size_t)(symbol - semantic->items) + 1U) * 8U);
 }
 
 static int emit_expression(const CAstNode *node, const CSemanticResult *semantic,
@@ -73,8 +77,11 @@ static int emit_expression(const CAstNode *node, const CSemanticResult *semantic
   }
   if (node->kind == C_AST_VARIABLE_REFERENCE) {
     const int slot = slot_for(semantic, node->data.reference.name);
-    return slot > 0 && append(text, length, capacity,
-                              "    mov rax, [rbp-%d]\n", slot);
+    const CSymbol *symbol = symbol_for(semantic, node->data.reference.name);
+    if (slot <= 0 || symbol == NULL || !append(text, length, capacity,
+                              "    mov rax, [rbp-%d]\n", slot)) return 0;
+    if (symbol->by_reference && !append(text, length, capacity, "    mov rax, [rax]\n")) return 0;
+    return 1;
   }
   if (node->kind == C_AST_BINARY) {
     if (!emit_expression(node->data.binary.left, semantic, text, length,
@@ -132,7 +139,11 @@ static int emit_statements(const CAstNode *program, const CAstNodeList *list, co
       if (statement->data.assignment.selectors.count != 0U ||
           !emit_expression(statement->data.assignment.expression, semantic, text, length, capacity)) return 0;
       const int slot = slot_for(semantic, statement->data.assignment.name);
-      if (slot == 0 || !append(text, length, capacity, "    mov [rbp-%d], rax\n", slot)) return 0;
+      const CSymbol *target = symbol_for(semantic, statement->data.assignment.name);
+      if (slot == 0 || target == NULL) return 0;
+      if (target->by_reference) {
+        if (!append(text, length, capacity, "    mov rcx, [rbp-%d]\n    mov [rcx], rax\n", slot)) return 0;
+      } else if (!append(text, length, capacity, "    mov [rbp-%d], rax\n", slot)) return 0;
     } else if (statement->kind == C_AST_PRINT) {
       for (size_t value = 0U; value < statement->data.print.values.count; value++) {
         if (!emit_expression(statement->data.print.values.items[value], semantic, text, length, capacity) ||
@@ -163,10 +174,15 @@ static int emit_statements(const CAstNode *program, const CAstNodeList *list, co
       if (procedure == NULL || statement->data.call.arguments.count > procedure->data.procedure.parameter_count) return 0;
       for (size_t argument = 0U; argument < statement->data.call.arguments.count; argument++) {
         const CParameter *parameter = &procedure->data.procedure.parameters[argument];
-        if (parameter->by_reference) return 0;
-        if (!emit_expression(statement->data.call.arguments.items[argument], semantic, text, length, capacity)) return 0;
         const int parameter_slot = slot_for(semantic, parameter->name);
-        if (parameter_slot == 0 || !append(text, length, capacity, "    mov [rbp-%d], rax\n", parameter_slot)) return 0;
+        if (parameter_slot == 0) return 0;
+        const CAstNode *argument_node = statement->data.call.arguments.items[argument];
+        if (parameter->by_reference) {
+          if (argument_node->kind != C_AST_VARIABLE_REFERENCE || argument_node->data.reference.selectors.count != 0U) return 0;
+          const int argument_slot = slot_for(semantic, argument_node->data.reference.name);
+          if (argument_slot == 0 || !append(text, length, capacity, "    lea rax, [rbp-%d]\n", argument_slot)) return 0;
+        } else if (!emit_expression(argument_node, semantic, text, length, capacity)) return 0;
+        if (!append(text, length, capacity, "    mov [rbp-%d], rax\n", parameter_slot)) return 0;
       }
       if (!append(text, length, capacity, "    call %s\n", statement->data.call.name)) return 0;
     } else if (statement->kind == C_AST_WHILE) {

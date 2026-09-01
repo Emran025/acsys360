@@ -48,8 +48,8 @@ static const CSymbol *find_symbol(const CSemanticResult *result,
   return NULL;
 }
 
-static int add_symbol(Analyzer *analyzer, const char *name, const char *type,
-                      const CAstNode *node) {
+static int add_symbol_mode(Analyzer *analyzer, const char *name, const char *type,
+                           const CAstNode *node, int by_reference) {
   CSemanticResult *result = analyzer->result;
   if (find_symbol(result, name) != NULL) {
     return diagnostic(analyzer, "تعريف مكرر للرمز: %s", name);
@@ -67,8 +67,14 @@ static int add_symbol(Analyzer *analyzer, const char *name, const char *type,
   symbol->offset = node->offset;
   symbol->line = node->line;
   symbol->column = node->column;
+  symbol->by_reference = by_reference;
   if (symbol->name == NULL || symbol->type == NULL) return 0;
   return 1;
+}
+
+static int add_symbol(Analyzer *analyzer, const char *name, const char *type,
+                      const CAstNode *node) {
+  return add_symbol_mode(analyzer, name, type, node, 0);
 }
 
 static int check_node(Analyzer *analyzer, const CAstNode *node);
@@ -159,9 +165,9 @@ static int check_node(Analyzer *analyzer, const CAstNode *node) {
       const size_t saved_count = analyzer->result->count;
       for (size_t index = 0U; index < node->data.procedure.parameter_count; index++) {
         const CParameter *parameter = &node->data.procedure.parameters[index];
-        if (!add_symbol(analyzer, parameter->name,
-                        parameter->type == NULL ? "" : parameter->type->name,
-                        node)) {
+        if (!add_symbol_mode(analyzer, parameter->name,
+                             parameter->type == NULL ? "" : parameter->type->name,
+                             node, parameter->by_reference)) {
           return 0;
         }
       }
