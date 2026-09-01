@@ -155,8 +155,25 @@ static int check_node(Analyzer *analyzer, const CAstNode *node) {
     case C_AST_REPEAT_UNTIL:
       return check_list(analyzer, &node->data.repeat_until.body) &&
           check_condition(analyzer, node->data.repeat_until.condition);
-    case C_AST_PROCEDURE_DECLARATION:
-      return 1;
+    case C_AST_PROCEDURE_DECLARATION: {
+      const size_t saved_count = analyzer->result->count;
+      for (size_t index = 0U; index < node->data.procedure.parameter_count; index++) {
+        const CParameter *parameter = &node->data.procedure.parameters[index];
+        if (!add_symbol(analyzer, parameter->name,
+                        parameter->type == NULL ? "" : parameter->type->name,
+                        node)) {
+          return 0;
+        }
+      }
+      const int valid = check_list(analyzer, &node->data.procedure.body);
+      while (analyzer->result->count > saved_count) {
+        const size_t position = analyzer->result->count - 1U;
+        free(analyzer->result->items[position].name);
+        free(analyzer->result->items[position].type);
+        analyzer->result->count--;
+      }
+      return valid;
+    }
     case C_AST_PRINT:
       for (size_t index = 0U; index < node->data.print.values.count; index++) {
         if (!check_expression(analyzer, node->data.print.values.items[index])) return 0;
