@@ -12,10 +12,14 @@ add_executable(arabicc_c
   src/protocol.c
   src/lexer.c
   src/ast.c
+  src/parser.c
 )
 target_include_directories(arabicc_c PRIVATE include)
 
 enable_testing()
-add_executable(arabicc_c_lexer_test tests/lexer_test.c src/lexer.c src/ast.c)
+add_executable(arabicc_c_lexer_test tests/lexer_test.c src/lexer.c src/ast.c src/parser.c)
 target_include_directories(arabicc_c_lexer_test PRIVATE include)
 add_test(NAME arabicc_c_lexer_test COMMAND arabicc_c_lexer_test)
+add_executable(arabicc_c_parser_test tests/parser_test.c src/lexer.c src/ast.c src/parser.c)
+target_include_directories(arabicc_c_parser_test PRIVATE include)
+add_test(NAME arabicc_c_parser_test COMMAND arabicc_c_parser_test)
