@@ -201,15 +201,13 @@ static int eval_expression(const CAstNode *node, RuntimeValue *values, size_t co
   return 0;
 }
 
-static int emit_execution(const CAstNode *program, const CSemanticResult *semantic) {
+static int emit_execution_body(const CAstNode *program, const CSemanticResult *semantic, int *first) {
   RuntimeValue *values = calloc(semantic->count, sizeof(*values));
   if (values == NULL) return 0;
   for (size_t i = 0U; i < semantic->count; i++) {
     values[i].name = semantic->items[i].name;
     values[i].value = 0;
   }
-  putchar('[');
-  int first = 1;
   for (size_t i = 0U; i < program->data.program.statements.count; i++) {
     const CAstNode *statement = program->data.program.statements.items[i];
     if (statement->kind == C_AST_ASSIGNMENT && statement->data.assignment.selectors.count == 0U) {
@@ -223,16 +221,23 @@ static int emit_execution(const CAstNode *program, const CSemanticResult *semant
       for (size_t j = 0U; j < statement->data.print.values.count; j++) {
         long value = 0;
         if (eval_expression(statement->data.print.values.items[j], values, semantic->count, &value)) {
-          if (!first) putchar(',');
+          if (!*first) putchar(',');
           printf("\"%ld\"", value);
-          first = 0;
+          *first = 0;
         }
       }
     }
   }
-  putchar(']');
   free(values);
   return 1;
+}
+
+static int emit_execution(const CAstNode *program, const CSemanticResult *semantic) {
+  putchar('[');
+  int first = 1;
+  const int success = emit_execution_body(program, semantic, &first);
+  putchar(']');
+  return success;
 }
 
 static void emit_symbols(const CSemanticResult *semantic) {
