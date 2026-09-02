@@ -137,14 +137,26 @@ static int check_node(Analyzer *analyzer, const CAstNode *node) {
                           node->data.assignment.name);
       }
       return check_expression(analyzer, node->data.assignment.expression);
-    case C_AST_CALL:
-      if (find_procedure(analyzer, node->data.call.name) == NULL) {
+    case C_AST_CALL: {
+      const CAstNode *procedure = find_procedure(analyzer, node->data.call.name);
+      if (procedure == NULL) {
         return diagnostic(analyzer, "اجراء غير معرف: %s", node->data.call.name);
       }
+      if (node->data.call.arguments.count != procedure->data.procedure.parameter_count) {
+        return diagnostic(analyzer, "عدد معاملات الاجراء %s غير صحيح", node->data.call.name);
+      }
       for (size_t index = 0U; index < node->data.call.arguments.count; index++) {
-        if (!check_expression(analyzer, node->data.call.arguments.items[index])) return 0;
+        const CParameter *parameter = &procedure->data.procedure.parameters[index];
+        const CAstNode *argument = node->data.call.arguments.items[index];
+        if (parameter->by_reference &&
+            (argument->kind != C_AST_VARIABLE_REFERENCE ||
+             argument->data.reference.selectors.count != 0U)) {
+          return diagnostic(analyzer, "المعامل بالمرجع %s يتطلب متغيرًا مباشرًا", parameter->name);
+        }
+        if (!check_expression(analyzer, argument)) return 0;
       }
       return 1;
+    }
     case C_AST_IF:
       return check_condition(analyzer, node->data.conditional.condition) &&
           check_list(analyzer, &node->data.conditional.then_branch) &&
