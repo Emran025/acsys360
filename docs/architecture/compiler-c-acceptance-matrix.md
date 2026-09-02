@@ -19,8 +19,8 @@
 | Typed IR | primitive/compound types وconversion وcontrol-flow validation | CTest وTyped IR generation | control-flow الأساسي منجز؛ compound types وgolden parity جزئي |
 | Runtime | نفس execution output وحدود الخطوات والأخطاء | parity fixtures | غير منجز |
 | NASM | x86-64 NASM صحيح وقابل للتجميع والربط والتشغيل | `nasm` + `gcc` native test على arithmetic وif وrepeat وprocedure call وfixtures 07/08 | integer + comparison/control-flow/repeat وprocedure ABI بالقيمة/المرجع؛ الأنواع المركبة وreturns متبقية |
-| Project mode | ملفات متعددة وexternal procedures/types وentry path | multi-file fixtures | غير منجز |
-| Protocol compile | قراءة `CompilationRequest` وإرجاع كل حقول `CompilationResponse` | CTest protocol smoke وDart bundle smoke | أساس v0.5.0 منجز؛ multi-file وserialization الكامل جزئي |
+| Project mode | ملفات متعددة وexternal procedures/types وentry path | multi-file fixtures؛ validation لكل source unit | تحليل الوحدات الإضافية منجز؛ cross-file symbols/types وentry selection متبقية |
+| Protocol compile | قراءة `CompilationRequest` وإرجاع كل حقول `CompilationResponse` | CTest protocol smoke وproject validation وDart bundle smoke | v0.5.0 وTAC/IR/NASM وSymbol spans منجزة؛ cross-file aggregation وDart bundle smoke متبقية |
 | Protocol assist | completion/help بنفس الحقول والاستبدالات | C executable `--assist` contract smoke؛ parity التفصيلي متبقٍ | endpoint منجز؛ parity جزئي |
 | Flutter adapter | `ProcessCompilerRepository` يستخدم C دون تغيير domain/presentation | editor integration tests وDart bundle smoke | executable متوافق مع smoke؛ اختيار bundle والتكامل النهائي متبقٍ |
 | Release | executable C مضمّن في Windows/Linux/macOS مع smoke tests | release matrix | غير منجز |
