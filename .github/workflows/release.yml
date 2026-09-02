@@ -49,6 +49,14 @@ jobs:
           sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
       - run: flutter config --enable-${{ matrix.target }}-desktop
       - run: flutter build ${{ matrix.target }} --release
+      - name: Build C compiler on Linux
+        if: matrix.target == 'linux'
+        shell: bash
+        run: |
+          cmake -S packages/compiler_c -B packages/compiler_c/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build packages/compiler_c/build --parallel
+          ctest --test-dir packages/compiler_c/build --output-on-failure
+          sudo apt-get install -y nasm gcc
       - name: Build bundled compiler on Unix
         if: matrix.target != 'windows'
         shell: bash
@@ -67,7 +75,16 @@ jobs:
         run: |
           mkdir -p build/linux/x64/release/bundle/compiler
           cp packages/compiler_core/build/arabicc build/linux/x64/release/bundle/compiler/arabicc
+          cp packages/compiler_c/build/arabicc_c build/linux/x64/release/bundle/compiler/arabicc_c
           cp -R "$FLUTTER_ROOT/bin/cache/dart-sdk" build/linux/x64/release/bundle/compiler/dart-sdk
+      - name: Smoke test native C compiler on Linux
+        if: matrix.target == 'linux'
+        shell: bash
+        run: |
+          printf '%s' 'برنامج إصدار { متغير س: صحيح؛ س = 2 + 3؛ اطبع(س)؛ }.' | build/linux/x64/release/bundle/compiler/arabicc_c --asm > /tmp/acsys360-release.asm
+          nasm -f elf64 /tmp/acsys360-release.asm -o /tmp/acsys360-release.o
+          gcc -no-pie /tmp/acsys360-release.o -o /tmp/acsys360-release
+          test "$(/tmp/acsys360-release)" = 5
       - name: Bundle compiler on Windows
         if: matrix.target == 'windows'
         shell: pwsh
