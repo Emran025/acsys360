@@ -43,6 +43,70 @@ static int append(char **text, size_t *length, size_t *capacity,
   return 1;
 }
 
+static int append_escaped_string(char **text, size_t *length, size_t *capacity,
+                                 const char *value) {
+  for (const unsigned char *cursor = (const unsigned char *)value; *cursor != '\0'; cursor++) {
+    if (*cursor == '"' || *cursor == '\\') {
+      if (!append(text, length, capacity, "\\%c", *cursor)) return 0;
+    } else if (*cursor == '\n') {
+      if (!append(text, length, capacity, "\\n")) return 0;
+    } else {
+      if (!append(text, length, capacity, "%c", *cursor)) return 0;
+    }
+  }
+  return 1;
+}
+
+static int emit_string_literal_data(const CAstNode *node, char **text,
+                                    size_t *length, size_t *capacity) {
+  if (node == NULL) return 1;
+  if (node->kind == C_AST_LITERAL && node->data.literal.literal_kind == C_TOKEN_STRING) {
+    const char *raw = node->data.literal.value;
+    const size_t raw_length = strlen(raw);
+    char *contents = duplicate(raw);
+    if (contents == NULL) return 0;
+    if (raw_length >= 2U && contents[0] == '"' && contents[raw_length - 1U] == '"') {
+      memmove(contents, contents + 1, raw_length - 2U);
+      contents[raw_length - 2U] = '\0';
+    }
+    const int valid = append(text, length, capacity, "str_%zu: db \"", node->offset) &&
+        append_escaped_string(text, length, capacity, contents) &&
+        append(text, length, capacity, "\", 0\n");
+    free(contents);
+    if (!valid) return 0;
+  }
+  switch (node->kind) {
+    case C_AST_PROGRAM:
+      for (size_t i = 0U; i < node->data.program.declarations.count; i++)
+        if (!emit_string_literal_data(node->data.program.declarations.items[i], text, length, capacity)) return 0;
+      for (size_t i = 0U; i < node->data.program.statements.count; i++)
+        if (!emit_string_literal_data(node->data.program.statements.items[i], text, length, capacity)) return 0;
+      break;
+    case C_AST_ASSIGNMENT:
+      return emit_string_literal_data(node->data.assignment.expression, text, length, capacity);
+    case C_AST_PRINT:
+      for (size_t i = 0U; i < node->data.print.values.count; i++)
+        if (!emit_string_literal_data(node->data.print.values.items[i], text, length, capacity)) return 0;
+      break;
+    case C_AST_BINARY:
+      return emit_string_literal_data(node->data.binary.left, text, length, capacity) &&
+          emit_string_literal_data(node->data.binary.right, text, length, capacity);
+    case C_AST_IF:
+      if (!emit_string_literal_data(node->data.conditional.condition, text, length, capacity)) return 0;
+      for (size_t i = 0U; i < node->data.conditional.then_branch.count; i++)
+        if (!emit_string_literal_data(node->data.conditional.then_branch.items[i], text, length, capacity)) return 0;
+      for (size_t i = 0U; i < node->data.conditional.else_branch.count; i++)
+        if (!emit_string_literal_data(node->data.conditional.else_branch.items[i], text, length, capacity)) return 0;
+      break;
+    case C_AST_PROCEDURE_DECLARATION:
+      for (size_t i = 0U; i < node->data.procedure.body.count; i++)
+        if (!emit_string_literal_data(node->data.procedure.body.items[i], text, length, capacity)) return 0;
+      break;
+    default: break;
+  }
+  return 1;
+}
+
 static int diagnostic(CAssemblyResult *result, const char *message) {
   char **items = realloc(result->diagnostics,
                          (result->diagnostic_count + 1U) * sizeof(*items));
@@ -71,9 +135,13 @@ static int emit_expression(const CAstNode *node, const CSemanticResult *semantic
                            char **text, size_t *length, size_t *capacity) {
   if (node == NULL) return 0;
   if (node->kind == C_AST_LITERAL) {
-    if (node->data.literal.literal_kind != C_TOKEN_INTEGER) return 0;
-    return append(text, length, capacity, "    mov rax, %s\n",
-                  node->data.literal.value);
+    if (node->data.literal.literal_kind == C_TOKEN_INTEGER) {
+      return append(text, length, capacity, "    mov rax, %s\n", node->data.literal.value);
+    }
+    if (node->data.literal.literal_kind == C_TOKEN_STRING) {
+      return append(text, length, capacity, "    lea rax, [rel str_%zu]\n", node->offset);
+    }
+    return 0;
   }
   if (node->kind == C_AST_VARIABLE_REFERENCE) {
     const int slot = slot_for(semantic, node->data.reference.name);
@@ -146,8 +214,16 @@ static int emit_statements(const CAstNode *program, const CAstNodeList *list, co
       } else if (!append(text, length, capacity, "    mov [rbp-%d], rax\n", slot)) return 0;
     } else if (statement->kind == C_AST_PRINT) {
       for (size_t value = 0U; value < statement->data.print.values.count; value++) {
-        if (!emit_expression(statement->data.print.values.items[value], semantic, text, length, capacity) ||
-            !append(text, length, capacity, "    mov rsi, rax\n    lea rdi, [rel fmt_int]\n    xor eax, eax\n    call printf\n")) return 0;
+        const CAstNode *expression = statement->data.print.values.items[value];
+        if (!emit_expression(expression, semantic, text, length, capacity)) return 0;
+        const int is_string = (expression->kind == C_AST_LITERAL &&
+                               expression->data.literal.literal_kind == C_TOKEN_STRING) ||
+            (expression->kind == C_AST_VARIABLE_REFERENCE &&
+             symbol_for(semantic, expression->data.reference.name) != NULL &&
+             strcmp(symbol_for(semantic, expression->data.reference.name)->type, "خيط_رمزي") == 0);
+        if (!append(text, length, capacity,
+                    is_string ? "    mov rsi, rax\n    lea rdi, [rel fmt_str]\n    xor eax, eax\n    call printf\n" :
+                               "    mov rsi, rax\n    lea rdi, [rel fmt_int]\n    xor eax, eax\n    call printf\n")) return 0;
       }
     } else if (statement->kind == C_AST_IF) {
       const size_t else_label = (*label)++; const size_t end_label = (*label)++;
@@ -215,11 +291,12 @@ int c_generate_nasm_x86_64(const CAstNode *program,
               "extern printf\n"
               "section .data\n"
               "fmt_int: db \"%%ld\", 10, 0\n"
-              "section .text\n"
-              "main:\n"
-              "    push rbp\n"
-              "    mov rbp, rsp\n"
-              "    sub rsp, %zu\n", frame_size)) {
+              "fmt_str: db \"%%s\", 10, 0\n")) {
+    c_assembly_result_free(result);
+    return 0;
+  }
+  if (!emit_string_literal_data(program, &result->text, &length, &capacity) ||
+      !append(&result->text, &length, &capacity, "section .text\nmain:\n    push rbp\n    mov rbp, rsp\n    sub rsp, %zu\n", frame_size)) {
     c_assembly_result_free(result);
     return 0;
   }
