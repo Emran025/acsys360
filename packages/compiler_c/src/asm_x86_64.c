@@ -225,7 +225,13 @@ int c_generate_nasm_x86_64(const CAstNode *program,
   }
   size_t label = 0U;
   if (!emit_statements(program, &program->data.program.statements, semantic, result,
-                       &result->text, &length, &capacity, &label)) return 1;
+                       &result->text, &length, &capacity, &label)) {
+    if (result->diagnostic_count == 0U) {
+      (void)diagnostic(result, "تعذر توليد NASM للبرنامج");
+    }
+    c_assembly_result_free(result);
+    return 0;
+  }
   if (!append(&result->text, &length, &capacity,
               "    xor eax, eax\n    leave\n    ret\n")) {
     c_assembly_result_free(result);
