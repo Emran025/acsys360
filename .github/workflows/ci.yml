@@ -40,6 +40,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install native toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nasm gcc
       - name: Build C compiler milestone
         working-directory: packages/compiler_c
         run: |
@@ -48,15 +52,22 @@ jobs:
       - name: Test C compiler milestone
         working-directory: packages/compiler_c
         run: ctest --test-dir build --output-on-failure
-      - name: Assemble and run C compiler artifact
+      - name: Assemble and run C compiler artifacts
         working-directory: packages/compiler_c
         run: |
-          sudo apt-get update
-          sudo apt-get install -y nasm
           printf '%s' 'برنامج تجميع { متغير س: صحيح؛ س = 2 + 3؛ اطبع(س)؛ }.' | ./build/arabicc_c --asm > /tmp/acsys360-program.asm
           nasm -f elf64 /tmp/acsys360-program.asm -o /tmp/acsys360-program.o
           gcc -no-pie /tmp/acsys360-program.o -o /tmp/acsys360-program
           test "$(/tmp/acsys360-program)" = 5
+          printf '%s' 'برنامج تكرار { متغير س: صحيح؛ س = 1؛ طالما(س < 4) { س = س + 1؛ }; اطبع(س)؛ }.' | ./build/arabicc_c --asm > /tmp/acsys360-loop.asm
+          nasm -f elf64 /tmp/acsys360-loop.asm -o /tmp/acsys360-loop.o
+          gcc -no-pie /tmp/acsys360-loop.o -o /tmp/acsys360-loop
+          test "$(/tmp/acsys360-loop)" = 4
+      - name: Upload C compiler executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: acsys360-compiler-c-linux-x64
+          path: packages/compiler_c/build/arabicc_c
 
   editor:
     runs-on: ubuntu-latest
