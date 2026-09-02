@@ -267,13 +267,15 @@ static int emit_execution(const CAstNode *program, const CSemanticResult *semant
   return success;
 }
 
-static void emit_symbols(const CSemanticResult *semantic) {
+static void emit_symbols(const CSemanticResult *semantic, const char *source_path) {
   putchar('[');
   for (size_t i = 0U; i < semantic->count; i++) {
     if (i != 0U) putchar(',');
     fputs("{\"name\":", stdout); json_string(semantic->items[i].name);
     fputs(",\"type\":", stdout); json_string(semantic->items[i].type);
-    fputs(",\"kind\":\"variable\",\"span\":{\"sourcePath\":\"\",\"offset\":", stdout);
+    fputs(",\"kind\":\"variable\",\"span\":{\"sourcePath\":", stdout);
+    json_string(source_path == NULL ? "" : source_path);
+    fputs(",\"offset\":", stdout);
     printf("%zu,\"line\":%zu,\"column\":%zu,\"length\":0}}", semantic->items[i].offset,
            semantic->items[i].line, semantic->items[i].column);
   }
@@ -358,7 +360,7 @@ int c_run_protocol(const char *payload) {
     putchar('}');
   } else fputs("null", stdout);
   fputs(",\"symbolTable\":", stdout);
-  if (semantic_ok) emit_symbols(&semantic); else fputs("[]", stdout);
+  if (semantic_ok) emit_symbols(&semantic, source_path); else fputs("[]", stdout);
   fputs(",\"threeAddressCode\":", stdout);
   if (tac_ok) emit_lines(tac.items, tac.count); else fputs("[]", stdout);
   fputs(",\"assembly\":", stdout);
