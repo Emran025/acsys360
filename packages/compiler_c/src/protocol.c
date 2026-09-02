@@ -126,6 +126,30 @@ static int extract_first_source(const char *payload, char **path, char **source)
   return extract_source_at(payload, 0U, path, source);
 }
 
+static int validate_additional_sources(const char *payload) {
+  for (size_t index = 1U; ; index++) {
+    char *path = NULL;
+    char *source = NULL;
+    if (!extract_source_at(payload, index, &path, &source)) return 1;
+    CLexResult lexical = {0};
+    CParseResult parsed = {0};
+    CSemanticResult semantic = {0};
+    const int lex_ok = c_lex(source, &lexical);
+    const int parse_ok = lex_ok && c_parse(&lexical, &parsed);
+    const int semantic_ok = parse_ok && parsed.program != NULL &&
+        c_analyze_semantics(parsed.program, &semantic);
+    const int valid = lex_ok && parse_ok && semantic_ok &&
+        lexical.diagnostic_count == 0U && parsed.diagnostic_count == 0U &&
+        semantic.diagnostic_count == 0U;
+    if (semantic_ok) c_semantic_result_free(&semantic);
+    if (parse_ok) c_parse_result_free(&parsed);
+    if (lex_ok) c_lex_result_free(&lexical);
+    free(path);
+    free(source);
+    if (!valid) return 0;
+  }
+}
+
 static int load_request_source(const char *payload, char **path, char **source) {
   if (extract_first_source(payload, path, source)) return 1;
   *path = extract_first_path(payload);
@@ -296,6 +320,7 @@ int c_run_protocol(const char *payload) {
   CSemanticResult semantic;
   const int lex_ok = c_lex(source, &lexical);
   const int parse_ok = lex_ok && c_parse(&lexical, &parsed);
+  const int project_ok = parse_ok && validate_additional_sources(payload);
   const int semantic_ok = parse_ok && parsed.program != NULL &&
       c_analyze_semantics(parsed.program, &semantic);
   CTacResult tac = {0};
@@ -306,7 +331,7 @@ int c_run_protocol(const char *payload) {
   const int assembly_ok = semantic_ok && c_generate_nasm_x86_64(parsed.program, &semantic, &assembly);
   const int success = lex_ok && parse_ok && semantic_ok &&
       lexical.diagnostic_count == 0U && parsed.diagnostic_count == 0U &&
-      semantic.diagnostic_count == 0U && tac_ok && tac.diagnostic_count == 0U &&
+      semantic.diagnostic_count == 0U && project_ok && tac_ok && tac.diagnostic_count == 0U &&
       typed_ir_ok && typed_ir.diagnostic_count == 0U && assembly_ok &&
       assembly.diagnostic_count == 0U;
 
