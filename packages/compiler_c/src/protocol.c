@@ -122,8 +122,20 @@ static int extract_source_at(const char *payload, size_t wanted, char **path, ch
   return 0;
 }
 
-static int extract_first_source(const char *payload, char **path, char **source) {
-  return extract_source_at(payload, 0U, path, source);
+static int extract_source_for_path(const char *payload, const char *wanted_path,
+                                   char **path, char **source) {
+  for (size_t index = 0U; ; index++) {
+    char *candidate_path = NULL;
+    char *candidate_source = NULL;
+    if (!extract_source_at(payload, index, &candidate_path, &candidate_source)) return 0;
+    if (strcmp(candidate_path, wanted_path) == 0) {
+      *path = candidate_path;
+      *source = candidate_source;
+      return 1;
+    }
+    free(candidate_path);
+    free(candidate_source);
+  }
 }
 
 static int validate_additional_sources(const char *payload) {
@@ -151,8 +163,13 @@ static int validate_additional_sources(const char *payload) {
 }
 
 static int load_request_source(const char *payload, char **path, char **source) {
-  if (extract_first_source(payload, path, source)) return 1;
-  *path = extract_first_path(payload);
+  char *entry_path = extract_first_path(payload);
+  if (entry_path == NULL) return 0;
+  if (extract_source_for_path(payload, entry_path, path, source)) {
+    free(entry_path);
+    return 1;
+  }
+  *path = entry_path;
   if (*path == NULL) return 0;
   char *root = extract_named_string(payload, "rootPath");
   if (root == NULL) { free(*path); *path = NULL; return 0; }
