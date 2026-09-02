@@ -77,6 +77,18 @@ static int add_symbol(Analyzer *analyzer, const char *name, const char *type,
   return add_symbol_mode(analyzer, name, type, node, 0);
 }
 
+static const char *literal_type(const CAstNode *node) {
+  if (node == NULL || node->kind != C_AST_LITERAL) return "";
+  switch (node->data.literal.literal_kind) {
+    case C_TOKEN_INTEGER: return "صحيح";
+    case C_TOKEN_REAL: return "حقيقي";
+    case C_TOKEN_BOOLEAN: return "منطقي";
+    case C_TOKEN_CHARACTER: return "حرفي";
+    case C_TOKEN_STRING: return "خيط_رمزي";
+    default: return "";
+  }
+}
+
 static int check_node(Analyzer *analyzer, const CAstNode *node);
 static int check_expression(Analyzer *analyzer, const CAstNode *node);
 
@@ -125,6 +137,10 @@ static int check_expression(Analyzer *analyzer, const CAstNode *node) {
 static int check_node(Analyzer *analyzer, const CAstNode *node) {
   if (node == NULL) return 0;
   switch (node->kind) {
+    case C_AST_CONSTANT_DECLARATION:
+      if (!check_expression(analyzer, node->data.constant.value)) return 0;
+      return add_symbol(analyzer, node->data.constant.name,
+                        literal_type(node->data.constant.value), node);
     case C_AST_VARIABLE_DECLARATION:
       for (size_t index = 0U; index < node->data.variable.name_count; index++) {
         if (!add_symbol(analyzer, node->data.variable.names[index],
