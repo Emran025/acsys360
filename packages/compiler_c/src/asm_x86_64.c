@@ -60,7 +60,9 @@ static int append_escaped_string(char **text, size_t *length, size_t *capacity,
 static int emit_string_literal_data(const CAstNode *node, char **text,
                                     size_t *length, size_t *capacity) {
   if (node == NULL) return 1;
-  if (node->kind == C_AST_LITERAL && node->data.literal.literal_kind == C_TOKEN_STRING) {
+  if (node->kind == C_AST_LITERAL &&
+      (node->data.literal.literal_kind == C_TOKEN_STRING ||
+       node->data.literal.literal_kind == C_TOKEN_CHARACTER)) {
     const char *raw = node->data.literal.value;
     const size_t raw_length = strlen(raw);
     char *contents = duplicate(raw);
@@ -68,6 +70,10 @@ static int emit_string_literal_data(const CAstNode *node, char **text,
     if (raw_length >= 2U && contents[0] == '"' && contents[raw_length - 1U] == '"') {
       memmove(contents, contents + 1, raw_length - 2U);
       contents[raw_length - 2U] = '\0';
+    } else if (raw_length >= 6U && strncmp(contents, "‘", 3U) == 0 &&
+               strncmp(contents + raw_length - 3U, "’", 3U) == 0) {
+      memmove(contents, contents + 3, raw_length - 6U);
+      contents[raw_length - 6U] = '\0';
     }
     const int valid = append(text, length, capacity, "str_%zu: db \"", node->offset) &&
         append_escaped_string(text, length, capacity, contents) &&
@@ -138,7 +144,12 @@ static int emit_expression(const CAstNode *node, const CSemanticResult *semantic
     if (node->data.literal.literal_kind == C_TOKEN_INTEGER) {
       return append(text, length, capacity, "    mov rax, %s\n", node->data.literal.value);
     }
-    if (node->data.literal.literal_kind == C_TOKEN_STRING) {
+    if (node->data.literal.literal_kind == C_TOKEN_BOOLEAN) {
+      return append(text, length, capacity, "    mov rax, %d\n",
+                    strcmp(node->data.literal.value, "صح") == 0 ? 1 : 0);
+    }
+    if (node->data.literal.literal_kind == C_TOKEN_STRING ||
+        node->data.literal.literal_kind == C_TOKEN_CHARACTER) {
       return append(text, length, capacity, "    lea rax, [rel str_%zu]\n", node->offset);
     }
     return 0;
@@ -217,10 +228,12 @@ static int emit_statements(const CAstNode *program, const CAstNodeList *list, co
         const CAstNode *expression = statement->data.print.values.items[value];
         if (!emit_expression(expression, semantic, text, length, capacity)) return 0;
         const int is_string = (expression->kind == C_AST_LITERAL &&
-                               expression->data.literal.literal_kind == C_TOKEN_STRING) ||
+                               (expression->data.literal.literal_kind == C_TOKEN_STRING ||
+                                expression->data.literal.literal_kind == C_TOKEN_CHARACTER)) ||
             (expression->kind == C_AST_VARIABLE_REFERENCE &&
              symbol_for(semantic, expression->data.reference.name) != NULL &&
-             strcmp(symbol_for(semantic, expression->data.reference.name)->type, "خيط_رمزي") == 0);
+             (strcmp(symbol_for(semantic, expression->data.reference.name)->type, "خيط_رمزي") == 0 ||
+              strcmp(symbol_for(semantic, expression->data.reference.name)->type, "حرفي") == 0));
         if (!append(text, length, capacity,
                     is_string ? "    mov rsi, rax\n    lea rdi, [rel fmt_str]\n    xor eax, eax\n    call printf\n" :
                                "    mov rsi, rax\n    lea rdi, [rel fmt_int]\n    xor eax, eax\n    call printf\n")) return 0;

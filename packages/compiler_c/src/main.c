@@ -63,6 +63,22 @@ int main(int argc, char **argv) {
     if (assembly_status && assembly.diagnostic_count == 0U) {
       fputs(assembly.text, stdout);
     }
+    if (lex_status && lexical.diagnostic_count != 0U) {
+      for (size_t index = 0U; index < lexical.diagnostic_count; index++)
+        fprintf(stderr, "lexical: %s\n", lexical.diagnostics[index]);
+    }
+    if (parse_status && parsed.diagnostic_count != 0U) {
+      for (size_t index = 0U; index < parsed.diagnostic_count; index++)
+        fprintf(stderr, "syntax: %s\n", parsed.diagnostics[index]);
+    }
+    if (semantic_status && semantic.diagnostic_count != 0U) {
+      for (size_t index = 0U; index < semantic.diagnostic_count; index++)
+        fprintf(stderr, "semantic: %s\n", semantic.diagnostics[index]);
+    }
+    if (assembly_status && assembly.diagnostic_count != 0U) {
+      for (size_t index = 0U; index < assembly.diagnostic_count; index++)
+        fprintf(stderr, "backend: %s\n", assembly.diagnostics[index]);
+    }
     if (assembly_status) c_assembly_result_free(&assembly);
     if (semantic_status) c_semantic_result_free(&semantic);
     if (parse_status) c_parse_result_free(&parsed);
