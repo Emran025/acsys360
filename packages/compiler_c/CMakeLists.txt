@@ -41,3 +41,5 @@ target_include_directories(arabicc_c_asm_test PRIVATE include)
 add_test(NAME arabicc_c_asm_test COMMAND arabicc_c_asm_test)
 add_test(NAME arabicc_c_protocol_smoke
   COMMAND ${CMAKE_SOURCE_DIR}/../../tools/verify_compiler_c_protocol.sh $<TARGET_FILE:arabicc_c>)
+add_test(NAME arabicc_c_project_protocol
+  COMMAND ${CMAKE_SOURCE_DIR}/../../tools/verify_compiler_c_project.sh $<TARGET_FILE:arabicc_c>)
