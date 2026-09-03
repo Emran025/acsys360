@@ -49,14 +49,21 @@ jobs:
           sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
       - run: flutter config --enable-${{ matrix.target }}-desktop
       - run: flutter build ${{ matrix.target }} --release
-      - name: Build C compiler on Linux
-        if: matrix.target == 'linux'
+      - name: Build C compiler on Unix
+        if: matrix.target != 'windows'
         shell: bash
         run: |
           cmake -S packages/compiler_c -B packages/compiler_c/build -DCMAKE_BUILD_TYPE=Release
           cmake --build packages/compiler_c/build --parallel
           ctest --test-dir packages/compiler_c/build --output-on-failure
-          sudo apt-get install -y nasm gcc
+          if [ "${{ matrix.target }}" = "linux" ]; then sudo apt-get install -y nasm gcc; fi
+      - name: Build C compiler on Windows
+        if: matrix.target == 'windows'
+        shell: pwsh
+        run: |
+          cmake -S packages/compiler_c -B packages/compiler_c/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build packages/compiler_c/build --config Release --parallel
+          ctest --test-dir packages/compiler_c/build -C Release --output-on-failure
       - name: Build bundled compiler on Unix
         if: matrix.target != 'windows'
         shell: bash
@@ -91,6 +98,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force build/windows/x64/runner/Release/compiler | Out-Null
           Copy-Item packages/compiler_core/build/arabicc.exe build/windows/x64/runner/Release/compiler/arabicc.exe
+          Copy-Item packages/compiler_c/build/Release/arabicc_c.exe build/windows/x64/runner/Release/compiler/arabicc_c.exe
           Copy-Item "$env:FLUTTER_ROOT\bin\cache\dart-sdk" build/windows/x64/runner/Release/compiler/dart-sdk -Recurse -Force
       - name: Bundle compiler on macOS
         if: matrix.target == 'macos'
@@ -98,6 +106,7 @@ jobs:
         run: |
           mkdir -p build/macos/Build/Products/Release/acsys360.app/Contents/MacOS/compiler
           cp packages/compiler_core/build/arabicc build/macos/Build/Products/Release/acsys360.app/Contents/MacOS/compiler/arabicc
+          cp packages/compiler_c/build/arabicc_c build/macos/Build/Products/Release/acsys360.app/Contents/MacOS/compiler/arabicc_c
           cp -R "$FLUTTER_ROOT/bin/cache/dart-sdk" build/macos/Build/Products/Release/acsys360.app/Contents/MacOS/compiler/dart-sdk
       - name: Smoke test bundled compiler on Unix
         if: matrix.target != 'windows'
