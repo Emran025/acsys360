@@ -137,8 +137,54 @@ static int slot_for(const CSemanticResult *semantic, const char *name) {
   return (int)(((size_t)(symbol - semantic->items) + 1U) * 8U);
 }
 
+static int expression_is_real(const CAstNode *node, const CSemanticResult *semantic) {
+  if (node == NULL) return 0;
+  if (node->kind == C_AST_LITERAL) return node->data.literal.literal_kind == C_TOKEN_REAL;
+  if (node->kind == C_AST_VARIABLE_REFERENCE) {
+    const CSymbol *symbol = symbol_for(semantic, node->data.reference.name);
+    return symbol != NULL && strcmp(symbol->type, "حقيقي") == 0;
+  }
+  return node->kind == C_AST_BINARY &&
+      (expression_is_real(node->data.binary.left, semantic) ||
+       expression_is_real(node->data.binary.right, semantic));
+}
+
+static int emit_expression(const CAstNode *node, const CSemanticResult *semantic,
+                           char **text, size_t *length, size_t *capacity);
+
+static int emit_real_expression(const CAstNode *node, const CSemanticResult *semantic,
+                                char **text, size_t *length, size_t *capacity) {
+  if (node == NULL) return 0;
+  if (node->kind == C_AST_LITERAL && node->data.literal.literal_kind == C_TOKEN_REAL) {
+    return append(text, length, capacity, "    mov rax, __float64__(%s)\n    movq xmm0, rax\n", node->data.literal.value);
+  }
+  if (node->kind == C_AST_VARIABLE_REFERENCE) {
+    const int slot = slot_for(semantic, node->data.reference.name);
+    if (slot <= 0) return 0;
+    return append(text, length, capacity, "    movq xmm0, [rbp-%d]\n", slot);
+  }
+  if (node->kind == C_AST_BINARY) {
+    const int left_real = expression_is_real(node->data.binary.left, semantic);
+    const int right_real = expression_is_real(node->data.binary.right, semantic);
+    if (!emit_expression(node->data.binary.left, semantic, text, length, capacity)) return 0;
+    if (!left_real && !append(text, length, capacity, "    cvtsi2sd xmm0, rax\n")) return 0;
+    if (!append(text, length, capacity, "    movapd xmm1, xmm0\n") ||
+        !emit_expression(node->data.binary.right, semantic, text, length, capacity)) return 0;
+    if (!right_real && !append(text, length, capacity, "    cvtsi2sd xmm0, rax\n")) return 0;
+    const char *op = NULL;
+    if (strcmp(node->data.binary.operator, "+") == 0) op = "addsd";
+    else if (strcmp(node->data.binary.operator, "-") == 0) op = "subsd";
+    else if (strcmp(node->data.binary.operator, "*") == 0) op = "mulsd";
+    else if (strcmp(node->data.binary.operator, "/") == 0) op = "divsd";
+    if (op == NULL) return 0;
+    return append(text, length, capacity, "    %s xmm1, xmm0\n    movapd xmm0, xmm1\n", op);
+  }
+  return 0;
+}
+
 static int emit_expression(const CAstNode *node, const CSemanticResult *semantic,
                            char **text, size_t *length, size_t *capacity) {
+  if (expression_is_real(node, semantic)) return emit_real_expression(node, semantic, text, length, capacity);
   if (node == NULL) return 0;
   if (node->kind == C_AST_LITERAL) {
     if (node->data.literal.literal_kind == C_TOKEN_INTEGER) {
@@ -184,6 +230,12 @@ static int emit_expression(const CAstNode *node, const CSemanticResult *semantic
       return append(text, length, capacity,
                     "    cqo\n    idiv rcx\n");
     }
+    if (strcmp(node->data.binary.operator, "&&") == 0) {
+      return append(text, length, capacity, "    and rax, rcx\n");
+    }
+    if (strcmp(node->data.binary.operator, "||") == 0) {
+      return append(text, length, capacity, "    or rax, rcx\n");
+    }
     const char *condition = NULL;
     if (strcmp(node->data.binary.operator, ">") == 0) condition = "g";
     else if (strcmp(node->data.binary.operator, "<") == 0) condition = "l";
@@ -220,23 +272,29 @@ static int emit_statements(const CAstNode *program, const CAstNodeList *list, co
       const int slot = slot_for(semantic, statement->data.assignment.name);
       const CSymbol *target = symbol_for(semantic, statement->data.assignment.name);
       if (slot == 0 || target == NULL) return 0;
-      if (target->by_reference) {
+      if (strcmp(target->type, "حقيقي") == 0) {
+        if (!append(text, length, capacity, "    movq [rbp-%d], xmm0\n", slot)) return 0;
+      } else if (target->by_reference) {
         if (!append(text, length, capacity, "    mov rcx, [rbp-%d]\n    mov [rcx], rax\n", slot)) return 0;
       } else if (!append(text, length, capacity, "    mov [rbp-%d], rax\n", slot)) return 0;
     } else if (statement->kind == C_AST_PRINT) {
       for (size_t value = 0U; value < statement->data.print.values.count; value++) {
         const CAstNode *expression = statement->data.print.values.items[value];
         if (!emit_expression(expression, semantic, text, length, capacity)) return 0;
+        const CSymbol *value_symbol = expression->kind == C_AST_VARIABLE_REFERENCE
+            ? symbol_for(semantic, expression->data.reference.name) : NULL;
+        const int is_real = expression_is_real(expression, semantic);
         const int is_string = (expression->kind == C_AST_LITERAL &&
                                (expression->data.literal.literal_kind == C_TOKEN_STRING ||
                                 expression->data.literal.literal_kind == C_TOKEN_CHARACTER)) ||
-            (expression->kind == C_AST_VARIABLE_REFERENCE &&
-             symbol_for(semantic, expression->data.reference.name) != NULL &&
-             (strcmp(symbol_for(semantic, expression->data.reference.name)->type, "خيط_رمزي") == 0 ||
-              strcmp(symbol_for(semantic, expression->data.reference.name)->type, "حرفي") == 0));
-        if (!append(text, length, capacity,
-                    is_string ? "    mov rsi, rax\n    lea rdi, [rel fmt_str]\n    xor eax, eax\n    call printf\n" :
-                               "    mov rsi, rax\n    lea rdi, [rel fmt_int]\n    xor eax, eax\n    call printf\n")) return 0;
+            (value_symbol != NULL && (strcmp(value_symbol->type, "خيط_رمزي") == 0 ||
+                                      strcmp(value_symbol->type, "حرفي") == 0));
+        const char *format = is_real
+            ? "    lea rdi, [rel fmt_real]\n    mov eax, 1\n    call printf\n"
+            : is_string
+                ? "    mov rsi, rax\n    lea rdi, [rel fmt_str]\n    xor eax, eax\n    call printf\n"
+                : "    mov rsi, rax\n    lea rdi, [rel fmt_int]\n    xor eax, eax\n    call printf\n";
+        if (!append(text, length, capacity, "%s", format)) return 0;
       }
     } else if (statement->kind == C_AST_IF) {
       const size_t else_label = (*label)++; const size_t end_label = (*label)++;
@@ -304,7 +362,8 @@ int c_generate_nasm_x86_64(const CAstNode *program,
               "extern printf\n"
               "section .data\n"
               "fmt_int: db \"%%ld\", 10, 0\n"
-              "fmt_str: db \"%%s\", 10, 0\n")) {
+              "fmt_str: db \"%%s\", 10, 0\n"
+              "fmt_real: db \"%%g\", 10, 0\n")) {
     c_assembly_result_free(result);
     return 0;
   }
@@ -314,6 +373,27 @@ int c_generate_nasm_x86_64(const CAstNode *program,
     return 0;
   }
   size_t label = 0U;
+  for (size_t index = 0U; index < program->data.program.declarations.count; index++) {
+    const CAstNode *declaration = program->data.program.declarations.items[index];
+    if (declaration->kind != C_AST_CONSTANT_DECLARATION) continue;
+    const int slot = slot_for(semantic, declaration->data.constant.name);
+    const CSymbol *symbol = symbol_for(semantic, declaration->data.constant.name);
+    if (slot <= 0 || symbol == NULL ||
+        !emit_expression(declaration->data.constant.value, semantic, &result->text,
+                         &length, &capacity)) {
+      c_assembly_result_free(result);
+      return 0;
+    }
+    if (strcmp(symbol->type, "حقيقي") == 0) {
+      if (!append(&result->text, &length, &capacity, "    movq [rbp-%d], xmm0\n", slot)) {
+        c_assembly_result_free(result);
+        return 0;
+      }
+    } else if (!append(&result->text, &length, &capacity, "    mov [rbp-%d], rax\n", slot)) {
+      c_assembly_result_free(result);
+      return 0;
+    }
+  }
   if (!emit_statements(program, &program->data.program.statements, semantic, result,
                        &result->text, &length, &capacity, &label)) {
     if (result->diagnostic_count == 0U) {

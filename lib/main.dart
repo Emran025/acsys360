@@ -43,18 +43,23 @@ void main() {
 }
 
 ProcessCompilerRepository _createCompilerRepository() {
-  final compilerName = Platform.isWindows ? 'arabicc.exe' : 'arabicc';
-  final bundledPath = [
-    File(Platform.resolvedExecutable).parent.path,
-    'compiler',
-    compilerName,
-  ].join(Platform.pathSeparator);
-  if (File(bundledPath).existsSync()) {
-    return ProcessCompilerRepository(
-      executable: bundledPath,
-      arguments: const ['--protocol'],
-      processWorkingDirectory: File(Platform.resolvedExecutable).parent.path,
-    );
+  final bundleRoot = File(Platform.resolvedExecutable).parent.path;
+  final compilerNames = Platform.isWindows
+      ? const ['arabicc_c.exe', 'arabicc.exe']
+      : const ['arabicc_c', 'arabicc'];
+  for (final compilerName in compilerNames) {
+    final bundledPath = [
+      bundleRoot,
+      'compiler',
+      compilerName,
+    ].join(Platform.pathSeparator);
+    if (File(bundledPath).existsSync()) {
+      return ProcessCompilerRepository(
+        executable: bundledPath,
+        arguments: const ['--protocol'],
+        processWorkingDirectory: bundleRoot,
+      );
+    }
   }
   return ProcessCompilerRepository(
     executable: 'dart',

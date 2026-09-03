@@ -138,27 +138,65 @@ static int extract_source_for_path(const char *payload, const char *wanted_path,
   }
 }
 
-static int validate_additional_sources(const char *payload) {
+static int merge_additional_declarations(const char *payload, CAstNode *entry_program) {
+  if (entry_program == NULL || entry_program->kind != C_AST_PROGRAM) return 0;
   for (size_t index = 1U; ; index++) {
     char *path = NULL;
     char *source = NULL;
     if (!extract_source_at(payload, index, &path, &source)) return 1;
     CLexResult lexical = {0};
     CParseResult parsed = {0};
-    CSemanticResult semantic = {0};
     const int lex_ok = c_lex(source, &lexical);
     const int parse_ok = lex_ok && c_parse(&lexical, &parsed);
-    const int semantic_ok = parse_ok && parsed.program != NULL &&
-        c_analyze_semantics(parsed.program, &semantic);
-    const int valid = lex_ok && parse_ok && semantic_ok &&
-        lexical.diagnostic_count == 0U && parsed.diagnostic_count == 0U &&
-        semantic.diagnostic_count == 0U;
-    if (semantic_ok) c_semantic_result_free(&semantic);
-    if (parse_ok) c_parse_result_free(&parsed);
-    if (lex_ok) c_lex_result_free(&lexical);
+    const int valid = lex_ok && parse_ok && parsed.program != NULL &&
+        lexical.diagnostic_count == 0U && parsed.diagnostic_count == 0U;
+    if (!valid) {
+      if (parse_ok) c_parse_result_free(&parsed);
+      if (lex_ok) c_lex_result_free(&lexical);
+      free(path);
+      free(source);
+      return 0;
+    }
+    CAstNode *unit = parsed.program;
+    size_t exported_count = 0U;
+    for (size_t item = 0U; item < unit->data.program.declarations.count; item++) {
+      const CAstKind kind = unit->data.program.declarations.items[item]->kind;
+      if (kind == C_AST_TYPE_DECLARATION || kind == C_AST_PROCEDURE_DECLARATION) {
+        exported_count++;
+      }
+    }
+    if (exported_count != 0U) {
+      const size_t old_count = entry_program->data.program.declarations.count;
+      CAstNode **items = realloc(entry_program->data.program.declarations.items,
+          (old_count + exported_count) * sizeof(*items));
+      if (items == NULL) {
+        c_parse_result_free(&parsed);
+        c_lex_result_free(&lexical);
+        free(path);
+        free(source);
+        return 0;
+      }
+      entry_program->data.program.declarations.items = items;
+      for (size_t item = 0U; item < unit->data.program.declarations.count; item++) {
+        CAstNode *declaration = unit->data.program.declarations.items[item];
+        if (declaration->kind == C_AST_TYPE_DECLARATION ||
+            declaration->kind == C_AST_PROCEDURE_DECLARATION) {
+          entry_program->data.program.declarations.items[
+              entry_program->data.program.declarations.count++] = declaration;
+          unit->data.program.declarations.items[item] = NULL;
+        }
+      }
+    }
+    for (size_t item = 0U; item < unit->data.program.declarations.count; item++) {
+      c_ast_free(unit->data.program.declarations.items[item]);
+    }
+    free(unit->data.program.declarations.items);
+    unit->data.program.declarations.items = NULL;
+    unit->data.program.declarations.count = 0U;
+    c_parse_result_free(&parsed);
+    c_lex_result_free(&lexical);
     free(path);
     free(source);
-    if (!valid) return 0;
   }
 }
 
@@ -245,6 +283,60 @@ static int eval_expression(const CAstNode *node, RuntimeValue *values, size_t co
   return 0;
 }
 
+static const CAstNode *find_procedure_in_program(const CAstNode *program, const char *name) {
+  if (program == NULL || name == NULL) return NULL;
+  for (size_t index = 0U; index < program->data.program.declarations.count; index++) {
+    const CAstNode *declaration = program->data.program.declarations.items[index];
+    if (declaration->kind == C_AST_PROCEDURE_DECLARATION &&
+        strcmp(declaration->data.procedure.name, name) == 0) return declaration;
+  }
+  return NULL;
+}
+
+static int emit_statement_list(const CAstNode *program, const CAstNodeList *statements,
+                               RuntimeValue *values, size_t value_count, int *first) {
+  for (size_t i = 0U; i < statements->count; i++) {
+    const CAstNode *statement = statements->items[i];
+    if (statement->kind == C_AST_ASSIGNMENT && statement->data.assignment.selectors.count == 0U) {
+      long value = 0;
+      if (eval_expression(statement->data.assignment.expression, values, value_count, &value)) {
+        for (size_t j = 0U; j < value_count; j++) {
+          if (strcmp(values[j].name, statement->data.assignment.name) == 0) values[j].value = value;
+        }
+      }
+    } else if (statement->kind == C_AST_PRINT) {
+      for (size_t j = 0U; j < statement->data.print.values.count; j++) {
+        long value = 0;
+        if (eval_expression(statement->data.print.values.items[j], values, value_count, &value)) {
+          if (!*first) putchar(',');
+          printf("\"%ld\"", value);
+          *first = 0;
+        }
+      }
+    } else if (statement->kind == C_AST_CALL) {
+      const CAstNode *procedure = find_procedure_in_program(program, statement->data.call.name);
+      if (procedure == NULL || statement->data.call.arguments.count !=
+          procedure->data.procedure.parameter_count) continue;
+      const size_t count = procedure->data.procedure.parameter_count;
+      RuntimeValue *locals = calloc(count, sizeof(*locals));
+      if (locals == NULL) return 0;
+      int valid = 1;
+      for (size_t parameter = 0U; parameter < count; parameter++) {
+        long value = 0;
+        if (!eval_expression(statement->data.call.arguments.items[parameter], values,
+                             value_count, &value)) { valid = 0; break; }
+        locals[parameter].name = procedure->data.procedure.parameters[parameter].name;
+        locals[parameter].value = value;
+      }
+      if (valid) valid = emit_statement_list(program, &procedure->data.procedure.body,
+                                              locals, count, first);
+      free(locals);
+      if (!valid) return 0;
+    }
+  }
+  return 1;
+}
+
 static int emit_execution_body(const CAstNode *program, const CSemanticResult *semantic, int *first) {
   RuntimeValue *values = calloc(semantic->count, sizeof(*values));
   if (values == NULL) return 0;
@@ -252,28 +344,10 @@ static int emit_execution_body(const CAstNode *program, const CSemanticResult *s
     values[i].name = semantic->items[i].name;
     values[i].value = 0;
   }
-  for (size_t i = 0U; i < program->data.program.statements.count; i++) {
-    const CAstNode *statement = program->data.program.statements.items[i];
-    if (statement->kind == C_AST_ASSIGNMENT && statement->data.assignment.selectors.count == 0U) {
-      long value = 0;
-      if (eval_expression(statement->data.assignment.expression, values, semantic->count, &value)) {
-        for (size_t j = 0U; j < semantic->count; j++) {
-          if (strcmp(values[j].name, statement->data.assignment.name) == 0) values[j].value = value;
-        }
-      }
-    } else if (statement->kind == C_AST_PRINT) {
-      for (size_t j = 0U; j < statement->data.print.values.count; j++) {
-        long value = 0;
-        if (eval_expression(statement->data.print.values.items[j], values, semantic->count, &value)) {
-          if (!*first) putchar(',');
-          printf("\"%ld\"", value);
-          *first = 0;
-        }
-      }
-    }
-  }
+  const int success = emit_statement_list(program, &program->data.program.statements,
+                                           values, semantic->count, first);
   free(values);
-  return 1;
+  return success;
 }
 
 static int emit_execution(const CAstNode *program, const CSemanticResult *semantic) {
@@ -339,7 +413,8 @@ int c_run_protocol(const char *payload) {
   CSemanticResult semantic;
   const int lex_ok = c_lex(source, &lexical);
   const int parse_ok = lex_ok && c_parse(&lexical, &parsed);
-  const int project_ok = parse_ok && validate_additional_sources(payload);
+  const int project_ok = parse_ok && parsed.program != NULL &&
+      merge_additional_declarations(payload, parsed.program);
   const int semantic_ok = parse_ok && parsed.program != NULL &&
       c_analyze_semantics(parsed.program, &semantic);
   CTacResult tac = {0};

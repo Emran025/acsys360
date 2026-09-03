@@ -110,16 +110,28 @@ static CIrType infer(const CAstNode *node, const CSemanticResult *semantic,
     const CIrType right_type = infer(node->data.binary.right, semantic, result,
                                      temporary, right, sizeof(right));
     if (left_type == C_IR_UNKNOWN || right_type == C_IR_UNKNOWN ||
-        left_type != right_type) {
+        (left_type != right_type &&
+         !(left_type == C_IR_REAL && right_type == C_IR_INTEGER) &&
+         !(left_type == C_IR_INTEGER && right_type == C_IR_REAL))) {
       (void)push_diagnostic(result, "أنواع غير متوافقة داخل العملية الثنائية");
       return C_IR_UNKNOWN;
     }
+    const int is_comparison = strcmp(node->data.binary.operator, ">") == 0 ||
+        strcmp(node->data.binary.operator, "<") == 0 ||
+        strcmp(node->data.binary.operator, ">=") == 0 ||
+        strcmp(node->data.binary.operator, "<=") == 0 ||
+        strcmp(node->data.binary.operator, "==") == 0 ||
+        strcmp(node->data.binary.operator, "!=") == 0 ||
+        strcmp(node->data.binary.operator, "&&") == 0 ||
+        strcmp(node->data.binary.operator, "||") == 0;
+    const CIrType result_type = is_comparison ? C_IR_BOOLEAN :
+        (left_type == C_IR_REAL || right_type == C_IR_REAL ? C_IR_REAL : left_type);
     const size_t current = (*temporary)++;
     if (!push_line(result, "t%zu: %s = %s %s %s", current,
-                   c_ir_type_name(left_type), left, node->data.binary.operator,
+                   c_ir_type_name(result_type), left, node->data.binary.operator,
                    right)) return C_IR_UNKNOWN;
     (void)snprintf(value, value_size, "t%zu", current);
-    return left_type;
+    return result_type;
   }
   return C_IR_UNKNOWN;
 }
