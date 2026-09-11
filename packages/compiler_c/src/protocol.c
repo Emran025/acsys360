@@ -309,7 +309,7 @@ char *protocol_serialize_response(const ProtocolResponse *resp) {
   if (resp->intermediate_representation_json && resp->intermediate_representation_json[0] != '\0') {
     buf_append(&b, resp->intermediate_representation_json);
   } else {
-    buf_append(&b, "null");
+    buf_append(&b, "{}");
   }
 
   buf_append(&b, "}\n");
@@ -318,7 +318,7 @@ char *protocol_serialize_response(const ProtocolResponse *resp) {
 
 int c_run_protocol(const char *payload) {
   if (payload == NULL || payload[0] == '\0') {
-    fputs("{\"protocolVersion\":\"" ARABICC_PROTOCOL_VERSION "\",\"success\":false,\"diagnostics\":[{\"severity\":\"error\",\"phase\":\"driver\",\"code\":\"P001\",\"message\":\"حزمة الطلب فارغة\",\"span\":null}],\"tokens\":[],\"syntaxTree\":null,\"symbolTable\":[],\"threeAddressCode\":[],\"assembly\":\"\",\"executionOutput\":[],\"artifacts\":[],\"intermediateRepresentation\":null}\n", stdout);
+    fputs("{\"protocolVersion\":\"" ARABICC_PROTOCOL_VERSION "\",\"success\":false,\"diagnostics\":[{\"severity\":\"error\",\"phase\":\"driver\",\"code\":\"P001\",\"message\":\"حزمة الطلب فارغة\",\"span\":null}],\"tokens\":[],\"syntaxTree\":null,\"symbolTable\":[],\"threeAddressCode\":[],\"assembly\":\"\",\"executionOutput\":[],\"artifacts\":[],\"intermediateRepresentation\":{}}\n", stdout);
     return 1;
   }
 

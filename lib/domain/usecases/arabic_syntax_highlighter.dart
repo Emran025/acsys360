@@ -133,7 +133,9 @@ class ArabicSyntaxHighlighter {
         index++;
         if (index < source.length) index++;
         if (index < source.length &&
-            (source[index] == '’' || source[index] == '‘' || source[index] == '\'')) {
+            (source[index] == '’' ||
+                source[index] == '‘' ||
+                source[index] == '\'')) {
           index++;
         }
         tokens.add(
