@@ -7,6 +7,32 @@ import 'package:acsys360/domain/entities/document.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('communicates with the compiled C arabicc binary over protocol', () async {
+    final cExecutable = '${Directory.current.path}/packages/compiler_c/build/arabicc.exe';
+    if (!File(cExecutable).existsSync()) return;
+
+    final repository = ProcessCompilerRepository(
+      executable: cExecutable,
+      arguments: const ['--protocol'],
+      processWorkingDirectory: Directory.current.path,
+    );
+
+    final response = await repository.compile(
+      rootPath: Directory.current.path,
+      sourcePath: '${Directory.current.path}/main.arb',
+      documents: [
+        Document(
+          path: '${Directory.current.path}/main.arb',
+          text: 'برنامج اختبار {}.',
+        ),
+      ],
+    );
+
+    expect(response['protocolVersion'], '0.5.0');
+    expect(response['success'], isTrue);
+    expect(response['diagnostics'], isEmpty);
+  });
+
   test('compiles open documents through the JSON CLI protocol', () async {
     final root = await Directory.systemTemp.createTemp('acsys360-adapter-');
     addTearDown(() => root.delete(recursive: true));

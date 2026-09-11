@@ -56,13 +56,23 @@ ProcessCompilerRepository _createCompilerRepository() {
       processWorkingDirectory: File(Platform.resolvedExecutable).parent.path,
     );
   }
+  final localBuildPath = [
+    Directory.current.path,
+    'packages',
+    'compiler_c',
+    'build',
+    compilerName,
+  ].join(Platform.pathSeparator);
+  if (File(localBuildPath).existsSync()) {
+    return ProcessCompilerRepository(
+      executable: localBuildPath,
+      arguments: const ['--protocol'],
+      processWorkingDirectory: Directory.current.path,
+    );
+  }
   return ProcessCompilerRepository(
-    executable: 'dart',
-    arguments: const [
-      'run',
-      'packages/compiler_core/bin/arabicc.dart',
-      '--protocol',
-    ],
+    executable: compilerName,
+    arguments: const ['--protocol'],
     processWorkingDirectory: Directory.current.path,
   );
 }

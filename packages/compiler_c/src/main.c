@@ -1,8 +1,5 @@
-#include "asm_x86_64.h"
-#include "lexer.h"
-#include "parser.h"
 #include "protocol.h"
-#include "semantic.h"
+#include "ast.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,57 +28,40 @@ static char *read_stdin(void) {
 }
 
 int main(int argc, char **argv) {
-  if (argc == 2 && strcmp(argv[1], "--protocol") == 0) {
+  if (argc >= 2 && (strcmp(argv[1], "--protocol") == 0 || strcmp(argv[1], "--assist") == 0)) {
     char *payload = read_stdin();
-    if (payload == NULL) return 70;
+    if (payload == NULL) {
+      fputs("{\"protocolVersion\":\"0.5.0\",\"success\":false,\"diagnostics\":[{\"severity\":\"error\",\"phase\":\"driver\",\"code\":\"P002\",\"message\":\"فشل قراءة الدخل القياسي\",\"span\":null}],\"tokens\":[],\"syntaxTree\":null,\"symbolTable\":[],\"threeAddressCode\":[],\"assembly\":\"\",\"executionOutput\":[],\"artifacts\":[],\"intermediateRepresentation\":null}\n", stdout);
+      return 70;
+    }
     const int result = c_run_protocol(payload);
     free(payload);
     return result;
   }
-  if (argc == 2 && strcmp(argv[1], "--asm") == 0) {
-    char *source = read_stdin();
-    if (source == NULL) return 70;
-    CLexResult lexical;
-    CParseResult parsed;
-    CSemanticResult semantic;
-    CAssemblyResult assembly;
-    const int lex_status = c_lex(source, &lexical);
-    const int parse_status = lex_status ? c_parse(&lexical, &parsed) : 0;
-    const int semantic_status = parse_status && parsed.program != NULL
-        ? c_analyze_semantics(parsed.program, &semantic)
-        : 0;
-    const int assembly_status = semantic_status
-        ? c_generate_nasm_x86_64(parsed.program, &semantic, &assembly)
-        : 0;
-    if (assembly_status && assembly.diagnostic_count == 0U) {
-      fputs(assembly.text, stdout);
-    }
-    if (assembly_status) c_assembly_result_free(&assembly);
-    if (semantic_status) c_semantic_result_free(&semantic);
-    if (parse_status) c_parse_result_free(&parsed);
-    if (lex_status) c_lex_result_free(&lexical);
-    free(source);
-    return assembly_status && lex_status && parse_status && semantic_status ? 0 : 1;
+
+  if (argc >= 2 && (strcmp(argv[1], "--version") == 0 || strcmp(argv[1], "-v") == 0)) {
+    printf("arabicc version %s (C / Flex+Bison backend)\n", ARABICC_PROTOCOL_VERSION);
+    return 0;
   }
-  if (argc == 2 && strcmp(argv[1], "--lex") == 0) {
-    char *source = read_stdin();
-    if (source == NULL) return 70;
-    CLexResult result;
-    const int success = c_lex(source, &result);
-    if (success) {
-      for (size_t index = 0U; index < result.count; index++) {
-        printf("%s\t%s\t%zu\t%zu\t%zu\n",
-               c_token_kind_name(result.items[index].kind),
-               result.items[index].lexeme,
-               result.items[index].line,
-               result.items[index].column,
-               result.items[index].length);
-      }
-    }
-    c_lex_result_free(&result);
-    free(source);
-    return success ? 0 : 70;
+
+  if (argc >= 2 && (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0)) {
+    printf("الاستخدام: arabicc [خيارات]\n");
+    printf("الخيارات:\n");
+    printf("  --protocol    تشغيل وضع بروتوكول التواصل مع محرر Flutter (عبر stdin/stdout)\n");
+    printf("  --assist      تشغيل وضع المساعدة والإكمال التلقائي\n");
+    printf("  --version     عرض إصدار المترجم\n");
+    printf("  --help        عرض هذه المساعدة\n");
+    return 0;
   }
-  fputs("usage: arabicc_c --protocol | --lex | --asm\\n", stderr);
+
+  /* الوضع الافتراضي: إذا لم يُمرر معامل، يتم قراءة stdin كبروتوكول افتراضي */
+  char *payload = read_stdin();
+  if (payload != NULL && payload[0] != '\0') {
+    const int result = c_run_protocol(payload);
+    free(payload);
+    return result;
+  }
+
+  fputs("استخدام المترجم: arabicc --protocol\n", stderr);
   return 64;
 }

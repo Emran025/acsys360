@@ -1,9 +1,20 @@
 #ifndef ARABICC_AST_H
 #define ARABICC_AST_H
 
-#include "lexer.h"
-
 #include <stddef.h>
+
+typedef enum {
+  C_TOK_IDENTIFIER,
+  C_TOK_KEYWORD,
+  C_TOK_INTEGER,
+  C_TOK_REAL,
+  C_TOK_STRING,
+  C_TOK_CHARACTER,
+  C_TOK_BOOLEAN,
+  C_TOK_OPERATOR,
+  C_TOK_PUNCTUATION,
+  C_TOK_EOF
+} CTokenKind;
 
 typedef enum {
   C_AST_PROGRAM,
