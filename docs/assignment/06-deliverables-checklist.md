@@ -17,9 +17,9 @@
 |---|---|
 | عشرة أمثلة عربية | مجلد `examples/` من `01_arithmetic.arb` إلى `10_combined.arb`، مع `examples/errors/` للنتائج السلبية |
 | compiler executable المضمّن | داخل حزمة Desktop في `compiler/arabicc` أو `compiler/arabicc.exe` |
-| Dart SDK للـ native target | داخل release في `compiler/dart-sdk` |
+| C compiler runtime | executable `arabicc` أو `arabicc.exe` داخل release |
 | نتائج lexer/parser/semantic/TAC/assembly/execution | استجابة protocol ولوحة نتائج المحرر |
-| artifact الناتج | قائمة `artifacts` بعد نجاح `target: dart-native` فقط |
+| artifact الناتج | قائمة `artifacts` بعد نجاح target المدعوم والتحقق من الملف |
 | شجرة الملفات | `WorkspaceExplorer` مع اختيار Workspace حقيقي |
 | التلوين | `ArabicCodeController.buildTextSpan` وتصنيف token colors |
 | indentation | Enter الذكي وformatter الصريح |

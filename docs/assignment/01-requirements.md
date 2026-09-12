@@ -17,7 +17,7 @@
 | Three-Address Code | تعليمات وسيطة ناتجة من AST والتعبيرات والتحكم والاستدعاءات |
 | Assembly | مخرج نصي NASM-like قابل للفحص الأكاديمي، مع التصريح بأنه غير assembled ما لم ينفذ assembler حقيقي |
 | Execution | تنفيذ داخلي للبرنامج الصحيح مع `executionOutput` منفصل عن artifact |
-| Native Artifact | executable حقيقي يعاد مساره فقط بعد نجاح `dart compile exe` والتحقق من الملف |
+| Compiler Artifact | executable `arabicc` حقيقي يبنيه CMake ويعاد تضمينه فقط بعد اجتياز smoke test |
 | Examples | عشرة أمثلة عربية متنوعة تغطي الحساب والتعريفات والشرط والحلقات والإجراءات والمراجع والقوائم والسجلات والبرنامج المركب |
 | Editor | محرر مستقل يتصل بالمترجم التنفيذي عبر JSON protocol versioned |
 
@@ -25,7 +25,7 @@
 
 لا تضيف اللغة صياغة تشبه C أو Java لمجرد تسهيل التنفيذ. الكلمات والرموز والتراكيب المقبولة هي التي تحددها وثيقة القواعد العربية. ويُرفض أي امتداد جديد ما لم يضاف إلى lexer وparser وAST وsemantic وruntime وbackend والاختبارات والتوثيق معًا.
 
-لا يُعد interpreter بديلًا عن compiler backend، ولا تُعد Assembly النصية ملفًا تنفيذيًا، ولا يُفترض أن يعمل native build من نسخة المستخدم إلا إذا كانت حزمة release تحتوي toolchain اللازمة أو كان backend مستقلًا عنها. في الإصدار self-contained الحالي تُرفق Dart SDK داخل `compiler/dart-sdk` في حزم Desktop.
+لا يُعد interpreter بديلًا عن compiler backend، ولا تُعد Assembly النصية ملفًا تنفيذيًا. في الإصدار self-contained الحالي يكون backend C مستقلًا داخل `compiler/arabicc[.exe]`، لذلك لا يحتاج المستخدم إلى Dart SDK أو Flex أو Bison لتشغيل الحزمة الموزعة.
 
 ## 4. حالات الاستخدام الأساسية
 

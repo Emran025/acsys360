@@ -20,7 +20,7 @@
 | `sourceTexts` | `Map<String, String>` | لا | محتوى snapshots؛ له الأولوية على القراءة من القرص |
 | `mode` | `String` | لا | `active` أو `project`، والافتراضي `project` |
 | `entryPath` | `String?` | لا | ملف الدخول عند الحاجة |
-| `target` | `String` | لا | الهدف؛ `none` أو `dart-native` |
+| `target` | `String` | لا | الهدف؛ `none` أو target مدعوم صراحة من backend الحالي |
 | `artifactDirectory` | `String?` | لا | مجلد إخراج artifact عند طلب target تنفيذي |
 
 ## الاستجابة
@@ -60,4 +60,4 @@
 
 ## ما لم ينفذ بعد
 
-العقد يعرّف شكل النقل، وCLI يمرر كل ملف إلى lexer/parser/semantic ثم يجمع النتائج في استجابة project، ويمرر `intermediateRepresentation` بعد بناء Typed IR والتحقق منه، مع تحليل project-level للإجراءات والأنواع المصدرة. لا تُسرّب المتغيرات بين الملفات دون import syntax. يدعم الإصدار `dart-native` طلب بناء artifact في `artifactDirectory`، ويستخدم Dart SDK المضمّن في release أو `DART_EXECUTABLE`/PATH في التطوير، ولا يعيد المسار إلا بعد إنشاء executable والتحقق من وجوده. أما `target: none` فيبقى السلوك الافتراضي المتوافق مع الترجمة والتحليل والتنفيذ الداخلي.
+العقد يعرّف شكل النقل، و`arabicc` يمرر كل ملف إلى lexer/parser/semantic ثم يجمع النتائج في استجابة project، ويمرر `intermediateRepresentation` عندما تتوفر في backend. لا تُسرّب المتغيرات بين الملفات دون import syntax. يبقى `target: none` السلوك الافتراضي للتحليل والتنفيذ الداخلي، ولا يعاد مسار artifact إلا بعد أن ينشئ backend المدعوم ملفًا حقيقيًا ويتحقق من وجوده.

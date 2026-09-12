@@ -65,7 +65,7 @@
 | Typed IR | تحقق من التعليمات والـ labels والقفزات قبل assembly/execution |
 | Assembly | نص NASM-like مشتق من TAC وقابل للفحص الأكاديمي فقط في الوضع الحالي |
 | Interpreter | تنفيذ داخلي وإخراج stdout من البرنامج الصحيح |
-| dart-native | توليد Dart ثم `dart compile exe` وإعادة مسار executable الحقيقي عند النجاح |
+| C backend | بناء `arabicc` عبر CMake وتضمينه بعد التحقق من executable الحقيقي |
 
 ## 7. معيار عدم الادعاء
 
