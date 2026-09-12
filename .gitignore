@@ -46,3 +46,8 @@ app.*.map.json
 
 # Native C build output
 packages/compiler_c/build/
+
+# Flex/Bison generated sources (re-generated at build time)
+packages/compiler_c/src/lexer.yy.c
+packages/compiler_c/src/parser.tab.c
+packages/compiler_c/src/parser.tab.h

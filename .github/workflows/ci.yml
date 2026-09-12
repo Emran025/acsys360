@@ -10,22 +10,13 @@ permissions:
   contents: read
 
 jobs:
-  compiler-core:
+  compiler-contracts:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dart-lang/setup-dart@v1
         with:
           sdk: 3.12.2
-      - name: Get compiler core dependencies
-        working-directory: packages/compiler_core
-        run: dart pub get
-      - name: Analyze compiler core
-        working-directory: packages/compiler_core
-        run: dart analyze
-      - name: Run compiler self-tests
-        working-directory: packages/compiler_core
-        run: dart run bin/self_test.dart
       - name: Get shared contracts dependencies
         working-directory: packages/compiler_contracts
         run: dart pub get
@@ -44,18 +35,18 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y flex bison
-      - name: Build C compiler milestone
+      - name: Build C compiler
         working-directory: packages/compiler_c
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
           cmake --build build --parallel
-      - name: Test C compiler milestone
+      - name: Run C compiler tests
         working-directory: packages/compiler_c
         run: ctest --test-dir build --output-on-failure
       - name: Verify C compiler protocol response
         working-directory: packages/compiler_c
         run: |
-          echo '{"protocolVersion":"0.5.0","rootPath":".","sourcePaths":["main.arb"],"sourceTexts":{"main.arb":"برنامج test {}."},"mode":"project"}' | ./build/arabicc_c --protocol
+          printf '{"protocolVersion":"0.5.0","rootPath":".","sourcePaths":["main.arb"],"sourceTexts":{"main.arb":"program test {}."},"mode":"project"}' | ./build/arabicc --protocol
 
   editor:
     runs-on: ubuntu-latest
@@ -69,13 +60,12 @@ jobs:
       - run: >-
           dart format --output=none --set-exit-if-changed
           lib test
-          packages/compiler_core/lib packages/compiler_core/test
           packages/compiler_contracts/lib packages/compiler_contracts/test
       - run: flutter analyze
       - run: flutter test
 
   desktop-build:
-    needs: [compiler-core, compiler-c, editor]
+    needs: [compiler-contracts, compiler-c, editor]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

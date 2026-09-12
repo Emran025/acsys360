@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../controllers/editor_controller.dart';
 
-
 class StatusBarWidget extends StatelessWidget {
   final EditorController controller;
   const StatusBarWidget({super.key, required this.controller});

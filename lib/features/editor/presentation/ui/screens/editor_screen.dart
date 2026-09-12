@@ -1253,4 +1253,3 @@ class _EditorShellState extends State<EditorShell> {
     );
   }
 }
-

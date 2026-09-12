@@ -3,7 +3,8 @@ abstract class Failure {
   const Failure([this.message = '']);
 
   @override
-  String toString() => message.isEmpty ? runtimeType.toString() : '$runtimeType: $message';
+  String toString() =>
+      message.isEmpty ? runtimeType.toString() : '$runtimeType: $message';
 }
 
 class ServerFailure extends Failure {
