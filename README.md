@@ -70,3 +70,35 @@ dart run tool/verify_compiler_bundle.dart --executable packages/compiler_c/build
 ```
 
 يتم نشر صورة بيئة التطوير تلقائيًا إلى `ghcr.io/emran025/acsys360/dev:latest` عند الدفع إلى الفرع الرئيسي.
+
+## بناء نسخة Windows نهائية محليًا
+
+يمكن بناء نسخة Windows كاملة من جذر المشروع باستخدام PowerShell. يتطلب السكربت Flutter وDart وCMake وVisual Studio مع أدوات C، إضافة إلى Flex وBison؛ ويمكن تثبيت الأخيرين عبر Chocolatey:
+
+```powershell
+choco install winflexbison3 --yes
+```
+
+بعدها شغّل:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tool\build_windows_release.ps1
+```
+
+ينفذ السكربت `flutter pub get` و`dart format` و`flutter analyze` و`flutter test`، ثم يبني `arabicc.exe` عبر CMake، ويبني المحرر بـ `flutter build windows --release`، ويضمّن المترجم داخل `compiler\arabicc.exe`. بعد ذلك يشغّل smoke test للبروتوكول ويكتب الحزمة القابلة للتوزيع هنا:
+
+```text
+dist\acsys360-windows-local.zip
+```
+
+لإعادة البناء من الصفر:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tool\build_windows_release.ps1 -Clean
+```
+
+يمكن تجاوز فحوص Dart/Flutter فقط عند الحاجة إلى تصحيح سريع للبناء، وليس كفحص إصدار نهائي:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tool\build_windows_release.ps1 -SkipChecks
+```
