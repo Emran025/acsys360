@@ -83,7 +83,7 @@ static int check_expression(Analyzer *analyzer, const CAstNode *node) {
   if (node == NULL) return 0;
   switch (node->kind) {
     case C_AST_LITERAL:
-      return 1;
+      return 1;  /* integer, real, string — all valid */
     case C_AST_VARIABLE_REFERENCE:
       if (find_symbol(analyzer->result, node->data.reference.name) == NULL) {
         return diagnostic(analyzer, "رمز غير معرف: %s",

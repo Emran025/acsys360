@@ -194,6 +194,15 @@ CAstNode *c_ast_new_integer(const char *value) {
   return node;
 }
 
+CAstNode *c_ast_new_string(char *value) {
+  CAstNode *node = calloc(1, sizeof(CAstNode));
+  if (!node) return NULL;
+  node->kind = C_AST_LITERAL;
+  node->data.literal.value = value; /* takes ownership (already strdup'd by lexer) */
+  node->data.literal.literal_kind = C_TOKEN_STRING;
+  return node;
+}
+
 CAstNode *c_ast_new_reference(char *name) {
   CAstNode *node = calloc(1, sizeof(CAstNode));
   if (!node) return NULL;

@@ -180,6 +180,7 @@ CAstNode *c_ast_new_assignment(char *name, CAstNode *expr);
 CAstNode *c_ast_new_print(CAstNode *expr);
 CAstNode *c_ast_new_binary(CAstNode *left, const char *op, CAstNode *right);
 CAstNode *c_ast_new_integer(const char *value);
+CAstNode *c_ast_new_string(char *value);
 CAstNode *c_ast_new_reference(char *name);
 
 #endif

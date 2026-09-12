@@ -43,7 +43,7 @@ CAstNode *g_root_ast = NULL;
 %token TOK_ASSIGN
 
 %type <node> program statement var_decl assign_stmt print_stmt expr term factor
-%type <list> declaration_list statement_list
+%type <list> declaration_list statement_list print_arg_list
 
 %start program
 
@@ -89,6 +89,22 @@ var_decl
     {
       $$ = c_ast_new_var_decl($2, "صحيح");
     }
+  | TOK_VAR TOK_IDENTIFIER ':' TOK_TYPE_REAL
+    {
+      $$ = c_ast_new_var_decl($2, "حقيقي");
+    }
+  | TOK_VAR TOK_IDENTIFIER ':' TOK_TYPE_STRING
+    {
+      $$ = c_ast_new_var_decl($2, "خيط_رمزي");
+    }
+  | TOK_VAR TOK_IDENTIFIER ':' TOK_TYPE_BOOL
+    {
+      $$ = c_ast_new_var_decl($2, "منطقي");
+    }
+  | TOK_VAR TOK_IDENTIFIER ':' TOK_TYPE_CHAR
+    {
+      $$ = c_ast_new_var_decl($2, "حرفي");
+    }
   ;
 
 statement_list
@@ -122,10 +138,35 @@ assign_stmt
     }
   ;
 
-print_stmt
-  : TOK_PRINT '(' expr ')'
+print_arg_list
+  : print_arg_list ',' expr
     {
-      $$ = c_ast_new_print($3);
+      $$ = $1;
+      c_ast_list_append(&$$, $3);
+    }
+  | expr
+    {
+      $$.items = NULL;
+      $$.count = 0;
+      c_ast_list_append(&$$, $1);
+    }
+  ;
+
+print_stmt
+  : TOK_PRINT '(' print_arg_list ')'
+    {
+      CAstNode *node = calloc(1, sizeof(CAstNode));
+      node->kind = C_AST_PRINT;
+      node->data.print.values = $3;
+      $$ = node;
+    }
+  | TOK_PRINT '(' ')'
+    {
+      CAstNode *node = calloc(1, sizeof(CAstNode));
+      node->kind = C_AST_PRINT;
+      node->data.print.values.items = NULL;
+      node->data.print.values.count = 0;
+      $$ = node;
     }
   ;
 
@@ -143,6 +184,10 @@ term
 
 factor
   : TOK_INTEGER_LITERAL { $$ = c_ast_new_integer($1); }
+  | TOK_REAL_LITERAL    { $$ = c_ast_new_integer($1); } /* treat real as numeric for now */
+  | TOK_STRING_LITERAL  { $$ = c_ast_new_string($1); }
+  | TOK_TRUE            { $$ = c_ast_new_integer("1"); }
+  | TOK_FALSE           { $$ = c_ast_new_integer("0"); }
   | TOK_IDENTIFIER      { $$ = c_ast_new_reference($1); }
   | '(' expr ')'        { $$ = $2; }
   ;
