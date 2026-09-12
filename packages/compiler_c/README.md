@@ -1,84 +1,108 @@
-# arabicc (C Compiler Backend - Flex & Bison)
+# arabicc — C Compiler Backend
 
-هذا هو التنفيذ المستقل للمترجم العربي بلغة C المبني باستخدام **Flex** (للمحلل المعجمي) و **GNU Bison** (للمحلل النحوي)، والذي يتصل مباشرة بواجهات محرر Flutter عبر بروتوكول JSON القياسي (`0.5.0`).
+هذا هو backend المستقل للمترجم العربي في `packages/compiler_c`. يستخدم **Flex** للمحلل المعجمي و**GNU Bison** للمحلل النحوي، ويبني executable باسم `arabicc` يتصل بتطبيق Flutter عبر JSON Protocol الإصدار `0.5.0`.
 
----
+## المتطلبات
 
-## 1. المتطلبات البرمجية الأساسية (Prerequisites)
+### Windows
 
-لأي مطور يقوم باستنساخ المشروع (Git Clone) أو للبناء على بيئات مختلفة:
+يعمل البناء الرسمي باستخدام Visual Studio و`winflexbison3`:
 
-### على نظام Windows:
-- **مترجم C**: `gcc` (متوفر عبر [MSYS2](https://www.msys2.org/) أو MinGW أو w64devkit).
-- **Flex و Bison**:
-  - الخيار 1 (عبر MSYS2 - موصى به):
-    ```sh
-    pacman -S mingw-w64-ucrt-x86_64-gcc flex bison make cmake
-    ```
-  - الخيار 2 (عبر Chocolatey):
-    ```sh
-    choco install winflexbison3 mingw
-    ```
-  - الخيار 3 (عبر Winget):
-    ```sh
-    winget install MSYS2.MSYS2
-    ```
+```powershell
+choco install winflexbison3 --yes
+```
 
-### على نظام Linux (Ubuntu / Debian):
+يمكن استخدام MSYS2 أو MinGW عند الحاجة إلى أدوات C إضافية، لكن workflow الرسمي يستخدم MSVC على `windows-latest`.
+
+### Linux
+
 ```sh
 sudo apt update
 sudo apt install -y build-essential flex bison cmake
 ```
 
-### على نظام macOS:
+### macOS
+
 ```sh
 brew install flex bison cmake
 ```
 
----
+## البناء عبر CMake
 
-## 2. طرق البناء (Build Instructions)
+من مجلد `packages/compiler_c`:
 
-### الطريقة 1: عبر سكربتات البناء المباشرة (Windows)
-تقوم السكربتات باكتشاف الأدوات تلقائياً سواء كانت في مسار النظام `PATH` أو في مسار MSYS2 الافتراضي `C:\msys64`:
-```powershell
-# عبر PowerShell:
-powershell -ExecutionPolicy Bypass -File build.ps1
-
-# أو عبر موجه الأوامر (CMD):
-build.bat
-```
-
-### الطريقة 2: عبر CMake (متوافق مع جميع المنصات وخوادم CI/CD)
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
-الناتج التنفيذي سيكون في المسار:
-- في Windows: `build/arabicc.exe` أو `build/arabicc_c.exe`
-- في Linux/macOS: `build/arabicc` أو `build/arabicc_c`
+على Windows باستخدام Visual Studio:
 
----
+```powershell
+cmake -S . -B build
+cmake --build build --parallel --config Release
+ctest --test-dir build -C Release --output-on-failure
+```
 
-## 3. التحقق من عمل المترجم وبروتوكول الواجهات
+الناتج هو:
 
-- التحقق من الإصدار:
-  ```sh
-  ./build/arabicc.exe --version
-  ```
-- تشغيل اختبار الدخان المعتمد للنشر (Deploy / Smoke Test):
-  ```sh
-  dart run ../../tool/verify_compiler_bundle.dart --executable packages/compiler_c/build/arabicc.exe
-  ```
+```text
+Linux/macOS: build/arabicc
+Windows:     build/Release/arabicc.exe
+```
 
----
+يستخدم `CMakeLists.txt` خيار Flex `--wincompat` على Windows حتى لا يضيف scanner الناتج اعتمادًا على `unistd.h` غير المتوفرة مع MSVC. كما يستخدم `lexer.l` دالة نسخ نصية محمولة متوافقة مع C17 بدل `strdup`.
 
-## 4. هيكل مجلد المترجم
-- `src/lexer.l`: مواصفات المحلل المعجمي (Flex) بدعم UTF-8 للحروف والكلمات العربية.
-- `src/parser.y`: قواعد الجرامر والإعراب (Bison).
-- `src/protocol.c` و `include/protocol.h`: جسر التواصل المعياري بالـ JSON مع محرر Flutter.
-- `src/ast.c` و `include/ast.h`: هياكل وإدارة عُقد شجرة الإعراب (AST).
-- `src/main.c`: نقطة البداية ومعالجة `--protocol` و `--assist`.
-- `legacy_manual/`: أرشيف محاولات بناء المترجم يدوياً قبل الانتقال إلى Flex و Bison.
+## الأوامر التشغيلية
+
+```sh
+./build/arabicc --version
+./build/arabicc --help
+```
+
+في Windows:
+
+```powershell
+.\build\Release\arabicc.exe --version
+.\build\Release\arabicc.exe --help
+```
+
+لتشغيل بروتوكول JSON، أرسل الطلب إلى stdin باستخدام `--protocol`:
+
+```sh
+printf '%s\n' '{"protocolVersion":"0.5.0","rootPath":"/tmp","sourcePaths":[],"sourceTexts":{},"mode":"project"}' | ./build/arabicc --protocol
+```
+
+ويتحقق اختبار التكامل من executable المضمن داخل تطبيق Desktop:
+
+```sh
+dart run tool/verify_compiler_bundle.dart --executable build/arabicc
+```
+
+## بنية المجلد
+
+| المسار | المسؤولية |
+|---|---|
+| `src/lexer.l` | قواعد Flex للرموز والكلمات العربية ومواقعها |
+| `src/parser.y` | قواعد Bison وبناء AST |
+| `src/protocol.c` | قراءة JSON request وتجميع JSON response |
+| `src/main.c` | نقطة التشغيل ومعالجة `--protocol` و`--assist` و`--version` و`--help` |
+| `src/ast.c` | عقد AST والتسلسل المرتبط بها |
+| `src/semantic.c` | الرموز والتحقق الدلالي المحدود |
+| `src/asm_x86_64.c` | توليد Assembly نصية ضمن subset المدعوم |
+| `include/*.h` | عقود البيانات وواجهات الوحدات |
+| `CMakeLists.txt` | توليد parser/scanner وبناء `arabicc` واختبارات CMake |
+
+## التكامل مع التطبيق
+
+يبدأ تطبيق Flutter العملية من data layer عبر `ProcessCompilerRepositoryImpl`. يكتب الطلب إلى stdin، يقرأ الاستجابة من stdout، ثم يحولها عبر `packages/compiler_contracts` إلى كيانات domain. لا يعتمد `arabicc` على Flutter، ولا يجب أن تستدعي Widgets parser أو filesystem مباشرة.
+
+## References
+
+[1]: https://github.com/Emran025/acsys360/blob/main/packages/compiler_c/CMakeLists.txt "arabicc CMake configuration"
+[2]: https://github.com/Emran025/acsys360/blob/main/packages/compiler_c/src/lexer.l "Arabic Flex lexer"
+[3]: https://github.com/Emran025/acsys360/blob/main/packages/compiler_c/src/parser.y "Arabic Bison parser"
+[4]: https://github.com/Emran025/acsys360/blob/main/.github/workflows/release.yml "Cross-platform release workflow"
+
+المراجع: [1] [2] [3] [4]

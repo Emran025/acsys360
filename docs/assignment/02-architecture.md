@@ -1,53 +1,65 @@
-# 02 — المعمارية والتنظيم
+# 02 — المعمارية والتنظيم الحالي
 
 ## 1. المبدأ العام
 
-المحرر والمترجم برنامجان منفصلان. لا يضع Flutter lexer أو parser أو semantic analyzer داخل طبقة العرض، ولا يقرأ المترجم حالة Widgets. يتواصل الطرفان عبر JSON protocol مشترك في حزمة `compiler_contracts`، بحيث يمكن اختبار compiler مستقلًا وإعادة بناء المحرر دون نقل منطق اللغة إلى الواجهة.
+المحرر والمترجم عمليتان منفصلتان. تطبيق Flutter لا يضع Flex أو Bison أو التحليل الدلالي داخل طبقة العرض، والمترجم لا يعتمد على Widgets أو حالة Flutter. يربط `ProcessCompilerRepositoryImpl` بين التطبيق وexecutable `arabicc` عبر JSON Protocol الإصدار `0.5.0`، بينما توفر `packages/compiler_contracts` النماذج والتحقق من الطلب والاستجابة.
 
-## 2. طبقات المحرر
+## 2. طبقات تطبيق Flutter
 
-| الطبقة | مسؤوليتها |
-|---|---|
-| Presentation | Widgets، الاختصارات، شريط النتائج، شجرة الملفات، الحالة المرئية، selection، ghost text |
-| State | `EditorController`، إدارة Workspace والتبويبات والتشخيصات وعمليات التحرير |
-| Domain | Use cases مثل التحليل والتنسيق والبحث والاستبدال، وواجهات repositories |
-| Data | filesystem repository و`ProcessCompilerRepository` الذي يبدأ compiler executable ويرسل JSON |
-| External | Flutter Desktop، file picker، process stdin/stdout، filesystem |
+| الطبقة | المسار | المسؤولية |
+|---|---|---|
+| Presentation | `lib/features/editor/presentation` | `EditorShell`، المحرر، التبويبات، مستكشف الملفات، لوحات التشخيص والنتائج، الاختصارات، minimap وWidgets |
+| Controller | `lib/features/editor/presentation/controllers` | `EditorController` وتنسيق حالة الملفات والتبويبات والتحليل والتنفيذ |
+| Domain | `lib/features/editor/domain` | كيانات `Document` و`Workspace` و`FileNode` و`CompilationResult`، عقود repositories، وuse cases للتحرير واللغة |
+| Data | `lib/features/editor/data` | `LocalWorkspaceRepositoryImpl`، `ProcessCompilerRepositoryImpl`، مصادر مسارات workspace وإنشاء عملية compiler |
+| Core | `lib/core` | الثوابت والأخطاء والخدمات العامة وواجهات use case الأساسية |
+| Shared | `lib/shared` | الثيمات وWidgets المشتركة |
 
-## 3. طبقات compiler_core
+لا توجد حاليًا حزم `editor_domain` أو `editor_data` مستقلة؛ الطبقات domain وdata موجودة داخل feature المحرر في `lib/features/editor`.
 
-يمر الطلب في pipeline واضح:
+## 3. طبقات المترجم C
+
+يوجد backend الفعلي في `packages/compiler_c` ويُبنى إلى executable اسمه `arabicc`:
 
 ```text
-JSON protocol
+main.c --protocol
     ↓
-Lexer → Tokens/lexical diagnostics
+protocol.c: JSON input/output
     ↓
-Parser → AST/syntax diagnostics
+lexer.l عبر Flex → tokens
     ↓
-Semantic analyzer → symbols/types/semantic diagnostics
+parser.y عبر Bison → AST
     ↓
-AST → Three-Address Code
+ast.c + semantic.c → AST وsymbols وdiagnostics
     ↓
-Typed IR validation
+asm_x86_64.c → Assembly نصية ضمن subset المدعوم
     ↓
-Assembly text + Interpreter execution
-    ↓
-Optional dart-native emitter → Dart source → dart compile exe → artifact
+JSON response إلى Flutter
 ```
 
-كل مرحلة تملك اختبارات مستقلة ومخرجًا يمكن عرضه في لوحة النتائج. لا تعتمد Flutter على إعادة تخمين موضع الخطأ؛ `Diagnostic` يحمل phase وcode وmessage وSourceSpan.
+يستقبل `arabicc` الطلب من stdin ويكتب استجابة واحدة إلى stdout. يدعم `--protocol` للتجميع والتحليل و`--assist` للمساعدة، ويدعم `--version` و`--help` للفحص التشغيلي.
 
 ## 4. العقد بين البرنامجين
 
-الإصدار المعتمد هو `0.5.0`. يرسل الطلب `rootPath` و`sourcePaths` و`sourcetexts` و`mode` و`entryPath`، ويمكنه تحديد `target: none` أو `target: dart-native` و`artifactDirectory`. تعيد الاستجابة `success` و`diagnostics` و`tokens` و`syntaxTree` و`symbolTable` و`threeAddressCode` و`assembly` و`intermediateRepresentation` و`executionOutput` و`artifacts`.
+يتضمن الطلب `protocolVersion` و`rootPath` و`sourcePaths` و`sourceTexts` و`mode`. ويمكن أن يضيف `entryPath` و`target` و`artifactDirectory`. تتضمن الاستجابة `success` و`diagnostics` و`tokens` و`syntaxTree` و`symbolTable` و`threeAddressCode` و`intermediateRepresentation` و`assembly` و`executionOutput` و`artifacts`.
 
-في compile العادي يمكن أن يكون `mode` هو project لتجميع ملفات Workspace. أما Ctrl/Cmd+F5 فيستخدم `CompilationMode.active` ويرسل الملف النشط فقط، حتى لا يفشل native build بسبب تبويب آخر غير صالح أو ملف لا ينتمي إلى entry point الحالي.
+يحوّل data layer الاستجابة إلى `CompilationResult` وكيانات التشخيص والرموز، ثم يعرضها controller في لوحات الواجهة. لا تقوم الواجهة بإعادة تحليل النص أو اختراع نتائج بديلة.
 
-## 5. سياسة الأسماء والملفات
+## 5. البناء والتغليف
 
-يولد backend أسماء Dart داخلية لا تتعارض مع أسماء اللغة العربية، ويكتب مصدر Dart وexecutable داخل `artifactDirectory` الذي يحدده الطلب. لا يعاد مسار artifact وهمي. ويُفضّل أن يبقى المصدر المولد لأغراض التدقيق الأكاديمي، مع إمكانية تنظيفه لاحقًا وفق سياسة واضحة لا تحذف executable الصحيح قبل عرضه للمستخدم.
+يُبنى backend عبر CMake مع Flex وBison. على Windows يستخدم CMake خيار Flex `--wincompat` لتجنب تضمين `unistd.h` غير المتوفرة مع MSVC. ويستخدم lexer دالة نسخ نصية محمولة بدل `strdup` غير المضمونة مع C17، مما يحافظ على عمل Linux وWindows.
 
-## 6. الحدود المتعمدة
+يضمّن `release.yml` executable `arabicc` داخل حزم Flutter Desktop للمنصات الثلاث. يختبر `verify_compiler_bundle.dart` العقد الفعلي بعد التغليف، ثم ينشر Release artifacts. أما `container.yml` فينشر صورة التطوير إلى GHCR.
 
-المشروع لا يستخدم C-like syntax، ولا يخلط بين pseudo-assembly وbinary. ويدعم المشروع متعدد الملفات على مستوى التحليل والرموز المصدرة ضمن الحدود الموثقة؛ أما استدعاء إجراءات خارجية أثناء التنفيذ فيحتاج import/dependency grammar مستقلة قبل اعتباره مدعومًا بالكامل.
+## 6. حدود التنفيذ
+
+لا يعني وجود backend C أن كل قواعد اللغة أو كل Assembly مدعومة بالكامل. التغطية الحالية هي subset موثق في grammar والاختبارات. ولا تُعد Assembly الناتجة binary قابلًا للتشغيل دون assembler مناسب. كما أن صورة التطوير في GHCR مخصصة لبيئة البناء ولا تستبدل حزم Desktop النهائية.
+
+## References
+
+[1]: https://github.com/Emran025/acsys360/tree/main/lib/features/editor "Editor feature layers"
+[2]: https://github.com/Emran025/acsys360/tree/main/packages/compiler_c "C compiler implementation"
+[3]: https://github.com/Emran025/acsys360/tree/main/packages/compiler_contracts "JSON protocol contracts"
+[4]: https://github.com/Emran025/acsys360/blob/main/.github/workflows/release.yml "Release workflow"
+
+المراجع: [1] [2] [3] [4]

@@ -54,9 +54,9 @@
 
 ## تشغيل المترجم داخل حزمة Desktop
 
-في بيئة التطوير يبقى التشغيل عبر `dart run packages/compiler_core/bin/arabicc.dart --protocol` حتى يمكن تعديل مصدر المترجم بسرعة. أما Release workflow فينفذ `dart compile exe` على runner المنصة، ثم ينسخ الناتج إلى مجلد `compiler` بجوار executable المحرر داخل كل bundle، ويرفق Dart SDK إلى `compiler/dart-sdk` حتى يستطيع target `dart-native` بناء artifact من النسخة المصدرة دون اعتماد على SDK خارجي. عند تشغيل النسخة المصدرة يبحث المحرر عن `compiler/arabicc` أو `compiler/arabicc.exe` ويشغل الملف نفسه مع `--protocol`، ويستبدلها داخليًا بـ `--assist` لطلبات الإكمال والمساعدة. إذا لم يجد الملف المضمّن يعود لمسار التطوير فقط.
+في بيئة التطوير يُبنى `packages/compiler_c` عبر CMake، ثم يُشغّل `build/arabicc --protocol` على Linux/macOS أو `build/Release/arabicc.exe --protocol` على Windows. أما Release workflow فيبني executable C على runner الأصلي لكل منصة، ثم ينسخه إلى مجلد `compiler` بجوار executable المحرر داخل كل bundle. عند تشغيل النسخة المصدرة يبحث المحرر عن `compiler/arabicc` أو `compiler/arabicc.exe` ويشغل الملف نفسه مع `--protocol`، ويستخدم `--assist` لطلبات الإكمال والمساعدة. إذا لم يجد الملف المضمّن يعود لمسار التطوير فقط.
 
-لا يعني ذلك أن Windows output ملف EXE منفردًا؛ Flutter Desktop يحتاج executable وDLL و`data` وملفات runtime. الناتج القابل للنقل هو ZIP يحتوي `acsys360.exe` ومجلده الكامل، إضافة إلى `compiler/arabicc.exe` و`compiler/dart-sdk`، وبذلك لا يحتاج المستخدم إلى تثبيت Dart SDK أو توفير مصدر المستودع.
+لا يعني ذلك أن Windows output ملف EXE منفردًا؛ Flutter Desktop يحتاج executable وDLL و`data` وملفات runtime. الناتج القابل للنقل هو ZIP يحتوي `acsys360.exe` ومجلده الكامل، إضافة إلى `compiler/arabicc.exe`، وبذلك لا يحتاج المستخدم إلى تثبيت Dart SDK أو Flex أو Bison أو توفير مصدر المستودع.
 
 ## ما لم ينفذ بعد
 

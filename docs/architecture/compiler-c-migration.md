@@ -1,4 +1,6 @@
-# خطة نقل المترجم إلى C مع الحفاظ على واجهة ACSys360
+# سجل نقل المترجم إلى C مع الحفاظ على واجهة ACSys360
+
+> هذه الوثيقة تصف قرار الانتقال بعد تنفيذه. المسارات القديمة مثل `packages/compiler_core` ونسخة Dart من `arabicc` كانت جزءًا من الخطة السابقة وليست بنية التشغيل الحالية.
 
 ## القرار المعماري
 
@@ -16,24 +18,24 @@
 
 استجابة الترجمة يجب أن تحافظ على الحقول `diagnostics`, `tokens`, `syntaxTree`, `symbolTable`, `threeAddressCode`, `assembly`, `executionOutput`, `artifacts`, و`intermediateRepresentation`. لا يُسمح بحذف حقل أو تحويل قيمة فارغة إلى `null` خلافًا للعقد.
 
-## مطابقة مراحل compiler_core
+## وحدات التنفيذ الحالية
 
 سيُقسم التنفيذ C إلى وحدات صغيرة ذات ملكية واضحة للذاكرة ومسارات خطأ صريحة:
 
-| مرحلة Dart الحالية | وحدة C المقابلة | الناتج |
+| مرحلة المترجم الحالية | وحدة C المقابلة | الناتج |
 |---|---|---|
-| `Lexer` | `lexer.c/.h` | tokens مع offset وline وcolumn وdiagnostics |
-| `Parser` وAST | `parser.c/.h`, `ast.c/.h` | شجرة البرنامج، declarations، statements، expressions |
-| `SemanticAnalyzer` | `semantic.c/.h`, `symbols.c/.h` | symbol table، الأنواع، أخطاء التوافق والنطاق |
-| `ProjectCompiler` | `project.c/.h` | جمع الملفات، external procedures/types، فحص التعارضات، entry path |
-| `ThreeAddressGenerator` | `tac.c/.h` | TAC مرتب وقابل للمقارنة مع fixtures |
-| `TypedIrProgram` | `typed_ir.c/.h` | typed instructions وملخص الأنواع وdiagnostics |
+| `Lexer` | `src/lexer.l` عبر Flex | tokens مع offset وline وcolumn وdiagnostics |
+| `Parser` وAST | `src/parser.y`, `src/ast.c`, `include/ast.h` | شجرة البرنامج، declarations، statements، expressions |
+| `SemanticAnalyzer` | `src/semantic.c`, `include/semantic.h` | symbol table والأنواع وأخطاء التوافق والنطاق |
+| `ProjectCompiler` | `src/protocol.c` و`src/main.c` | قراءة الطلب، source paths، entry path، وتجميع الاستجابة |
+| `ThreeAddressGenerator` | `src/protocol.c` | TAC النصي ضمن response |
+| `TypedIrProgram` | `src/protocol.c` | intermediate representation ضمن response |
 | `AssemblyGenerator` | `asm_x86_64.c/.h` | Assembly x86-64 محدد الهدف مع labels وstack layout |
 | `Interpreter` | `runtime.c/.h` | execution output وحد أقصى للخطوات |
-| `LanguageAssist` | `assist.c/.h` | completion/help وreplace ranges |
-| protocol models | `protocol.c/.h`, `json.c/.h` | parsing وserialization للعقد دون اعتماد Flutter أو Dart |
+| `LanguageAssist` | `src/protocol.c` و`src/main.c` | completion/help وreplace ranges |
+| protocol models | `src/protocol.c`, `include/protocol.h` | parsing وserialization للعقد دون اعتماد Flutter أو Dart |
 
-تُستخدم بنية arena أو قوائم ملكية مركزية لكل compilation request، ويُحرر الطلب كاملًا في نهاية العملية. لا توجد global mutable state بين الطلبات، حتى تكون نتيجة project mode قابلة لإعادة الاختبار.
+تُدار ذاكرة الطلب داخل وحدات C الحالية وتُحرر الاستجابة في نهاية المعالجة. يجب اعتبار حدود دعم project mode والذاكرة جزءًا من اختبارات backend، لا افتراضات من خطة النقل القديمة.
 
 ## قواعد اللغة التي يجب نقلها حرفيًا
 
@@ -68,8 +70,8 @@
 | Assembly | golden NASM output، labels، precedence، ورفض source غير صالح |
 | integration | تشغيل Flutter الحالي ضد executable C دون تغيير widget أو state APIs |
 
-## استراتيجية الدمج
+## استراتيجية الدمج المنفذة
 
-يُضاف مجلد `packages/compiler_c` بجانب `packages/compiler_core`، ولا يُحذف Dart compiler خلال فترة التكافؤ. بعد نجاح كل البوابات يُغيّر release workflow فقط ليبني executable C ويضعه في المسار نفسه `compiler/arabicc[.exe]`. تبقى واجهة Flutter كما هي، وتظل نسخة Dart متاحة كمرجع اختبارات وfallback تطويري إلى أن يوافق التكليف على إزالة المرجع.
+يوجد `packages/compiler_c` الآن بوصفه backend المضمن في التطبيق. يبني `release.yml` executable `arabicc` لكل منصة ويضعه في `compiler/arabicc[.exe]` داخل Desktop bundle. تبقى واجهة Flutter وعقد JSON كما هي، بينما تنفذ data layer عملية التشغيل وتحوّل الاستجابة عبر `packages/compiler_contracts`.
 
 أي فرق بين نتائج C وDart يجب أن يسجل كاختبار أو قرار موثق، لا أن يُخفى بتحويل الاستجابة أو إسقاط المرحلة. الهدف هو compiler C حقيقي ذو pipeline واضح وAssembly قابل للتحقق، وليس wrapper يستدعي compiler Dart أو مولد نص Assembly شكلي.

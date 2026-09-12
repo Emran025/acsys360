@@ -2,33 +2,47 @@
 
 ## سياسة الاختيار
 
-تُضاف dependency فقط إذا كان لها دور واضح يمكن اختباره وشرحه في التقرير. لا تستخدم الواجهة حزمة parser أو language service لإخفاء مراحل المترجم؛ مصدر grammar هو `compiler_core`، ومصدر النقل هو JSON protocol، ومكونات المحرر فوق Flutter primitives حيث يكفي ذلك.
+تُضاف dependency فقط عندما يكون لها دور واضح يمكن اختباره وشرحه. يعتمد المشروع على Flutter للواجهة، وعلى Dart لعقود التكامل وأدوات المحرر، وعلى CMake وFlex وBison لبناء backend المترجم. لا تحتوي الواجهة على parser موازٍ لقواعد اللغة.
 
-| الأداة أو المكتبة | الإصدار المثبت | الغرض | موضع الاستخدام | سبب الاختيار والحد |
-|---|---:|---|---|---|
-| Flutter | `3.44.5` في CI وrelease | بناء محرر Desktop والاختبارات المرئية | `lib/`, `test/`, منصات `windows/linux/macos` | يوفر widgets وTextField وShortcuts وMediaQuery وtest harness؛ لا ينفذ parser أو semantic |
-| Dart | إصدار SDK المرفق مع Flutter `3.44.5` | لغة المحرر ونواة compiler وCLI وruntime | كل ملفات `.dart` | لغة موحدة للـdomain والـcompiler وCLI مع قابلية تشغيل cross-platform |
-| `file_picker` | كما هو مثبت في `pubspec.lock` | اختيار ملف أو مجلد حقيقي من النظام | `main.dart` وworkspace explorer | يعزل native picker؛ لا يملك حالة workspace ولا يقرأ grammar |
-| `compiler_core` | path dependency محلية | Lexer وParser وAST وSemantic وTAC وTyped IR وAssembly وInterpreter وnative backend | `packages/compiler_core`، ويستخدم Lexer فقط في highlighter | يمنع تكرار lexical grammar؛ الواجهة لا تستدعي Parser أو Semantic |
-| `compiler_contracts` | path dependency محلية | نماذج JSON typed والتحقق من protocol `0.5.0` | `packages/compiler_contracts` وprocess adapter | يثبت عقدًا مستقلاً بين executableين ويمنع خرائط غير موثقة |
-| `flutter_test` | تابع لـFlutter SDK | widget tests وpump وkeyboard events | `test/` | يثبت RTL وTextField وshortcuts والـMinimap من منظور المستخدم |
-| `package:test` | تابع للحزم | اختبارات compiler_core وcompiler_contracts | `packages/*/test` | سريع ومناسب للمراحل النقية بعيدًا عن Flutter |
-| Dart `dart:io` | جزء من SDK | process/filesystem في حدود infrastructure وCLI | `lib/data`, `packages/compiler_core/bin`, backend | مقيد بحدود adapter؛ لا يدخل domain editor path policy |
-| Cairo font asset | ملف محلي في `assets/fonts/Cairo.ttf` | عرض واجهة عربية مدمجة ومستقرة | `pubspec.yaml` وtheme | لا يعتمد على خط النظام، ويثبت الشكل في release |
+| الأداة أو المكتبة | الإصدار أو المصدر | الغرض | موضع الاستخدام | الحد المعتمد |
+|---|---|---|---|---|
+| Flutter | `3.44.5` في CI وRelease | بناء واجهة Desktop والاختبارات المرئية | `lib/`, `test/`, ومنصات Desktop | لا ينفذ grammar أو semantic analysis |
+| Dart | SDK المرفق مع Flutter | لغة التطبيق وعقد JSON وأدوات التحقق | ملفات `.dart` و`tool/` و`packages/compiler_contracts` | لا يستبدل executable المترجم C |
+| `file_picker` | مثبت في `pubspec.lock` | اختيار ملف أو مجلد workspace | شاشة المحرر وعمليات workspace | لا يدير الحالة ولا يقرأ اللغة |
+| `compiler_contracts` | path package في `packages/compiler_contracts` | نماذج وتحليل JSON Protocol `0.5.0` | التطبيق والاختبارات | لا يحتوي implementation للمترجم |
+| Flex | أداة نظام | توليد scanner من `packages/compiler_c/src/lexer.l` | CMake وCI | على Windows يعمل بوضع `--wincompat` |
+| Bison | أداة نظام | توليد parser من `packages/compiler_c/src/parser.y` | CMake وCI | تحذيرات conflicts لا تعني اكتمال grammar |
+| CMake | أداة بناء | توليد ملفات البناء لكل منصة | `packages/compiler_c/CMakeLists.txt` | لا يحدد قواعد اللغة |
+| C compiler | MSVC أو GCC/Clang | بناء executable `arabicc` | `packages/compiler_c` | backend الحالي مستقل عن Flutter |
+| Cairo font | `assets/fonts/Cairo.ttf` | عرض واجهة عربية ثابتة | `pubspec.yaml` وtheme | لا يؤثر على compiler |
 
-## أدوات التطوير والتحقق
+## البنية البرمجية الفعلية
 
-| الأداة | الغرض | قاعدة الاستخدام |
+يتكون تطبيق Flutter من feature واحدة رئيسية حاليًا هي `lib/features/editor`. تحتوي `domain` على الكيانات والعقود وعمليات الاستخدام، وتحتوي `data` على تنفيذ filesystem وتشغيل عملية `arabicc`، بينما تحتوي `presentation` على controller والواجهة وWidgets. توجد الخدمات والثوابت العامة في `lib/core` والمكونات والثيمات المشتركة في `lib/shared`.
+
+أما المترجم المستقل فيوجد في `packages/compiler_c`. ويضم `src/lexer.l` و`src/parser.y` وملفات AST والتحليل الدلالي والبروتوكول وbackend Assembly، إضافة إلى headers في `include`. لا يوجد حاليًا مجلد `packages/compiler_core` أو تطبيق `apps/compiler_cli`؛ هذه أسماء كانت في التصميم السابق وليست مسارات يجب استخدامها.
+
+## أدوات التحقق والبناء
+
+| الأداة | الغرض | الاستخدام |
 |---|---|---|
-| `dart format` / `flutter analyze` | تنسيق وتحليل ساكن | يجب أن ينجحا قبل الدمج |
-| `flutter test` | اختبارات المحرر والتكامل | يشمل widget وrepository وprotocol adapter |
-| GitHub Actions | التحقق المتكرر وبناء Desktop | يستخدم Flutter `3.44.5` ومصفوفة Windows/Linux/macOS |
-| `gh` | إدارة CI وtags وreleases | لا يُنشأ release قبل نجاح jobs المطلوبة |
+| `dart format` | تنسيق Dart | قبل الدمج وعلى ملفات التطبيق والحزم |
+| `flutter analyze` | تحليل ساكن | بوابة CI الأساسية |
+| `flutter test` | اختبارات Flutter والعقد | CI وRelease |
+| `cmake --build` | بناء `arabicc` | كل منصة مستهدفة |
+| `ctest` | اختبارات C البسيطة | `--version` و`--help` |
+| `tool/verify_compiler_bundle.dart` | Smoke test للتكامل | بعد تضمين executable داخل Desktop bundle |
+| GitHub Actions | CI وRelease وصورة GHCR | `ci.yml` و`release.yml` و`container.yml` |
 
-## أدوات تمت دراستها ولم تُدمج
+## قواعد مهمة
 
-لم تُدمج حزم syntax-highlighting أو editor package لأن `ArabicSyntaxHighlighter` يعيد استخدام Lexer الحقيقي، ولأن undo/redo وRTL وghost text تحتاج تحكمًا مباشرًا في TextEditingValue. لم تُدمج parser generator مثل PEG؛ parser recursive-descent الحالي أسهل في ربط كل production برسالة syntax وAST، وسيُعاد تقييم القرار فقط مع benchmark واختبارات grammar جديدة.
+يجب تشغيل `arabicc` من خلال repository أو data source في التطبيق، وليس من Widget مباشرة. يجب أن تمر نتائج المترجم عبر `compiler_contracts` قبل تحويلها إلى كيانات domain. لا يجوز اعتبار النص الناتج من `asm_x86_64.c` executable binary دون assembler فعلي. كما لا يجوز اعتبار وجود `file_picker` دليلًا على اكتمال workspace؛ اكتمال workspace ناتج عن repository والكيانات والاختبارات معًا.
 
-## التتبع الأكاديمي
+## References
 
-عند شرح dependency في التقرير يجب ذكر الاسم والإصدار والغرض والجزء المستخدم، ثم شرح السلوك الذي يظل مفهومًا للفريق. وجود package لا يُعد دليلًا على اكتمال وظيفة: `file_picker` لا يثبت workspace، وFlutter لا يثبت language service، و`compiler_core` لا يجعل Assembly binary ما لم يُستخدم assembler حقيقي.
+[1]: https://github.com/Emran025/acsys360/blob/main/pubspec.yaml "Application dependencies"
+[2]: https://github.com/Emran025/acsys360/tree/main/packages/compiler_c "Standalone C compiler backend"
+[3]: https://github.com/Emran025/acsys360/tree/main/packages/compiler_contracts "Compiler protocol contracts"
+[4]: https://github.com/Emran025/acsys360/blob/main/.github/workflows/ci.yml "Continuous integration workflow"
+
+المراجع: [1] [2] [3] [4]
