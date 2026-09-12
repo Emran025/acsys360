@@ -18,6 +18,15 @@ int yy_token_length = 0;
 ProtocolResponse *g_protocol_response = NULL;
 extern const char *g_current_source_path;
 
+static char *duplicate_string(const char *source) {
+  size_t length = strlen(source);
+  char *copy = malloc(length + 1U);
+  if (copy != NULL) {
+    memcpy(copy, source, length + 1U);
+  }
+  return copy;
+}
+
 static size_t utf8_char_count(const char *s, size_t byte_len) {
   size_t chars = 0;
   for (size_t i = 0; i < byte_len; i++) {
@@ -109,25 +118,25 @@ DIGIT         [0-9]
 
 {DIGIT}+      {
   emit_token("integer", yytext);
-  yylval.str = strdup(yytext);
+  yylval.str = duplicate_string(yytext);
   return TOK_INTEGER_LITERAL;
 }
 
 {DIGIT}+\.{DIGIT}+ {
   emit_token("real", yytext);
-  yylval.str = strdup(yytext);
+  yylval.str = duplicate_string(yytext);
   return TOK_REAL_LITERAL;
 }
 
 \"([^\"\\]|\\.)*\" {
   emit_token("string", yytext);
-  yylval.str = strdup(yytext);
+  yylval.str = duplicate_string(yytext);
   return TOK_STRING_LITERAL;
 }
 
 {ID}          {
   emit_token("identifier", yytext);
-  yylval.str = strdup(yytext);
+  yylval.str = duplicate_string(yytext);
   return TOK_IDENTIFIER;
 }
 

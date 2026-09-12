@@ -9,7 +9,14 @@ find_package(BISON REQUIRED)
 find_package(FLEX REQUIRED)
 
 bison_target(ArabicParser src/parser.y ${CMAKE_CURRENT_BINARY_DIR}/parser.tab.c COMPILE_FLAGS "-d")
-flex_target(ArabicLexer src/lexer.l ${CMAKE_CURRENT_BINARY_DIR}/lexer.yy.c)
+set(ARABICC_FLEX_FLAGS "")
+if(WIN32)
+  # win_flex otherwise emits an unconditional <unistd.h> include, which is
+  # not available when the generated scanner is compiled with MSVC.
+  set(ARABICC_FLEX_FLAGS "--wincompat")
+endif()
+flex_target(ArabicLexer src/lexer.l ${CMAKE_CURRENT_BINARY_DIR}/lexer.yy.c
+  COMPILE_FLAGS "${ARABICC_FLEX_FLAGS}")
 add_flex_bison_dependency(ArabicLexer ArabicParser)
 
 add_executable(arabicc
