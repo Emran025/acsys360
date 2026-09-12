@@ -104,6 +104,11 @@ void protocol_response_free(ProtocolResponse *resp) {
   if (!resp) return;
   free(resp->diagnostics);
   free(resp->tokens);
+  for (size_t i = 0; i < resp->symbol_count; i++) {
+    free((char *)resp->symbols[i].name);
+    free((char *)resp->symbols[i].kind);
+    free((char *)resp->symbols[i].type);
+  }
   free(resp->symbols);
   free(resp->syntax_tree_json);
   free(resp->assembly);
@@ -159,9 +164,9 @@ void protocol_add_symbol(ProtocolResponse *resp, const char *name, const char *k
     resp->symbols = (ProtocolSymbol *)realloc(resp->symbols, resp->symbol_capacity * sizeof(ProtocolSymbol));
   }
   ProtocolSymbol *s = &resp->symbols[resp->symbol_count++];
-  s->name = name;
-  s->kind = kind;
-  s->type = type;
+  s->name = name ? c_strdup(name) : NULL;
+  s->kind = kind ? c_strdup(kind) : NULL;
+  s->type = type ? c_strdup(type) : NULL;
   s->span = span;
 }
 
@@ -330,6 +335,25 @@ extern int current_line;
 extern int current_column;
 extern const char *g_current_source_path;
 
+/* skip_json_string: advances *pp past a JSON string (including surrounding quotes).
+   Returns 1 on success, 0 if malformed. */
+static int skip_json_string(const char **pp) {
+  const char *p = *pp;
+  if (*p != '"') return 0;
+  p++; /* skip opening quote */
+  while (*p && *p != '"') {
+    if (*p == '\\') {
+      p++; /* skip escape char */
+      if (!*p) return 0;
+    }
+    p++;
+  }
+  if (*p != '"') return 0;
+  p++; /* skip closing quote */
+  *pp = p;
+  return 1;
+}
+
 static char *extract_source_code(const char *payload) {
   if (!payload) return NULL;
   if (strstr(payload, "\"sourceTexts\"") == NULL) {
@@ -340,14 +364,34 @@ static char *extract_source_code(const char *payload) {
   }
   const char *p = strstr(payload, "\"sourceTexts\"");
   if (!p) return NULL;
+
+  /* advance past "sourceTexts" then find the opening { of the object */
   p = strchr(p, '{');
   if (!p) return NULL;
-  p = strchr(p, ':');
-  if (!p) return NULL;
-  while (*p && *p != '"') p++;
-  if (!*p) return NULL;
-  p++;
-  size_t cap = 1024;
+  p++; /* skip '{' */
+
+  /* skip optional whitespace */
+  while (*p && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')) p++;
+
+  /* p should now be at the opening " of the first key string */
+  if (*p != '"') return NULL;
+  /* skip the key string (e.g. "C:/test/main.arb") */
+  if (!skip_json_string(&p)) return NULL;
+
+  /* skip optional whitespace then ':' */
+  while (*p && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')) p++;
+  if (*p != ':') return NULL;
+  p++; /* skip ':' */
+
+  /* skip optional whitespace */
+  while (*p && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')) p++;
+
+  /* p should now be at the opening " of the source text value */
+  if (*p != '"') return NULL;
+  p++; /* skip opening quote of value */
+
+  /* read and unescape the value */
+  size_t cap = 4096;
   size_t len = 0;
   char *buf = malloc(cap);
   if (!buf) return NULL;
@@ -361,6 +405,43 @@ static char *extract_source_code(const char *payload) {
         case 't': ch = '\t'; break;
         case '"': ch = '"'; break;
         case '\\': ch = '\\'; break;
+        case 'u': {
+          /* \uXXXX → UTF-8 */
+          if (p[0] && p[1] && p[2] && p[3]) {
+            unsigned int cp = 0;
+            for (int i = 0; i < 4; i++) {
+              char hc = p[i];
+              cp <<= 4;
+              if (hc >= '0' && hc <= '9') cp |= (unsigned)(hc - '0');
+              else if (hc >= 'a' && hc <= 'f') cp |= (unsigned)(hc - 'a' + 10);
+              else if (hc >= 'A' && hc <= 'F') cp |= (unsigned)(hc - 'A' + 10);
+            }
+            p += 4;
+            /* encode cp as UTF-8 into buf */
+            char utf8[4];
+            int nb = 0;
+            if (cp < 0x80) {
+              utf8[nb++] = (char)cp;
+            } else if (cp < 0x800) {
+              utf8[nb++] = (char)(0xC0 | (cp >> 6));
+              utf8[nb++] = (char)(0x80 | (cp & 0x3F));
+            } else {
+              utf8[nb++] = (char)(0xE0 | (cp >> 12));
+              utf8[nb++] = (char)(0x80 | ((cp >> 6) & 0x3F));
+              utf8[nb++] = (char)(0x80 | (cp & 0x3F));
+            }
+            if (len + nb >= cap) {
+              cap *= 2;
+              char *nb2 = realloc(buf, cap);
+              if (!nb2) { free(buf); return NULL; }
+              buf = nb2;
+            }
+            for (int i = 0; i < nb; i++) buf[len++] = utf8[i];
+            continue;
+          }
+          ch = 'u'; /* fallback */
+          break;
+        }
         default: ch = esc; break;
       }
     }
