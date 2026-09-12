@@ -12,10 +12,18 @@ typedef struct {
 } CSymbol;
 
 typedef struct {
+  char *message;
+  size_t offset;
+  size_t line;
+  size_t column;
+  size_t length;
+} CSemanticDiagnostic;
+
+typedef struct {
   CSymbol *items;
   size_t count;
   size_t capacity;
-  char **diagnostics;
+  CSemanticDiagnostic *diagnostics;
   size_t diagnostic_count;
   size_t diagnostic_capacity;
 } CSemanticResult;

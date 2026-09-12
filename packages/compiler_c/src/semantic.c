@@ -17,13 +17,15 @@ static char *duplicate(const char *value) {
   return copy;
 }
 
-static int diagnostic(Analyzer *analyzer, const char *format, ...) {
+static int diagnostic(Analyzer *analyzer, const CAstNode *node,
+                      const char *format, ...) {
   CSemanticResult *result = analyzer->result;
   if (result->diagnostic_count == result->diagnostic_capacity) {
     const size_t capacity = result->diagnostic_capacity == 0U
         ? 4U
         : result->diagnostic_capacity * 2U;
-    char **items = realloc(result->diagnostics, capacity * sizeof(*items));
+    CSemanticDiagnostic *items = realloc(result->diagnostics,
+                                         capacity * sizeof(*items));
     if (items == NULL) return 0;
     result->diagnostics = items;
     result->diagnostic_capacity = capacity;
@@ -33,8 +35,13 @@ static int diagnostic(Analyzer *analyzer, const char *format, ...) {
   va_start(arguments, format);
   (void)vsnprintf(buffer, sizeof(buffer), format, arguments);
   va_end(arguments);
-  result->diagnostics[result->diagnostic_count] = duplicate(buffer);
-  if (result->diagnostics[result->diagnostic_count] == NULL) return 0;
+  CSemanticDiagnostic *item = &result->diagnostics[result->diagnostic_count];
+  item->message = duplicate(buffer);
+  if (item->message == NULL) return 0;
+  item->offset = node != NULL ? node->offset : 0U;
+  item->line = node != NULL ? node->line : 1U;
+  item->column = node != NULL ? node->column : 1U;
+  item->length = 1U;
   result->diagnostic_count++;
   return 1;
 }
@@ -51,7 +58,7 @@ static int add_symbol(Analyzer *analyzer, const char *name, const char *type,
                       const CAstNode *node) {
   CSemanticResult *result = analyzer->result;
   if (find_symbol(result, name) != NULL) {
-    return diagnostic(analyzer, "تعريف مكرر للرمز: %s", name);
+    return diagnostic(analyzer, node, "تعريف مكرر للرمز: %s", name);
   }
   if (result->count == result->capacity) {
     const size_t capacity = result->capacity == 0U ? 8U : result->capacity * 2U;
@@ -83,10 +90,10 @@ static int check_expression(Analyzer *analyzer, const CAstNode *node) {
   if (node == NULL) return 0;
   switch (node->kind) {
     case C_AST_LITERAL:
-      return 1;  /* integer, real, string — all valid */
+      return 1;
     case C_AST_VARIABLE_REFERENCE:
       if (find_symbol(analyzer->result, node->data.reference.name) == NULL) {
-        return diagnostic(analyzer, "رمز غير معرف: %s",
+        return diagnostic(analyzer, node, "رمز غير معرف: %s",
                           node->data.reference.name);
       }
       return 1;
@@ -96,7 +103,7 @@ static int check_expression(Analyzer *analyzer, const CAstNode *node) {
     case C_AST_UNARY:
       return check_expression(analyzer, node->data.unary.operand);
     default:
-      return diagnostic(analyzer, "عقدة غير صالحة داخل التعبير");
+      return diagnostic(analyzer, node, "عقدة غير صالحة داخل التعبير");
   }
 }
 
@@ -111,7 +118,7 @@ static int check_node(Analyzer *analyzer, const CAstNode *node) {
       return 1;
     case C_AST_ASSIGNMENT:
       if (find_symbol(analyzer->result, node->data.assignment.name) == NULL) {
-        return diagnostic(analyzer, "رمز غير معرف: %s",
+        return diagnostic(analyzer, node, "رمز غير معرف: %s",
                           node->data.assignment.name);
       }
       return check_expression(analyzer, node->data.assignment.expression);
@@ -123,7 +130,7 @@ static int check_node(Analyzer *analyzer, const CAstNode *node) {
     case C_AST_EMPTY:
       return 1;
     default:
-      return diagnostic(analyzer, "تعليمة غير مدعومة في Semantic C الحالية");
+      return diagnostic(analyzer, node, "تعليمة غير مدعومة في Semantic C الحالية");
   }
 }
 
@@ -143,7 +150,7 @@ void c_semantic_result_free(CSemanticResult *result) {
     free(result->items[index].type);
   }
   for (size_t index = 0U; index < result->diagnostic_count; index++) {
-    free(result->diagnostics[index]);
+    free(result->diagnostics[index].message);
   }
   free(result->items);
   free(result->diagnostics);

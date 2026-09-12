@@ -989,6 +989,7 @@ int c_run_protocol(const char *payload) {
     YY_BUFFER_STATE buffer = yy_scan_string(source);
     int parse_res = yyparse();
     yy_delete_buffer(buffer);
+    const int parse_failed = parse_res != 0 || g_root_ast == NULL;
 
     if (parse_res == 0 && g_root_ast != NULL) {
       /* 1. Syntax Tree */
@@ -1023,7 +1024,15 @@ int c_run_protocol(const char *payload) {
       }
 
       for (size_t i = 0; i < semantic.diagnostic_count; i++) {
-        protocol_add_diagnostic(&resp, SEVERITY_ERROR, "semantic", "SEM001", semantic.diagnostics[i], NULL);
+        ProtocolSpan span = {
+          g_current_source_path[0] != '\0' ? g_current_source_path : NULL,
+          semantic.diagnostics[i].offset,
+          semantic.diagnostics[i].line,
+          semantic.diagnostics[i].column,
+          semantic.diagnostics[i].length
+        };
+        protocol_add_diagnostic(&resp, SEVERITY_ERROR, "semantic", "SEM001",
+                                semantic.diagnostics[i].message, &span);
       }
 
       /* 4. Typed IR */
@@ -1060,6 +1069,15 @@ int c_run_protocol(const char *payload) {
       g_root_ast = NULL;
     }
     free(source);
+    if (parse_failed) {
+      if (resp.diagnostic_count == 0) {
+        protocol_add_diagnostic(&resp, SEVERITY_ERROR, "syntax", "S001",
+                                "تعذر تحليل المصدر", NULL);
+      }
+    }
+  } else {
+    protocol_add_diagnostic(&resp, SEVERITY_ERROR, "driver", "P003",
+                            "لم يحتوي الطلب على مصدر قابل للترجمة", NULL);
   }
 
   char *json_out = protocol_serialize_response(&resp);
@@ -1067,6 +1085,7 @@ int c_run_protocol(const char *payload) {
     fputs(json_out, stdout);
     free(json_out);
   }
+  const int exit_code = resp.success ? 0 : 1;
   protocol_response_free(&resp);
-  return 0;
+  return exit_code;
 }

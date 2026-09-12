@@ -40,3 +40,8 @@ target_include_directories(arabicc PRIVATE
 enable_testing()
 add_test(NAME arabicc_version COMMAND arabicc --version)
 add_test(NAME arabicc_help COMMAND arabicc --help)
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+add_test(NAME arabicc_protocol_smoke
+  COMMAND Python3::Interpreter
+          ${CMAKE_CURRENT_SOURCE_DIR}/tests/protocol_smoke.py
+          $<TARGET_FILE:arabicc>)
