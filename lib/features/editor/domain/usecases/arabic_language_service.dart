@@ -62,6 +62,17 @@ class ArabicLanguageService {
         ),
       ];
     }
+    final unexpected = RegExp(r'رمز غير متوقع «([^»]+)»').firstMatch(message);
+    if (diagnostic.code == 'S001' && unexpected != null) {
+      return [
+        EditorCodeAction(
+          title: 'حذف «${unexpected.group(1)}»',
+          offset: diagnostic.offset,
+          length: diagnostic.length <= 0 ? 1 : diagnostic.length,
+          replacement: '',
+        ),
+      ];
+    }
     return const [];
   }
 }

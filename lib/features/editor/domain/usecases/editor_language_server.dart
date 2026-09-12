@@ -52,16 +52,19 @@ class EditorLanguageServer {
       orElse: () => Document(path: sourcePath, text: ''),
     );
     final rawDiagnostics = response['diagnostics'];
+    bool matchesPath(String? p1, String p2) {
+      if (p1 == null || p1.isEmpty) return true;
+      final n1 = p1.replaceAll('\\', '/').toLowerCase();
+      final n2 = p2.replaceAll('\\', '/').toLowerCase();
+      return n1 == n2;
+    }
+
     final diagnostics = diagnosticsService
         .enrichDiagnostics(
           rawDiagnostics is List ? rawDiagnostics : const [],
           active.text,
         )
-        .where(
-          (diagnostic) =>
-              diagnostic.sourcePath == null ||
-              diagnostic.sourcePath == sourcePath,
-        )
+        .where((diagnostic) => matchesPath(diagnostic.sourcePath, sourcePath))
         .toList();
     return LanguageAnalysis(compilation: compilation, diagnostics: diagnostics);
   }
