@@ -46,7 +46,7 @@ jobs:
       - name: Verify C compiler protocol response
         working-directory: packages/compiler_c
         run: |
-          printf '{"protocolVersion":"0.5.0","rootPath":".","sourcePaths":["main.arb"],"sourceTexts":{"main.arb":"program test {}."},"mode":"project"}' | ./build/arabicc --protocol
+          printf '{"protocolVersion":"0.5.0","rootPath":".","sourcePaths":["main.arb"],"sourceTexts":{"main.arb":"برنامج اختبار {}."},"mode":"project"}' | ./build/arabicc --protocol
 
   editor:
     runs-on: ubuntu-latest
