@@ -4,7 +4,7 @@ import 'features/editor/data/datasources/compiler_process_factory.dart';
 import 'features/editor/data/datasources/local_workspace_path_service.dart';
 import 'features/editor/data/repositories_impl/local_workspace_repository_impl.dart';
 import 'features/editor/presentation/controllers/editor_controller.dart';
-import 'features/editor/presentation/ui/screens/editor_screen.dart';
+import 'routes/app_router.dart';
 import 'shared/themes/app_theme.dart';
 
 export 'features/editor/presentation/ui/screens/editor_screen.dart';
@@ -55,7 +55,9 @@ class _ArabicEditorAppState extends State<ArabicEditorApp> {
       themeMode: themeMode,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
-      home: EditorShell(
+      initialRoute: AppRoutes.editor,
+      onGenerateRoute: (settings) => AppRouter.onGenerateRoute(
+        settings,
         controller: widget.controller,
         onToggleTheme: _toggleTheme,
         isDark: themeMode == ThemeMode.dark,

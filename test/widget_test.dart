@@ -10,6 +10,7 @@ import 'package:acsys360/features/editor/presentation/ui/widgets/code_minimap.da
 import 'package:acsys360/features/editor/presentation/ui/widgets/line_numbered_editor.dart';
 import 'package:compiler_contracts/compiler_contracts.dart';
 import 'package:acsys360/main.dart';
+import 'package:acsys360/routes/app_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -64,6 +65,30 @@ class FakeWorkspaceRepository implements WorkspaceRepository {
 }
 
 void main() {
+  test('routes resolve to the injected editor shell', () {
+    final controller = EditorController(
+      repository: FakeWorkspaceRepository(),
+      rootPath: '',
+    );
+
+    final home = AppRouter.onGenerateRoute(
+      const RouteSettings(name: AppRoutes.home),
+      controller: controller,
+    );
+    final editor = AppRouter.onGenerateRoute(
+      const RouteSettings(name: AppRoutes.editor),
+      controller: controller,
+    );
+    final unknown = AppRouter.onGenerateRoute(
+      const RouteSettings(name: '/missing'),
+      controller: controller,
+    );
+
+    expect(home, isA<MaterialPageRoute<void>>());
+    expect(editor, isA<MaterialPageRoute<void>>());
+    expect(unknown, isNull);
+  });
+
   testWidgets('starts with no folder and shows the welcome workspace', (
     tester,
   ) async {
