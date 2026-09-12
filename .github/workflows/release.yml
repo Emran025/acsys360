@@ -92,8 +92,12 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force build/windows/x64/runner/Release/compiler | Out-Null
-          Copy-Item packages/compiler_c/build/Release/arabicc.exe `
-            build/windows/x64/runner/Release/compiler/arabicc.exe
+          $exe = if (Test-Path packages/compiler_c/build/Release/arabicc.exe) {
+            "packages/compiler_c/build/Release/arabicc.exe"
+          } else {
+            "packages/compiler_c/build/arabicc.exe"
+          }
+          Copy-Item $exe build/windows/x64/runner/Release/compiler/arabicc.exe
 
       # ── Bundle compiler into app (macOS) ────────────────────────────────
       - name: Install Flex & Bison (macOS)
