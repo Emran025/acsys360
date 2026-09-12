@@ -9,7 +9,7 @@
 | Semantic tests | الأنواع والنطاقات والثوابت والمراجع والسجلات والقوائم والأخطاء الموضعية |
 | IR/TAC tests | تعليمات typed، labels، jumps، وقواعد التحقق من CFG الأساسي |
 | Interpreter tests | الناتج والسلوك الحسابي والتحكم والإدخال والأخطاء التنفيذية |
-| Native parity | مقارنة stdout بين interpreter وexecutable الناتج من dart-native |
+| C backend smoke | التحقق من JSON protocol وexit code للـ executable `arabicc` المولد عبر CMake |
 | Protocol tests | round-trip JSON، الإصدار، قوائم النتائج، target، artifactDirectory، والأخطاء B001–B004 |
 | Flutter widget tests | ghost text، رفض الاقتراح، الأسهم، اتجاه TextField، Enter indentation، المصباح، الأيقونة، والشجرة |
 | CI build | format، analyze، test، Flutter desktop build، compiler bundle smoke test، والحزم الثلاث |
@@ -42,7 +42,7 @@ flutter build linux --release
 
 ## 4. البناء والنشر
 
-يُبنى compiler عبر `dart compile exe` على كل runner، ثم يوضع بجانب التطبيق داخل `compiler/arabicc` أو `compiler/arabicc.exe`. ولجعل `dart-native` قابلًا للاستخدام من الحزمة الموزعة، يرفق workflow مجلد `compiler/dart-sdk`. يتم اختبار compiler المضمّن عبر protocol smoke، ثم تُرفع حزم Linux وWindows وmacOS إلى GitHub Release.
+يُبنى compiler عبر CMake وFlex وBison على كل runner، ثم يوضع executable `arabicc` أو `arabicc.exe` بجانب التطبيق داخل `compiler/`. يتم اختبار compiler المضمّن عبر protocol smoke، ثم تُرفع حزم Linux وWindows وmacOS إلى GitHub Release.
 
 ## 5. معايير قبول الإصدار
 
@@ -54,7 +54,7 @@ flutter build linux --release
 |---|---|
 | protocol `0.5.0` | مدمج ومختبر مع Typed IR طرفيًا |
 | typed IR | مدمج مع اختبارات تحقق |
-| native executable | مدعوم عبر `dart-native` للتركيبات المختبرة |
-| release self-contained | منشور في v0.9.0 مع compiler وDart SDK |
+| C executable | مدعوم عبر `arabicc` للتركيبات التي يغطيها backend |
+| release self-contained | منشور في v0.0.1 مع compiler C المضمن |
 | Flutter CI | format/analyze/test/build ناجحة في آخر run موثق بالمستودع |
 | Assembly binary | غير مدعوم؛ المخرج الحالي نص NASM-like أكاديمي |

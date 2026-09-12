@@ -55,19 +55,19 @@
 | formatter وCRLF وliteral غير مغلق | `test/format_arabic_source_test.dart` | مثبت |
 | RTL وEnter عند offset صفر وghost | `test/widget_test.dart` | مثبت |
 | Ctrl/Cmd+/ وzoom/reset وexecution output | `test/widget_test.dart` | مثبت |
-| external procedure/type execution | `packages/compiler_core/test/project_compiler_test.dart` و`protocol_smoke_test.dart` | مثبت |
-| Typed IR operands/types/unary | `packages/compiler_core/test/typed_ir_test.dart` | مثبت |
+| compiler protocol وexecution output | `packages/compiler_contracts/test/compilation_protocol_test.dart` و`tool/verify_compiler_bundle.dart` | مثبت |
+| C backend build وsmoke | `packages/compiler_c/CMakeLists.txt` و`tool/verify_compiler_bundle.dart` | مثبت |
 | process timeout | `test/process_compiler_repository_test.dart` | مثبت |
 | syntax/semantic negative fixtures | `examples/errors/` و`grammar_coverage_test.dart` | مثبت |
 
 ## نتيجة الجولة المحلية
 
-قبل الدمج الأخير نجح format gate الموسع، و`flutter analyze`، و`flutter test` بعدد 53 اختبارًا، و`compiler_core` analyze وself-test و36 اختبارًا، و`compiler_contracts` analyze و6 اختبارات. هذه نتيجة محلية على Flutter `3.44.5` وDart `3.12.2` المرفق به. بعد الرفع نجح CI في التشغيل [`32844493727`](https://github.com/Emran025/acsys360/actions/runs/32844493727) على commit `98741b5`؛ نجحت jobs `editor` و`compiler-core` و`desktop-build`، وشملت بوابة format الموسعة وبناء Linux Desktop.
+قبل إصدار `v0.0.1` نجح format gate الموسع، و`flutter analyze`، و`flutter test`، وبناء C backend على Linux وWindows وmacOS. كما نجحت اختبارات smoke للمترجم المضمن في تشغيل Release [`34700784289`](https://github.com/Emran025/acsys360/actions/runs/34700784289) على commit `e6e8785`، وشملت jobs المنصات الثلاث ومرحلة publish.
 
 ## حدود لم تُخفَ
 
-لا تزال F2 وF12 وCtrl/Cmd+. المباشر تحتاج protocol actions ومواقع رموز AST دقيقة. الأدوار الدلالية الحالية mapping بالاسم، ولذلك لا تحل shadowing الكامل. Assembly المخرجة نص تعليمـي NASM-like وليست binary assembled، و`dart-native` executable حقيقي لكنه محدود بالـsubset الذي يمر عبر backend واختبارات parity. كما أن project runtime لا يقدم import/module grammar ولا يخلط global variables بين الملفات.
+لا تزال F2 وF12 وCtrl/Cmd+. المباشر تحتاج protocol actions ومواقع رموز AST دقيقة. الأدوار الدلالية الحالية mapping بالاسم، ولذلك لا تحل shadowing الكامل. Assembly المخرجة نص تعليمي NASM-like وليست binary assembled، وC backend محدود بالـsubset الذي يمر عبر parser والتحليل واختبارات smoke. كما أن project runtime لا يقدم import/module grammar ولا يخلط global variables بين الملفات.
 
 ## قرار الدمج
 
-اجتاز commit `98741b5` workflow الذي يشمل format للحزم، analyze، اختبارات Flutter، اختبارات compiler/contracts، وبناء Linux Desktop في التشغيل `32844493727`. لذلك يمكن إنشاء tag لاحق لهذه الجولة إذا كان إصدارها مطلوبًا، مع إعادة التحقق من workflow الخاص بالـrelease نفسه. تُذكر أرقام التشغيل والcommit والأصول دون تقريب أو استنتاج من نتيجة محلية.
+اجتاز commit `e6e8785` workflow الإصدار الذي يشمل format، analyze، اختبارات Flutter، بناء C backend، bundling واختبارات smoke للمنصات الثلاث في التشغيل `34700784289`. لذلك أُنشئ Release `v0.0.1` من هذا commit. تُذكر أرقام التشغيل والcommit والأصول دون تقريب أو استنتاج من نتيجة محلية.

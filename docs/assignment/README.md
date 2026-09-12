@@ -27,11 +27,11 @@
 
 > لا تُسمّى الشفرة التنفيذية artifact إلا إذا وُجد الملف فعلًا، واجتاز البناء والتحقق التشغيلي المقصود، وأُعيد مساره من خلال العقد. ولا تُسمّى Assembly النصية binary assembled ما لم تمر عبر assembler حقيقي.
 
-تستخدم النسخة الحالية target باسم `dart-native` لبناء executable حقيقي عبر `dart compile exe` عند توفر Dart SDK، وتضمّن release SDK المطلوب بجانب compiler. وتبقى صلاحية native backend مرتبطة بالتركيبات التي يغطيها semantic analyzer واختبارات parity؛ لذلك لا تدعي هذه الوثائق دعم كل امتداد مستقبلي قبل إضافة اختبار صريح له. توجد عشرة fixtures نجاح في `examples/` وfixture syntax وfixture semantic في `examples/errors/`.
+تستخدم النسخة الحالية backend C في `packages/compiler_c` لبناء executable حقيقي باسم `arabicc` عبر CMake وFlex وBison. ويُضمّن executable بجانب تطبيق Desktop في Release. وتبقى صلاحية backend مرتبطة بالتركيبات التي يغطيها parser والتحليل الدلالي واختبارات smoke؛ لذلك لا تدعي هذه الوثائق دعم كل امتداد مستقبلي قبل إضافة اختبار صريح له. توجد أمثلة نجاح وأمثلة أخطاء في `examples/` و`examples/errors/`.
 
 ## مراجع السلوك التحريري
 
-تستفيد مواصفة المحرر من مبادئ VS Code الرسمية في IntelliSense وlanguage configuration وsyntax highlighting، مع تكييفها للغة عربية ومحرر Flutter مستقل. ويستخدم التلوين الحالي Lexer الفعلي من `compiler_core` للطبقة المعجمية، مع refinement دلالي خفيف بالأدوار المستخرجة من compilation result؛ ولا يُعد ذلك language server كاملًا أو تحديد مواقع رموز دقيقة.
+تستفيد مواصفة المحرر من مبادئ VS Code الرسمية في IntelliSense وlanguage configuration وsyntax highlighting، مع تكييفها للغة عربية ومحرر Flutter مستقل. ويستخدم التلوين الحالي tokens الناتجة من lexer الفعلي في `packages/compiler_c/src/lexer.l` للطبقة المعجمية، مع refinement دلالي خفيف بالأدوار المستخرجة من compilation result؛ ولا يُعد ذلك language server كاملًا أو تحديد مواقع رموز دقيقة.
 
 [1]: https://code.visualstudio.com/docs/editing/intellisense "VS Code IntelliSense"
 [2]: https://code.visualstudio.com/api/language-extensions/language-configuration-guide "VS Code Language Configuration Guide"
