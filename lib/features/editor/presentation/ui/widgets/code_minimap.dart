@@ -2,8 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../../domain/entities/editor_diagnostic.dart';
-import '../theme/app_theme.dart';
+import '../../../domain/entities/editor_diagnostic.dart';
+import '../../../../../../shared/themes/app_theme.dart';
 
 class CodeMinimap extends StatefulWidget {
   final TextEditingController controller;

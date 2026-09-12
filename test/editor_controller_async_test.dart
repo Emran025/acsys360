@@ -1,9 +1,8 @@
 import 'dart:async';
-
-import 'package:acsys360/domain/entities/document.dart';
-import 'package:acsys360/domain/entities/file_node.dart';
-import 'package:acsys360/domain/repositories/workspace_repository.dart';
-import 'package:acsys360/presentation/state/editor_controller.dart';
+import 'package:acsys360/features/editor/domain/entities/document.dart';
+import 'package:acsys360/features/editor/domain/entities/file_node.dart';
+import 'package:acsys360/features/editor/domain/repositories/workspace_repository.dart';
+import 'package:acsys360/features/editor/presentation/controllers/editor_controller.dart';
 import 'package:compiler_contracts/compiler_contracts.dart';
 import 'package:flutter_test/flutter_test.dart';
 

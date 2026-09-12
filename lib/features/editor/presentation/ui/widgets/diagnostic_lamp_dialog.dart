@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../domain/entities/editor_diagnostic.dart';
+import '../../../domain/entities/editor_diagnostic.dart';
 import 'editor_dialogs.dart';
 
 Future<EditorCodeAction?> showDiagnosticLampDialog(

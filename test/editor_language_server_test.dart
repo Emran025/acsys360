@@ -1,6 +1,6 @@
-import 'package:acsys360/domain/entities/document.dart';
-import 'package:acsys360/domain/repositories/workspace_repository.dart';
-import 'package:acsys360/domain/usecases/editor_language_server.dart';
+import 'package:acsys360/features/editor/domain/entities/document.dart';
+import 'package:acsys360/features/editor/domain/repositories/workspace_repository.dart';
+import 'package:acsys360/features/editor/domain/usecases/editor_language_server.dart';
 import 'package:compiler_contracts/compiler_contracts.dart';
 import 'package:flutter_test/flutter_test.dart';
 

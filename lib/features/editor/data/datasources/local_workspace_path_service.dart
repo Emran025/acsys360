@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import '../../domain/services/workspace_path_service.dart';
+import '../../../../core/services/workspace_path_service.dart';
 
 class LocalWorkspacePathService implements WorkspacePathService {
   const LocalWorkspacePathService();

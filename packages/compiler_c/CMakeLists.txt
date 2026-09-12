@@ -16,6 +16,8 @@ add_executable(arabicc_c
   src/main.c
   src/protocol.c
   src/ast.c
+  src/semantic.c
+  src/asm_x86_64.c
   ${BISON_ArabicParser_OUTPUTS}
   ${FLEX_ArabicLexer_OUTPUTS}
 )

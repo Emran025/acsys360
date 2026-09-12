@@ -71,6 +71,8 @@
 
 #include "protocol.h"
 #include "ast.h"
+#include "semantic.h"
+#include "asm_x86_64.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -86,7 +88,7 @@ extern const char *g_current_source_path;
 
 CAstNode *g_root_ast = NULL;
 
-#line 90 "src/parser.tab.c"
+#line 92 "src/parser.tab.c"
 
 # ifndef YY_CAST
 #  ifdef __cplusplus
@@ -158,24 +160,29 @@ enum yysymbol_kind_t
   YYSYMBOL_TOK_AND = 41,                   /* TOK_AND  */
   YYSYMBOL_TOK_OR = 42,                    /* TOK_OR  */
   YYSYMBOL_TOK_ASSIGN = 43,                /* TOK_ASSIGN  */
-  YYSYMBOL_44_ = 44,                       /* '.'  */
-  YYSYMBOL_45_ = 45,                       /* '{'  */
-  YYSYMBOL_46_ = 46,                       /* '}'  */
+  YYSYMBOL_44_ = 44,                       /* '{'  */
+  YYSYMBOL_45_ = 45,                       /* '}'  */
+  YYSYMBOL_46_ = 46,                       /* '.'  */
   YYSYMBOL_47_ = 47,                       /* ';'  */
   YYSYMBOL_48_ = 48,                       /* ':'  */
-  YYSYMBOL_49_ = 49,                       /* '('  */
-  YYSYMBOL_50_ = 50,                       /* ')'  */
-  YYSYMBOL_51_ = 51,                       /* '='  */
-  YYSYMBOL_YYACCEPT = 52,                  /* $accept  */
-  YYSYMBOL_program = 53,                   /* program  */
-  YYSYMBOL_block = 54,                     /* block  */
-  YYSYMBOL_declaration_list = 55,          /* declaration_list  */
-  YYSYMBOL_declaration = 56,               /* declaration  */
-  YYSYMBOL_var_decl = 57,                  /* var_decl  */
-  YYSYMBOL_statement_list = 58,            /* statement_list  */
-  YYSYMBOL_statement = 59,                 /* statement  */
-  YYSYMBOL_print_stmt = 60,                /* print_stmt  */
-  YYSYMBOL_assign_stmt = 61                /* assign_stmt  */
+  YYSYMBOL_49_ = 49,                       /* '='  */
+  YYSYMBOL_50_ = 50,                       /* '('  */
+  YYSYMBOL_51_ = 51,                       /* ')'  */
+  YYSYMBOL_52_ = 52,                       /* '+'  */
+  YYSYMBOL_53_ = 53,                       /* '-'  */
+  YYSYMBOL_54_ = 54,                       /* '*'  */
+  YYSYMBOL_55_ = 55,                       /* '/'  */
+  YYSYMBOL_YYACCEPT = 56,                  /* $accept  */
+  YYSYMBOL_program = 57,                   /* program  */
+  YYSYMBOL_declaration_list = 58,          /* declaration_list  */
+  YYSYMBOL_var_decl = 59,                  /* var_decl  */
+  YYSYMBOL_statement_list = 60,            /* statement_list  */
+  YYSYMBOL_statement = 61,                 /* statement  */
+  YYSYMBOL_assign_stmt = 62,               /* assign_stmt  */
+  YYSYMBOL_print_stmt = 63,                /* print_stmt  */
+  YYSYMBOL_expr = 64,                      /* expr  */
+  YYSYMBOL_term = 65,                      /* term  */
+  YYSYMBOL_factor = 66                     /* factor  */
 };
 typedef enum yysymbol_kind_t yysymbol_kind_t;
 
@@ -503,16 +510,16 @@ union yyalloc
 /* YYFINAL -- State number of the termination state.  */
 #define YYFINAL  5
 /* YYLAST -- Last index in YYTABLE.  */
-#define YYLAST   46
+#define YYLAST   50
 
 /* YYNTOKENS -- Number of terminals.  */
-#define YYNTOKENS  52
+#define YYNTOKENS  56
 /* YYNNTS -- Number of nonterminals.  */
-#define YYNNTS  10
+#define YYNNTS  11
 /* YYNRULES -- Number of rules.  */
-#define YYNRULES  17
+#define YYNRULES  23
 /* YYNSTATES -- Number of states.  */
-#define YYNSTATES  36
+#define YYNSTATES  50
 
 /* YYMAXUTOK -- Last valid token kind.  */
 #define YYMAXUTOK   298
@@ -533,15 +540,15 @@ static const yytype_int8 yytranslate[] =
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-      49,    50,     2,     2,     2,     2,    44,     2,     2,     2,
+      50,    51,    54,    52,     2,    53,    46,    55,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,    48,    47,
-       2,    51,     2,     2,     2,     2,     2,     2,     2,     2,
+       2,    49,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,     2,     2,    45,     2,    46,     2,     2,     2,     2,
+       2,     2,     2,    44,     2,    45,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -563,10 +570,11 @@ static const yytype_int8 yytranslate[] =
 
 #if YYDEBUG
 /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
-static const yytype_int8 yyrline[] =
+static const yytype_uint8 yyrline[] =
 {
-       0,    50,    50,    54,    61,    62,    66,    67,    71,    75,
-      85,    86,    90,    91,    92,    96,    97,   101
+       0,    53,    53,    58,    66,    74,    79,    88,    95,   100,
+     107,   114,   115,   119,   126,   133,   134,   135,   139,   140,
+     141,   145,   146,   147
 };
 #endif
 
@@ -591,9 +599,10 @@ static const char *const yytname[] =
   "TOK_TYPE_INT", "TOK_TYPE_REAL", "TOK_TYPE_BOOL", "TOK_TYPE_CHAR",
   "TOK_TYPE_STRING", "TOK_ARRAY", "TOK_RECORD", "TOK_TRUE", "TOK_FALSE",
   "TOK_EQ", "TOK_NE", "TOK_LE", "TOK_GE", "TOK_AND", "TOK_OR",
-  "TOK_ASSIGN", "'.'", "'{'", "'}'", "';'", "':'", "'('", "')'", "'='",
-  "$accept", "program", "block", "declaration_list", "declaration",
-  "var_decl", "statement_list", "statement", "print_stmt", "assign_stmt", YY_NULLPTR
+  "TOK_ASSIGN", "'{'", "'}'", "'.'", "';'", "':'", "'='", "'('", "')'",
+  "'+'", "'-'", "'*'", "'/'", "$accept", "program", "declaration_list",
+  "var_decl", "statement_list", "statement", "assign_stmt", "print_stmt",
+  "expr", "term", "factor", YY_NULLPTR
 };
 
 static const char *
@@ -603,7 +612,7 @@ yysymbol_name (yysymbol_kind_t yysymbol)
 }
 #endif
 
-#define YYPACT_NINF (-43)
+#define YYPACT_NINF (-45)
 
 #define yypact_value_is_default(Yyn) \
   ((Yyn) == YYPACT_NINF)
@@ -617,10 +626,11 @@ yysymbol_name (yysymbol_kind_t yysymbol)
    STATE-NUM.  */
 static const yytype_int8 yypact[] =
 {
-       0,   -43,     3,     7,   -42,   -43,   -43,   -35,     2,    -3,
-     -43,     8,   -43,   -37,    -1,   -36,   -33,   -43,   -43,   -43,
-     -30,   -29,   -28,   -43,   -43,    13,     1,   -43,   -43,    -7,
-     -43,   -27,   -26,   -43,   -43,   -43
+      10,   -45,     2,    24,   -34,   -45,     1,   -19,    30,   -16,
+       1,   -11,    -2,    -8,   -45,   -45,    -3,   -13,    -3,    -7,
+      -1,   -45,    -5,     3,   -45,   -45,   -45,    -3,   -30,   -28,
+     -45,     9,   -44,   -45,    -4,   -45,   -45,   -32,    -3,    -3,
+      -3,    -3,   -45,   -45,   -45,   -45,   -28,   -28,   -45,   -45
 };
 
 /* YYDEFACT[STATE-NUM] -- Default reduction number in state STATE-NUM.
@@ -628,22 +638,25 @@ static const yytype_int8 yypact[] =
    means the default is an error.  */
 static const yytype_int8 yydefact[] =
 {
-       0,     3,     0,     0,     0,     1,     7,     0,    11,     0,
-       2,     0,     6,     0,     0,     0,     0,     5,    14,    10,
-       0,     0,     0,     8,     4,     0,     0,    12,    13,     0,
-      17,     0,     0,     9,    15,    16
+       0,     4,     0,     0,     0,     1,    10,     0,     0,     0,
+      10,     0,     0,     0,    11,    12,     0,     0,     0,     0,
+       0,     6,     0,     0,     9,    22,    21,     0,    13,    17,
+      20,     0,     0,     5,     0,     3,     8,     0,     0,     0,
+       0,     0,     7,    14,     2,    23,    15,    16,    18,    19
 };
 
 /* YYPGOTO[NTERM-NUM].  */
 static const yytype_int8 yypgoto[] =
 {
-     -43,   -43,   -43,   -43,   -43,   -43,    14,   -43,   -43,   -43
+     -45,   -45,   -45,    28,    35,     5,   -45,   -45,   -12,   -10,
+      -9
 };
 
 /* YYDEFGOTO[NTERM-NUM].  */
 static const yytype_int8 yydefgoto[] =
 {
-       0,     3,     7,     8,    12,    13,     9,    19,    20,    21
+       0,     3,    10,    11,    12,    13,    14,    15,    28,    29,
+      30
 };
 
 /* YYTABLE[YYPACT[STATE-NUM]] -- What to do in state STATE-NUM.  If
@@ -651,44 +664,49 @@ static const yytype_int8 yydefgoto[] =
    number is the opposite.  If YYTABLE_NINF, syntax error.  */
 static const yytype_int8 yytable[] =
 {
-      15,     1,    15,     6,    31,    32,     4,     5,     2,    10,
-      23,    22,    16,    11,    16,    25,    26,    27,    28,    30,
-      29,    33,    14,    34,    35,     0,     0,     0,     0,     0,
-       0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
-       0,     0,     0,    17,    18,    24,    18
+      25,     7,     7,    26,     7,     4,    32,    43,    38,    39,
+       6,     1,     8,     9,     9,    37,     9,    23,     2,    45,
+      38,    39,    38,    39,     5,    23,    40,    41,    46,    47,
+      16,    48,    49,    17,    18,    31,    21,    42,    19,    24,
+      33,    35,    44,    22,    34,    20,     0,    27,     0,     0,
+      36
 };
 
 static const yytype_int8 yycheck[] =
 {
-       3,     1,     3,    45,     3,     4,     3,     0,     8,    44,
-      47,     3,    15,    11,    15,    51,    49,    47,    47,     6,
-      48,    28,     8,    50,    50,    -1,    -1,    -1,    -1,    -1,
-      -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,
-      -1,    -1,    -1,    46,    47,    46,    47
+       3,     3,     3,     6,     3,     3,    18,    51,    52,    53,
+      44,     1,    11,    15,    15,    27,    15,    12,     8,    51,
+      52,    53,    52,    53,     0,    20,    54,    55,    38,    39,
+      49,    40,    41,     3,    50,    48,    47,    28,    10,    47,
+      47,    46,    46,    45,    45,    10,    -1,    50,    -1,    -1,
+      47
 };
 
 /* YYSTOS[STATE-NUM] -- The symbol kind of the accessing symbol of
    state STATE-NUM.  */
 static const yytype_int8 yystos[] =
 {
-       0,     1,     8,    53,     3,     0,    45,    54,    55,    58,
-      44,    11,    56,    57,    58,     3,    15,    46,    47,    59,
-      60,    61,     3,    47,    46,    51,    49,    47,    47,    48,
-       6,     3,     4,    28,    50,    50
+       0,     1,     8,    57,     3,     0,    44,     3,    11,    15,
+      58,    59,    60,    61,    62,    63,    49,     3,    50,    59,
+      60,    47,    45,    61,    47,     3,     6,    50,    64,    65,
+      66,    48,    64,    47,    45,    46,    47,    64,    52,    53,
+      54,    55,    28,    51,    46,    51,    65,    65,    66,    66
 };
 
 /* YYR1[RULE-NUM] -- Symbol kind of the left-hand side of rule RULE-NUM.  */
 static const yytype_int8 yyr1[] =
 {
-       0,    52,    53,    53,    54,    54,    55,    55,    56,    57,
-      58,    58,    59,    59,    59,    60,    60,    61
+       0,    56,    57,    57,    57,    58,    58,    59,    60,    60,
+      60,    61,    61,    62,    63,    64,    64,    64,    65,    65,
+      65,    66,    66,    66
 };
 
 /* YYR2[RULE-NUM] -- Number of symbols on the right-hand side of rule RULE-NUM.  */
 static const yytype_int8 yyr2[] =
 {
-       0,     2,     4,     1,     4,     3,     2,     0,     2,     4,
-       2,     0,     2,     2,     1,     4,     4,     3
+       0,     2,     7,     6,     1,     3,     2,     4,     3,     2,
+       0,     1,     1,     3,     4,     3,     3,     1,     3,     3,
+       1,     1,     1,     3
 };
 
 
@@ -1151,35 +1169,175 @@ yyreduce:
   YY_REDUCE_PRINT (yyn);
   switch (yyn)
     {
-  case 2: /* program: TOK_PROGRAM TOK_IDENTIFIER block '.'  */
-#line 51 "src/parser.y"
+  case 2: /* program: TOK_PROGRAM TOK_IDENTIFIER '{' declaration_list statement_list '}' '.'  */
+#line 54 "src/parser.y"
     {
-      g_root_ast = NULL;
-    }
-#line 1160 "src/parser.tab.c"
-    break;
-
-  case 3: /* program: error  */
-#line 55 "src/parser.y"
-    {
-      g_root_ast = NULL;
-    }
-#line 1168 "src/parser.tab.c"
-    break;
-
-  case 9: /* var_decl: TOK_VAR TOK_IDENTIFIER ':' TOK_TYPE_INT  */
-#line 76 "src/parser.y"
-    {
-      if (g_protocol_response) {
-        ProtocolSpan span = {g_current_source_path, 0, (size_t)current_line, (size_t)current_column, 0};
-        protocol_add_symbol(g_protocol_response, (yyvsp[-2].str), "variable", "صحيح", span);
-      }
+      (yyval.node) = c_ast_new_program((yyvsp[-5].str), (yyvsp[-3].list), (yyvsp[-2].list));
+      g_root_ast = (yyval.node);
     }
 #line 1179 "src/parser.tab.c"
     break;
 
+  case 3: /* program: TOK_PROGRAM TOK_IDENTIFIER '{' statement_list '}' '.'  */
+#line 59 "src/parser.y"
+    {
+      CAstNodeList empty_decls;
+      empty_decls.items = NULL;
+      empty_decls.count = 0;
+      (yyval.node) = c_ast_new_program((yyvsp[-4].str), empty_decls, (yyvsp[-2].list));
+      g_root_ast = (yyval.node);
+    }
+#line 1191 "src/parser.tab.c"
+    break;
 
-#line 1183 "src/parser.tab.c"
+  case 4: /* program: error  */
+#line 67 "src/parser.y"
+    {
+      g_root_ast = NULL;
+      (yyval.node) = NULL;
+    }
+#line 1200 "src/parser.tab.c"
+    break;
+
+  case 5: /* declaration_list: declaration_list var_decl ';'  */
+#line 75 "src/parser.y"
+    {
+      (yyval.list) = (yyvsp[-2].list);
+      c_ast_list_append(&(yyval.list), (yyvsp[-1].node));
+    }
+#line 1209 "src/parser.tab.c"
+    break;
+
+  case 6: /* declaration_list: var_decl ';'  */
+#line 80 "src/parser.y"
+    {
+      (yyval.list).items = NULL;
+      (yyval.list).count = 0;
+      c_ast_list_append(&(yyval.list), (yyvsp[-1].node));
+    }
+#line 1219 "src/parser.tab.c"
+    break;
+
+  case 7: /* var_decl: TOK_VAR TOK_IDENTIFIER ':' TOK_TYPE_INT  */
+#line 89 "src/parser.y"
+    {
+      (yyval.node) = c_ast_new_var_decl((yyvsp[-2].str), "صحيح");
+    }
+#line 1227 "src/parser.tab.c"
+    break;
+
+  case 8: /* statement_list: statement_list statement ';'  */
+#line 96 "src/parser.y"
+    {
+      (yyval.list) = (yyvsp[-2].list);
+      c_ast_list_append(&(yyval.list), (yyvsp[-1].node));
+    }
+#line 1236 "src/parser.tab.c"
+    break;
+
+  case 9: /* statement_list: statement ';'  */
+#line 101 "src/parser.y"
+    {
+      (yyval.list).items = NULL;
+      (yyval.list).count = 0;
+      c_ast_list_append(&(yyval.list), (yyvsp[-1].node));
+    }
+#line 1246 "src/parser.tab.c"
+    break;
+
+  case 10: /* statement_list: %empty  */
+#line 107 "src/parser.y"
+    {
+      (yyval.list).items = NULL;
+      (yyval.list).count = 0;
+    }
+#line 1255 "src/parser.tab.c"
+    break;
+
+  case 11: /* statement: assign_stmt  */
+#line 114 "src/parser.y"
+                { (yyval.node) = (yyvsp[0].node); }
+#line 1261 "src/parser.tab.c"
+    break;
+
+  case 12: /* statement: print_stmt  */
+#line 115 "src/parser.y"
+                { (yyval.node) = (yyvsp[0].node); }
+#line 1267 "src/parser.tab.c"
+    break;
+
+  case 13: /* assign_stmt: TOK_IDENTIFIER '=' expr  */
+#line 120 "src/parser.y"
+    {
+      (yyval.node) = c_ast_new_assignment((yyvsp[-2].str), (yyvsp[0].node));
+    }
+#line 1275 "src/parser.tab.c"
+    break;
+
+  case 14: /* print_stmt: TOK_PRINT '(' expr ')'  */
+#line 127 "src/parser.y"
+    {
+      (yyval.node) = c_ast_new_print((yyvsp[-1].node));
+    }
+#line 1283 "src/parser.tab.c"
+    break;
+
+  case 15: /* expr: expr '+' term  */
+#line 133 "src/parser.y"
+                  { (yyval.node) = c_ast_new_binary((yyvsp[-2].node), "+", (yyvsp[0].node)); }
+#line 1289 "src/parser.tab.c"
+    break;
+
+  case 16: /* expr: expr '-' term  */
+#line 134 "src/parser.y"
+                  { (yyval.node) = c_ast_new_binary((yyvsp[-2].node), "-", (yyvsp[0].node)); }
+#line 1295 "src/parser.tab.c"
+    break;
+
+  case 17: /* expr: term  */
+#line 135 "src/parser.y"
+                  { (yyval.node) = (yyvsp[0].node); }
+#line 1301 "src/parser.tab.c"
+    break;
+
+  case 18: /* term: term '*' factor  */
+#line 139 "src/parser.y"
+                    { (yyval.node) = c_ast_new_binary((yyvsp[-2].node), "*", (yyvsp[0].node)); }
+#line 1307 "src/parser.tab.c"
+    break;
+
+  case 19: /* term: term '/' factor  */
+#line 140 "src/parser.y"
+                    { (yyval.node) = c_ast_new_binary((yyvsp[-2].node), "/", (yyvsp[0].node)); }
+#line 1313 "src/parser.tab.c"
+    break;
+
+  case 20: /* term: factor  */
+#line 141 "src/parser.y"
+                    { (yyval.node) = (yyvsp[0].node); }
+#line 1319 "src/parser.tab.c"
+    break;
+
+  case 21: /* factor: TOK_INTEGER_LITERAL  */
+#line 145 "src/parser.y"
+                        { (yyval.node) = c_ast_new_integer((yyvsp[0].str)); }
+#line 1325 "src/parser.tab.c"
+    break;
+
+  case 22: /* factor: TOK_IDENTIFIER  */
+#line 146 "src/parser.y"
+                        { (yyval.node) = c_ast_new_reference((yyvsp[0].str)); }
+#line 1331 "src/parser.tab.c"
+    break;
+
+  case 23: /* factor: '(' expr ')'  */
+#line 147 "src/parser.y"
+                        { (yyval.node) = (yyvsp[-1].node); }
+#line 1337 "src/parser.tab.c"
+    break;
+
+
+#line 1341 "src/parser.tab.c"
 
       default: break;
     }
@@ -1372,10 +1530,11 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 104 "src/parser.y"
+#line 150 "src/parser.y"
 
 
 void yyerror(const char *s) {
+  fprintf(stderr, "خطأ نحوي عند السطر %d، العمود %d: %s\n", current_line, current_column, s);
   if (g_protocol_response) {
     ProtocolSpan span = {g_current_source_path, 0, (size_t)current_line, (size_t)current_column, 1};
     protocol_add_diagnostic(g_protocol_response, SEVERITY_ERROR, "syntax", "S001", s, &span);

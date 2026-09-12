@@ -103,15 +103,13 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 20 "src/parser.y"
+#line 22 "src/parser.y"
 
   char *str;
-  int int_val;
-  double real_val;
   CAstNode *node;
-  CTypeSpec *type;
+  CAstNodeList list;
 
-#line 115 "src/parser.tab.h"
+#line 113 "src/parser.tab.h"
 
 };
 typedef union YYSTYPE YYSTYPE;

@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:acsys360/data/repositories/local_workspace_repository.dart';
+import 'package:acsys360/features/editor/data/repositories_impl/local_workspace_repository_impl.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

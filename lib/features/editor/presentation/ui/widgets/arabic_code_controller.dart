@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../domain/entities/editor_diagnostic.dart';
-import '../../domain/entities/source_token.dart';
-import '../../domain/usecases/arabic_syntax_highlighter.dart';
-import '../theme/app_theme.dart';
+import '../../../domain/entities/editor_diagnostic.dart';
+import '../../../domain/entities/source_token.dart';
+import '../../../domain/usecases/arabic_syntax_highlighter.dart';
+import '../../../../../../shared/themes/app_theme.dart';
 
 class ArabicCodeController extends TextEditingController {
   final ArabicSyntaxHighlighter _highlighter;

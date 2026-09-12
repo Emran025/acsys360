@@ -11,7 +11,7 @@ import '../../domain/usecases/find_replace.dart';
 import '../../domain/usecases/editor_language_server.dart';
 import '../../domain/usecases/format_arabic_source.dart';
 import '../../domain/usecases/workspace_actions.dart';
-import '../../domain/services/workspace_path_service.dart';
+import '../../../../core/services/workspace_path_service.dart';
 
 /// مصدر حالة المحرر: workspace والوثائق والنتائج، بينما تبقى الملفات والمترجم خلف عقود repositories.
 class EditorController extends ChangeNotifier {

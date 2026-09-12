@@ -42,7 +42,7 @@ if exist src\lexer.l (
 )
 
 echo [3/3] Compiling C source files...
-set SOURCES=src\main.c src\protocol.c src\ast.c
+set SOURCES=src\main.c src\protocol.c src\ast.c src\semantic.c src\asm_x86_64.c
 if exist src\parser.tab.c set SOURCES=!SOURCES! src\parser.tab.c
 if exist src\lexer.yy.c set SOURCES=!SOURCES! src\lexer.yy.c
 

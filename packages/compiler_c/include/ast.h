@@ -13,7 +13,16 @@ typedef enum {
   C_TOK_BOOLEAN,
   C_TOK_OPERATOR,
   C_TOK_PUNCTUATION,
-  C_TOK_EOF
+  C_TOK_EOF,
+  C_TOKEN_INTEGER = C_TOK_INTEGER,
+  C_TOKEN_KEYWORD = C_TOK_KEYWORD,
+  C_TOKEN_IDENTIFIER = C_TOK_IDENTIFIER,
+  C_TOKEN_REAL = C_TOK_REAL,
+  C_TOKEN_STRING = C_TOK_STRING,
+  C_TOKEN_CHARACTER = C_TOK_CHARACTER,
+  C_TOKEN_BOOLEAN = C_TOK_BOOLEAN,
+  C_TOKEN_OPERATOR = C_TOK_OPERATOR,
+  C_TOKEN_PUNCTUATION = C_TOK_PUNCTUATION
 } CTokenKind;
 
 typedef enum {
@@ -163,5 +172,14 @@ struct CAstNode {
 
 void c_ast_free(CAstNode *node);
 void c_type_free(CTypeSpec *type);
+
+void c_ast_list_append(CAstNodeList *list, CAstNode *node);
+CAstNode *c_ast_new_program(char *name, CAstNodeList decls, CAstNodeList stmts);
+CAstNode *c_ast_new_var_decl(char *name, const char *type_name);
+CAstNode *c_ast_new_assignment(char *name, CAstNode *expr);
+CAstNode *c_ast_new_print(CAstNode *expr);
+CAstNode *c_ast_new_binary(CAstNode *left, const char *op, CAstNode *right);
+CAstNode *c_ast_new_integer(const char *value);
+CAstNode *c_ast_new_reference(char *name);
 
 #endif

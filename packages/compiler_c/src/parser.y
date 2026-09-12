@@ -1,6 +1,8 @@
 %{
 #include "protocol.h"
 #include "ast.h"
+#include "semantic.h"
+#include "asm_x86_64.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,10 +21,8 @@ CAstNode *g_root_ast = NULL;
 
 %union {
   char *str;
-  int int_val;
-  double real_val;
   CAstNode *node;
-  CTypeSpec *type;
+  CAstNodeList list;
 }
 
 %token <str> TOK_IDENTIFIER
@@ -42,68 +42,115 @@ CAstNode *g_root_ast = NULL;
 %token TOK_EQ TOK_NE TOK_LE TOK_GE TOK_AND TOK_OR
 %token TOK_ASSIGN
 
+%type <node> program statement var_decl assign_stmt print_stmt expr term factor
+%type <list> declaration_list statement_list
+
 %start program
 
 %%
 
 program
-  : TOK_PROGRAM TOK_IDENTIFIER block '.'
+  : TOK_PROGRAM TOK_IDENTIFIER '{' declaration_list statement_list '}' '.'
     {
-      g_root_ast = NULL;
+      $$ = c_ast_new_program($2, $4, $5);
+      g_root_ast = $$;
+    }
+  | TOK_PROGRAM TOK_IDENTIFIER '{' statement_list '}' '.'
+    {
+      CAstNodeList empty_decls;
+      empty_decls.items = NULL;
+      empty_decls.count = 0;
+      $$ = c_ast_new_program($2, empty_decls, $4);
+      g_root_ast = $$;
     }
   | error
     {
       g_root_ast = NULL;
+      $$ = NULL;
     }
   ;
 
-block
-  : '{' declaration_list statement_list '}'
-  | '{' statement_list '}'
-  ;
-
 declaration_list
-  : declaration_list declaration
-  | /* empty */
-  ;
-
-declaration
-  : var_decl ';'
+  : declaration_list var_decl ';'
+    {
+      $$ = $1;
+      c_ast_list_append(&$$, $2);
+    }
+  | var_decl ';'
+    {
+      $$.items = NULL;
+      $$.count = 0;
+      c_ast_list_append(&$$, $1);
+    }
   ;
 
 var_decl
   : TOK_VAR TOK_IDENTIFIER ':' TOK_TYPE_INT
     {
-      if (g_protocol_response) {
-        ProtocolSpan span = {g_current_source_path, 0, (size_t)current_line, (size_t)current_column, 0};
-        protocol_add_symbol(g_protocol_response, $2, "variable", "صحيح", span);
-      }
+      $$ = c_ast_new_var_decl($2, "صحيح");
     }
   ;
 
 statement_list
-  : statement_list statement
+  : statement_list statement ';'
+    {
+      $$ = $1;
+      c_ast_list_append(&$$, $2);
+    }
+  | statement ';'
+    {
+      $$.items = NULL;
+      $$.count = 0;
+      c_ast_list_append(&$$, $1);
+    }
   | /* empty */
+    {
+      $$.items = NULL;
+      $$.count = 0;
+    }
   ;
 
 statement
-  : print_stmt ';'
-  | assign_stmt ';'
-  | ';'
-  ;
-
-print_stmt
-  : TOK_PRINT '(' TOK_IDENTIFIER ')'
-  | TOK_PRINT '(' TOK_STRING_LITERAL ')'
+  : assign_stmt { $$ = $1; }
+  | print_stmt  { $$ = $1; }
   ;
 
 assign_stmt
-  : TOK_IDENTIFIER '=' TOK_INTEGER_LITERAL
+  : TOK_IDENTIFIER '=' expr
+    {
+      $$ = c_ast_new_assignment($1, $3);
+    }
+  ;
+
+print_stmt
+  : TOK_PRINT '(' expr ')'
+    {
+      $$ = c_ast_new_print($3);
+    }
+  ;
+
+expr
+  : expr '+' term { $$ = c_ast_new_binary($1, "+", $3); }
+  | expr '-' term { $$ = c_ast_new_binary($1, "-", $3); }
+  | term          { $$ = $1; }
+  ;
+
+term
+  : term '*' factor { $$ = c_ast_new_binary($1, "*", $3); }
+  | term '/' factor { $$ = c_ast_new_binary($1, "/", $3); }
+  | factor          { $$ = $1; }
+  ;
+
+factor
+  : TOK_INTEGER_LITERAL { $$ = c_ast_new_integer($1); }
+  | TOK_IDENTIFIER      { $$ = c_ast_new_reference($1); }
+  | '(' expr ')'        { $$ = $2; }
   ;
 
 %%
 
 void yyerror(const char *s) {
+  fprintf(stderr, "خطأ نحوي عند السطر %d، العمود %d: %s\n", current_line, current_column, s);
   if (g_protocol_response) {
     ProtocolSpan span = {g_current_source_path, 0, (size_t)current_line, (size_t)current_column, 1};
     protocol_add_diagnostic(g_protocol_response, SEVERITY_ERROR, "syntax", "S001", s, &span);

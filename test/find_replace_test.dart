@@ -1,4 +1,4 @@
-import 'package:acsys360/domain/usecases/find_replace.dart';
+import 'package:acsys360/features/editor/domain/usecases/find_replace.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -1,5 +1,7 @@
 #include "protocol.h"
 #include "ast.h"
+#include "semantic.h"
+#include "asm_x86_64.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,6 +39,40 @@ int main(int argc, char **argv) {
     const int result = c_run_protocol(payload);
     free(payload);
     return result;
+  }
+
+  if (argc >= 2 && strcmp(argv[1], "--asm") == 0) {
+    char *source = read_stdin();
+    if (source == NULL) return 70;
+    typedef struct yy_buffer_state *YY_BUFFER_STATE;
+    extern YY_BUFFER_STATE yy_scan_string(const char *str);
+    extern void yy_delete_buffer(YY_BUFFER_STATE buffer);
+    extern int yyparse(void);
+    extern CAstNode *g_root_ast;
+
+    YY_BUFFER_STATE buffer = yy_scan_string(source);
+    int parse_res = yyparse();
+    yy_delete_buffer(buffer);
+
+    if (parse_res == 0 && g_root_ast != NULL) {
+      CSemanticResult semantic;
+      memset(&semantic, 0, sizeof(semantic));
+      if (c_analyze_semantics(g_root_ast, &semantic) && semantic.diagnostic_count == 0) {
+        CAssemblyResult assembly;
+        memset(&assembly, 0, sizeof(assembly));
+        if (c_generate_nasm_x86_64(g_root_ast, &semantic, &assembly) && assembly.text) {
+          fputs(assembly.text, stdout);
+          c_assembly_result_free(&assembly);
+          c_semantic_result_free(&semantic);
+          free(source);
+          return 0;
+        }
+        c_assembly_result_free(&assembly);
+      }
+      c_semantic_result_free(&semantic);
+    }
+    free(source);
+    return 1;
   }
 
   if (argc >= 2 && (strcmp(argv[1], "--version") == 0 || strcmp(argv[1], "-v") == 0)) {

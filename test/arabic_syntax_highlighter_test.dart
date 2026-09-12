@@ -1,5 +1,5 @@
-import 'package:acsys360/domain/entities/source_token.dart';
-import 'package:acsys360/domain/usecases/arabic_syntax_highlighter.dart';
+import 'package:acsys360/features/editor/domain/entities/source_token.dart';
+import 'package:acsys360/features/editor/domain/usecases/arabic_syntax_highlighter.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

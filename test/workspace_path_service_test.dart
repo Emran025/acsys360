@@ -1,4 +1,4 @@
-import 'package:acsys360/domain/services/workspace_path_service.dart';
+import 'package:acsys360/core/services/workspace_path_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

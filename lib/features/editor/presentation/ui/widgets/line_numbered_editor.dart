@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../domain/entities/editor_diagnostic.dart';
-import '../theme/app_theme.dart';
+import '../../../domain/entities/editor_diagnostic.dart';
+import '../../../../../../shared/themes/app_theme.dart';
 import 'code_minimap.dart';
 
 class LineNumberedEditor extends StatefulWidget {

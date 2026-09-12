@@ -316,6 +316,66 @@ char *protocol_serialize_response(const ProtocolResponse *resp) {
   return b.data;
 }
 
+#include "ast.h"
+#include "semantic.h"
+#include "asm_x86_64.h"
+
+typedef struct yy_buffer_state *YY_BUFFER_STATE;
+extern YY_BUFFER_STATE yy_scan_string(const char *str);
+extern void yy_delete_buffer(YY_BUFFER_STATE buffer);
+extern int yyparse(void);
+extern CAstNode *g_root_ast;
+extern ProtocolResponse *g_protocol_response;
+extern int current_line;
+extern int current_column;
+extern const char *g_current_source_path;
+
+static char *extract_source_code(const char *payload) {
+  if (!payload) return NULL;
+  if (strstr(payload, "\"sourceTexts\"") == NULL) {
+    size_t len = strlen(payload);
+    char *res = malloc(len + 1);
+    if (res) memcpy(res, payload, len + 1);
+    return res;
+  }
+  const char *p = strstr(payload, "\"sourceTexts\"");
+  if (!p) return NULL;
+  p = strchr(p, '{');
+  if (!p) return NULL;
+  p = strchr(p, ':');
+  if (!p) return NULL;
+  while (*p && *p != '"') p++;
+  if (!*p) return NULL;
+  p++;
+  size_t cap = 1024;
+  size_t len = 0;
+  char *buf = malloc(cap);
+  if (!buf) return NULL;
+  while (*p && *p != '"') {
+    char ch = *p++;
+    if (ch == '\\' && *p) {
+      char esc = *p++;
+      switch (esc) {
+        case 'n': ch = '\n'; break;
+        case 'r': ch = '\r'; break;
+        case 't': ch = '\t'; break;
+        case '"': ch = '"'; break;
+        case '\\': ch = '\\'; break;
+        default: ch = esc; break;
+      }
+    }
+    if (len + 1 >= cap) {
+      cap *= 2;
+      char *nb = realloc(buf, cap);
+      if (!nb) { free(buf); return NULL; }
+      buf = nb;
+    }
+    buf[len++] = ch;
+  }
+  buf[len] = '\0';
+  return buf;
+}
+
 int c_run_protocol(const char *payload) {
   if (payload == NULL || payload[0] == '\0') {
     fputs("{\"protocolVersion\":\"" ARABICC_PROTOCOL_VERSION "\",\"success\":false,\"diagnostics\":[{\"severity\":\"error\",\"phase\":\"driver\",\"code\":\"P001\",\"message\":\"حزمة الطلب فارغة\",\"span\":null}],\"tokens\":[],\"syntaxTree\":null,\"symbolTable\":[],\"threeAddressCode\":[],\"assembly\":\"\",\"executionOutput\":[],\"artifacts\":[],\"intermediateRepresentation\":{}}\n", stdout);
@@ -332,6 +392,40 @@ int c_run_protocol(const char *payload) {
   ProtocolResponse resp;
   protocol_response_init(&resp);
   resp.success = 1;
+
+  char *source = extract_source_code(payload);
+  if (source && source[0] != '\0') {
+    g_protocol_response = &resp;
+    current_line = 1;
+    current_column = 1;
+    g_root_ast = NULL;
+
+    YY_BUFFER_STATE buffer = yy_scan_string(source);
+    int parse_res = yyparse();
+    yy_delete_buffer(buffer);
+
+    if (parse_res == 0 && g_root_ast != NULL) {
+      CSemanticResult semantic;
+      memset(&semantic, 0, sizeof(semantic));
+      if (c_analyze_semantics(g_root_ast, &semantic)) {
+        for (size_t i = 0; i < semantic.count; i++) {
+          ProtocolSpan span = {g_current_source_path, semantic.items[i].offset, semantic.items[i].line, semantic.items[i].column, 0};
+          protocol_add_symbol(&resp, semantic.items[i].name, "variable", semantic.items[i].type, span);
+        }
+        CAssemblyResult assembly;
+        memset(&assembly, 0, sizeof(assembly));
+        if (c_generate_nasm_x86_64(g_root_ast, &semantic, &assembly) && assembly.text) {
+          protocol_set_assembly(&resp, assembly.text);
+        }
+        c_assembly_result_free(&assembly);
+      }
+      for (size_t i = 0; i < semantic.diagnostic_count; i++) {
+        protocol_add_diagnostic(&resp, SEVERITY_ERROR, "semantic", "SEM001", semantic.diagnostics[i], NULL);
+      }
+      c_semantic_result_free(&semantic);
+    }
+    free(source);
+  }
 
   char *json_out = protocol_serialize_response(&resp);
   if (json_out) {

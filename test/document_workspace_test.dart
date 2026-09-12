@@ -1,5 +1,5 @@
-import 'package:acsys360/domain/entities/document.dart';
-import 'package:acsys360/domain/entities/workspace.dart';
+import 'package:acsys360/features/editor/domain/entities/document.dart';
+import 'package:acsys360/features/editor/domain/entities/workspace.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

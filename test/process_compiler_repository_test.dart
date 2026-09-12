@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:acsys360/features/editor/data/repositories_impl/process_compiler_repository_impl.dart';
+import 'package:acsys360/features/editor/domain/entities/document.dart';
 import 'package:compiler_contracts/compiler_contracts.dart';
-import 'package:acsys360/data/repositories/process_compiler_repository.dart';
-import 'package:acsys360/domain/entities/document.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

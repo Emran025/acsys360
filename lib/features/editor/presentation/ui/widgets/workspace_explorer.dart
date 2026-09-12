@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
-import '../../domain/entities/file_node.dart';
+import '../../../domain/entities/file_node.dart';
 import 'arabic_file_icon.dart';
 
 enum _WorkspaceAction { open, cut, delete, paste, newFile, newFolder, rename }

@@ -16,8 +16,10 @@ const char *g_current_source_path = "";
 
 %option noyywrap
 %option yylineno
+%option nounput
+%option noinput
 
-ARABIC_CHAR   (\xD8[\x80-\xBF]|\xD9[\x80-\xBF]|\xDA[\x80-\xBF]|\xDB[\x80-\xBF])
+ARABIC_CHAR   (\xD8[\x80-\x8B\x8D-\x9A\x9C-\xBF]|\xD9[\x80-\xBF]|\xDA[\x80-\xBF]|\xDB[\x80-\xBF])
 ID            ({ARABIC_CHAR}|[a-zA-Z_])({ARABIC_CHAR}|[a-zA-Z0-9_])*
 DIGIT         [0-9]
 
@@ -57,6 +59,9 @@ DIGIT         [0-9]
 "سجل"          { return TOK_RECORD; }
 "صح"           { return TOK_TRUE; }
 "خطأ"          { return TOK_FALSE; }
+
+"؛"           { return ';'; }
+"،"           { return ','; }
 
 "=="          { return TOK_EQ; }
 "!="          { return TOK_NE; }
@@ -99,9 +104,7 @@ DIGIT         [0-9]
 ">"           { return '>'; }
 
 ";"           { return ';'; }
-"؛"           { return ';'; }
 ","           { return ','; }
-"،"           { return ','; }
 "{"           { return '{'; }
 "}"           { return '}'; }
 "("           { return '('; }
