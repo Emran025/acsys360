@@ -10,8 +10,12 @@
 extern int yylex(void);
 extern int yyparse(void);
 extern void yyerror(const char *s);
-extern int current_line;
-extern int current_column;
+
+extern int yy_token_offset;
+extern int yy_token_line;
+extern int yy_token_column;
+extern int yy_token_length;
+extern char *yytext;
 
 extern ProtocolResponse *g_protocol_response;
 extern const char *g_current_source_path;
@@ -88,22 +92,27 @@ var_decl
   : TOK_VAR TOK_IDENTIFIER ':' TOK_TYPE_INT
     {
       $$ = c_ast_new_var_decl($2, "صحيح");
+      if ($$) { $$->offset = (size_t)yy_token_offset; $$->line = (size_t)yy_token_line; $$->column = (size_t)yy_token_column; }
     }
   | TOK_VAR TOK_IDENTIFIER ':' TOK_TYPE_REAL
     {
       $$ = c_ast_new_var_decl($2, "حقيقي");
+      if ($$) { $$->offset = (size_t)yy_token_offset; $$->line = (size_t)yy_token_line; $$->column = (size_t)yy_token_column; }
     }
   | TOK_VAR TOK_IDENTIFIER ':' TOK_TYPE_STRING
     {
       $$ = c_ast_new_var_decl($2, "خيط_رمزي");
+      if ($$) { $$->offset = (size_t)yy_token_offset; $$->line = (size_t)yy_token_line; $$->column = (size_t)yy_token_column; }
     }
   | TOK_VAR TOK_IDENTIFIER ':' TOK_TYPE_BOOL
     {
       $$ = c_ast_new_var_decl($2, "منطقي");
+      if ($$) { $$->offset = (size_t)yy_token_offset; $$->line = (size_t)yy_token_line; $$->column = (size_t)yy_token_column; }
     }
   | TOK_VAR TOK_IDENTIFIER ':' TOK_TYPE_CHAR
     {
       $$ = c_ast_new_var_decl($2, "حرفي");
+      if ($$) { $$->offset = (size_t)yy_token_offset; $$->line = (size_t)yy_token_line; $$->column = (size_t)yy_token_column; }
     }
   ;
 
@@ -184,7 +193,7 @@ term
 
 factor
   : TOK_INTEGER_LITERAL { $$ = c_ast_new_integer($1); }
-  | TOK_REAL_LITERAL    { $$ = c_ast_new_integer($1); } /* treat real as numeric for now */
+  | TOK_REAL_LITERAL    { $$ = c_ast_new_integer($1); }
   | TOK_STRING_LITERAL  { $$ = c_ast_new_string($1); }
   | TOK_TRUE            { $$ = c_ast_new_integer("1"); }
   | TOK_FALSE           { $$ = c_ast_new_integer("0"); }
@@ -195,9 +204,24 @@ factor
 %%
 
 void yyerror(const char *s) {
-  fprintf(stderr, "خطأ نحوي عند السطر %d، العمود %d: %s\n", current_line, current_column, s);
+  int line = yy_token_line > 0 ? yy_token_line : 1;
+  int col = yy_token_column > 0 ? yy_token_column : 1;
+  fprintf(stderr, "خطأ نحوي عند السطر %d، العمود %d: %s\n", line, col, s);
   if (g_protocol_response) {
-    ProtocolSpan span = {g_current_source_path, 0, (size_t)current_line, (size_t)current_column, 1};
-    protocol_add_diagnostic(g_protocol_response, SEVERITY_ERROR, "syntax", "S001", s, &span);
+    size_t len = yy_token_length > 0 ? (size_t)yy_token_length : 1;
+    ProtocolSpan span;
+    span.source_path = (g_current_source_path && g_current_source_path[0] != '\0') ? g_current_source_path : NULL;
+    span.offset = (size_t)yy_token_offset;
+    span.line = (size_t)line;
+    span.column = (size_t)col;
+    span.length = len;
+
+    char msg[256];
+    if (yytext && yytext[0] != '\0') {
+      snprintf(msg, sizeof(msg), "رمز غير متوقع «%s»", yytext);
+    } else {
+      snprintf(msg, sizeof(msg), "خطأ نحوي: متوقع تعليمة أو إغلاق القوس");
+    }
+    protocol_add_diagnostic(g_protocol_response, SEVERITY_ERROR, "syntax", "S001", msg, &span);
   }
 }
