@@ -1,0 +1,33 @@
+# سجل التغييرات
+
+## v0.0.1
+
+هذا الإصدار مبني من commit `e6e8785` ويتضمن إصلاحات جاهزية النشر للمترجم العربي.
+
+- إصلاح توليد Flex على Windows باستخدام وضع `wincompat` حتى لا يعتمد scanner الناتج على `unistd.h` غير المتوفرة مع MSVC.
+- استبدال `strdup` غير المحمولة بنسخ نصية متوافقة مع C17 وMSVC، مما يمنع انهيار اختبار البروتوكول على Linux.
+- توحيد اسم الملف التنفيذي للمترجم إلى `arabicc` ومسارات bundling في بناءات Linux وWindows وmacOS.
+- إضافة smoke test للتحقق من أن compiler المضمن يعيد JSON protocol صالحًا بالإصدار `0.5.0`.
+
+### بناء المترجم محليًا
+
+```sh
+cd packages/compiler_c
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+```
+
+على Windows باستخدام Visual Studio، استخدم:
+
+```powershell
+cmake -S . -B build
+cmake --build build --parallel --config Release
+```
+
+### صورة التطوير
+
+يتم نشر صورة التطوير تلقائيًا إلى:
+
+```text
+ghcr.io/emran025/acsys360/dev:latest
+```

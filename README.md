@@ -27,6 +27,7 @@
 | `docs/roadmap/roadmap.md` | مراحل البناء ومعايير الانتقال |
 | `docs/testing/test-strategy.md` | اختبارات كل مرحلة ومعايير الجودة |
 | `.github/workflows/ci.yml` | بوابة CI وبناء Desktop |
+| `CHANGELOG.md` | سجل الإصدارات وملاحظات البناء |
 
 ## المنتج المستهدف
 
@@ -42,4 +43,30 @@
 
 يحتوي المحرر على workspace حقيقي وشجرة ملفات وتبويبات وتحرير وحفظ وتنسيق وتشخيصات وquick fixes محدودة وcompletion وhelp وghost text وsyntax/semantic highlighting وMinimap واختصارات التحرير وthemes ونتائج مراحل المترجم. توجد عشرة أمثلة نجاح مختلفة في `examples/`، وfixtures سلبية مستقلة في `examples/errors/` لاختبار syntax وsemantic diagnostics.
 
-الإصدار المنشور حاليًا هو [`v0.14.0`](https://github.com/Emran025/acsys360/releases/tag/v0.14.0). لا تُسمى Assembly binary، ولا يُعلن `dart-native` مترجمًا عامًا لكل قواعد اللغة؛ كلا الحدين موثق ومغطى فقط ضمن subset المثبت.
+الإصدار الحالي هو [`v0.0.1`](https://github.com/Emran025/acsys360/releases/tag/v0.0.1)، ويشمل إصلاحات بناء المترجم على Linux وWindows وmacOS. لا تُسمى Assembly binary، ولا يُعلن `dart-native` مترجمًا عامًا لكل قواعد اللغة؛ كلا الحدين موثق ومغطى فقط ضمن subset المثبت.
+
+## بناء المترجم المستقل
+
+يتطلب بناء `arabicc` وجود CMake وFlex وBison ومترجم C متوافق. على Linux وmacOS:
+
+```sh
+cd packages/compiler_c
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+```
+
+وعلى Windows باستخدام Visual Studio:
+
+```powershell
+cd packages/compiler_c
+cmake -S . -B build
+cmake --build build --parallel --config Release
+```
+
+يتم توليد scanner الخاص بـ Flex في Windows بوضع `wincompat` لتجنب الاعتماد على `unistd.h`، كما أن الكود يستخدم نسخًا نصية محمولة ومتوافقة مع C17 وMSVC. بعد البناء يمكن اختبار عقد البروتوكول عبر:
+
+```sh
+dart run tool/verify_compiler_bundle.dart --executable packages/compiler_c/build/arabicc
+```
+
+يتم نشر صورة بيئة التطوير تلقائيًا إلى `ghcr.io/emran025/acsys360/dev:latest` عند الدفع إلى الفرع الرئيسي.
