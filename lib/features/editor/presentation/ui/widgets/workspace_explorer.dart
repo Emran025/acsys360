@@ -143,6 +143,8 @@ class WorkspaceExplorer extends StatelessWidget {
                     Expanded(
                       child: Text(
                         _rootName.isEmpty ? 'اختر مجلدًا' : _rootName,
+                        textDirection: TextDirection.ltr,
+                        textAlign: TextAlign.right,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
@@ -327,6 +329,8 @@ class _WorkspaceTreeNode extends StatelessWidget {
           leading: _fileLeading(colors),
           title: Text(
             node.name,
+            textDirection: TextDirection.ltr,
+            textAlign: TextAlign.right,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: node.path == selectedPath ? colors.primary : null,
@@ -372,6 +376,8 @@ class _WorkspaceTreeNode extends StatelessWidget {
             ),
             title: Text(
               node.name,
+              textDirection: TextDirection.ltr,
+              textAlign: TextAlign.right,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: node.path == selectedPath ? colors.primary : null,
