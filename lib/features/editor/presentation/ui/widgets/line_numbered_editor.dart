@@ -67,18 +67,11 @@ class _LineNumberedEditorState extends State<LineNumberedEditor> {
   void _handleControllerChange() {
     final next = _lineCount(widget.controller.text);
     if (next != lineCount && mounted) setState(() => lineCount = next);
-    var selection = widget.controller.selection;
-    if (selection.isCollapsed && selection.affinity == TextAffinity.upstream) {
-      final offset = selection.extentOffset;
-      final text = widget.controller.text;
-      if (offset > 0 && offset <= text.length && text[offset - 1] == '\n') {
-        selection = TextSelection.collapsed(
-          offset: offset - 1,
-          affinity: TextAffinity.downstream,
-        );
-        widget.controller.selection = selection;
-      }
-    }
+    // Do not normalize affinity or rewrite the selection here. Flutter's
+    // bidi-aware TextField uses affinity to distinguish the end of one line
+    // from the start of the next; rewriting it causes an apparent jump when
+    // selecting trailing spaces in RTL source.
+    final selection = widget.controller.selection;
     if (selection != lastSelection) {
       lastSelection = selection;
       widget.onSelectionChanged?.call(selection);

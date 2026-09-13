@@ -22,42 +22,42 @@ String formatArabicSource(String source) {
 
 int _leadingClosingBraces(String line) {
   var index = 0;
-  while (index < line.length && line[index] == '}') {
-    index++;
-  }
+  while (index < line.length && line[index] == '}') index++;
   return index;
 }
 
 int _braceBalance(String line) {
   var balance = 0;
   var inString = false;
-  var inCharacter = false;
+  String? characterCloser;
   for (var index = 0; index < line.length; index++) {
     final current = line[index];
-    if ((inString || inCharacter) &&
-        current == '\\' &&
-        index + 1 < line.length) {
-      index++;
+    if (characterCloser != null) {
+      if (current == '\\' && index + 1 < line.length) {
+        index++;
+      } else if (current == characterCloser) {
+        characterCloser = null;
+      }
       continue;
     }
-    if (!inCharacter && current == '"') {
-      inString = !inString;
+    if (inString) {
+      if (current == '\\' && index + 1 < line.length) index++;
+      if (current == '"') inString = false;
       continue;
     }
-    if (!inString && !inCharacter && current == '‘') {
-      inCharacter = true;
-      continue;
-    }
-    if (!inString && inCharacter && current == '’') {
-      inCharacter = false;
-      continue;
-    }
-    if (inString || inCharacter) continue;
-    if (current == '/' && index + 1 < line.length && line[index + 1] == '/') {
+    if (current == '"') {
+      inString = true;
+    } else if (current == '‘' || current == '’' || current == '\'') {
+      characterCloser = current == '‘' ? '’' : '‘';
+    } else if (current == '/' &&
+        index + 1 < line.length &&
+        line[index + 1] == '/') {
       break;
+    } else if (current == '{') {
+      balance++;
+    } else if (current == '}') {
+      balance--;
     }
-    if (current == '{') balance++;
-    if (current == '}') balance--;
   }
   return balance;
 }
@@ -65,46 +65,41 @@ int _braceBalance(String line) {
 bool _hasBalancedBlocks(String source) {
   var depth = 0;
   var inString = false;
-  var inCharacter = false;
+  String? characterCloser;
   final normalized = source.replaceAll('\r\n', '\n');
   for (var index = 0; index < normalized.length; index++) {
     final current = normalized[index];
-    if ((inString || inCharacter) &&
-        current == '\\' &&
-        index + 1 < normalized.length) {
-      index++;
+    if (characterCloser != null) {
+      if (current == '\\' && index + 1 < normalized.length) {
+        index++;
+      } else if (current == characterCloser) {
+        characterCloser = null;
+      } else if (current == '\n') {
+        return false;
+      }
       continue;
     }
     if (inString) {
+      if (current == '\\' && index + 1 < normalized.length) index++;
       if (current == '"') inString = false;
-      if (current == '\n') return false;
-      continue;
-    }
-    if (inCharacter) {
-      if (current == '’') inCharacter = false;
       if (current == '\n') return false;
       continue;
     }
     if (current == '"') {
       inString = true;
-      continue;
-    }
-    if (current == '‘') {
-      inCharacter = true;
-      continue;
-    }
-    if (current == '/' &&
+    } else if (current == '‘' || current == '’' || current == '\'') {
+      characterCloser = current == '‘' ? '’' : '‘';
+    } else if (current == '/' &&
         index + 1 < normalized.length &&
         normalized[index + 1] == '/') {
       final lineEnd = normalized.indexOf('\n', index + 2);
       index = lineEnd == -1 ? normalized.length : lineEnd;
-      continue;
-    }
-    if (current == '{') depth++;
-    if (current == '}') {
+    } else if (current == '{') {
+      depth++;
+    } else if (current == '}') {
       depth--;
       if (depth < 0) return false;
     }
   }
-  return !inString && !inCharacter && depth == 0;
+  return !inString && characterCloser == null && depth == 0;
 }

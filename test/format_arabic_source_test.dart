@@ -45,4 +45,13 @@ void main() {
 
     expect(formatArabicSource(source), source);
   });
+
+  test('recognizes both Arabic character quote orientations', () {
+    const source = 'برنامج اختبار؛ {\nمتغير أ = ’أ‘؛\n}.';
+
+    expect(
+      formatArabicSource(source),
+      'برنامج اختبار؛ {\n  متغير أ = ’أ‘؛\n}.',
+    );
+  });
 }

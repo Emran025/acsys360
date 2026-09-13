@@ -222,10 +222,9 @@ class _EditorShellState extends State<EditorShell> {
         !hardware.isMetaPressed &&
         !hardware.isAltPressed) {
       if (hasCompletion) widget.controller.clearAssist();
-      return _moveCaretVisually(
-        moveLeft: key == LogicalKeyboardKey.arrowLeft,
-        extend: hardware.isShiftPressed,
-      );
+      // Let TextField handle bidi-aware caret movement and Shift selection.
+      // Manually reversing logical offsets breaks mixed Arabic/code lines.
+      return KeyEventResult.ignored;
     }
     if (hasCompletion && _dismissesCompletion(key, hardware)) {
       widget.controller.clearAssist();
@@ -278,30 +277,6 @@ class _EditorShellState extends State<EditorShell> {
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
-  }
-
-  KeyEventResult _moveCaretVisually({
-    required bool moveLeft,
-    required bool extend,
-  }) {
-    final value = textController.value;
-    final selection = value.selection;
-    if (!selection.isValid) return KeyEventResult.ignored;
-
-    // In an Arabic field, physical left advances the logical offset.
-    final delta = moveLeft ? 1 : -1;
-    final target = (selection.extentOffset + delta)
-        .clamp(0, value.text.length)
-        .toInt();
-    final nextSelection = extend
-        ? selection.copyWith(extentOffset: target)
-        : selection.isCollapsed
-        ? TextSelection.collapsed(offset: target)
-        : TextSelection.collapsed(
-            offset: moveLeft ? selection.end : selection.start,
-          );
-    textController.value = value.copyWith(selection: nextSelection);
-    return KeyEventResult.handled;
   }
 
   bool _dismissesCompletion(LogicalKeyboardKey key, HardwareKeyboard hardware) {
@@ -836,9 +811,8 @@ class _EditorShellState extends State<EditorShell> {
       replaceController.text,
     );
     if (!mounted || count == 0) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('تم استبدال $count تطابقات')));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('تم استبدال $count تطابقات')));
   }
 
   Future<void> _showEditorMenu(Offset position) async {
@@ -1076,9 +1050,8 @@ class _EditorShellState extends State<EditorShell> {
           ),
         },
         child: MediaQuery(
-          data: MediaQuery.of(
-            context,
-          ).copyWith(textScaler: TextScaler.linear(_zoomScale)),
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(_zoomScale)),
           child: Directionality(
             textDirection: TextDirection.rtl,
             child: Scaffold(
