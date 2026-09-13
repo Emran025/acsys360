@@ -59,6 +59,7 @@ class _EditorShellState extends State<EditorShell> {
   bool isRefreshing = false;
   bool topBarExpanded = true;
   bool resultsExpanded = true;
+  double resultsHeight = 160;
   EditorDiagnostic? visibleDiagnostic;
   Timer? analysisTimer;
   int _editGeneration = 0;
@@ -1201,10 +1202,19 @@ class _EditorShellState extends State<EditorShell> {
                                   title: 'نتائج الترجمة',
                                   icon: Icons.terminal_rounded,
                                   expanded: resultsExpanded,
-                                  expandedHeight: 160,
+                                  expandedHeight: resultsHeight,
                                   onToggle: () => setState(
                                     () => resultsExpanded = !resultsExpanded,
                                   ),
+                                  onResize: (delta) {
+                                    final maxHeight = MediaQuery.sizeOf(context).height * .75;
+                                    setState(() {
+                                      resultsHeight = (resultsHeight - delta).clamp(
+                                        100.0,
+                                        maxHeight,
+                                      );
+                                    });
+                                  },
                                   child: DiagnosticsPanelWidget(
                                     controller: controller,
                                   ),
