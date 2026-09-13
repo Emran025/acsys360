@@ -25,7 +25,7 @@ void main() {
         documents: [
           Document(
             path: '${Directory.current.path}/main.arb',
-            text: 'برنامج اختبار {}.',
+            text: 'برنامج اختبار؛ {}.',
           ),
         ],
       );
@@ -93,7 +93,7 @@ void main() {
 }
 
 String _validProgram(String name, String value) =>
-    '''برنامج اختبار {
+    '''برنامج اختبار؛ {
   متغير $name: صحيح;
   $name = $value;
   اطبع($name);

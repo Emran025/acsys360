@@ -73,7 +73,7 @@ void main() {
     final root = await Directory.systemTemp.createTemp('acsys360-rename-');
     addTearDown(() => root.delete(recursive: true));
     final file = File('${root.path}/main.arb');
-    await file.writeAsString('برنامج اختبار {}.');
+    await file.writeAsString('برنامج اختبار؛ {}.');
 
     final repository = LocalWorkspaceRepository();
     await repository.rename(file.path, 'renamed.arb');

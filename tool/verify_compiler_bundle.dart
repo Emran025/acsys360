@@ -17,7 +17,7 @@ Future<void> main(List<String> arguments) async {
     'rootPath': Directory.current.path,
     'sourcePaths': ['smoke.arb'],
     'sourceTexts': {
-      'smoke.arb': '''برنامج اختبار {
+      'smoke.arb': '''برنامج اختبار؛ {
   متغير س: صحيح;
   س = 2;
   اطبع(س);

@@ -4,31 +4,23 @@ import '../repositories_impl/process_compiler_repository_impl.dart';
 
 ProcessCompilerRepository createCompilerRepository() {
   final compilerName = Platform.isWindows ? 'arabicc.exe' : 'arabicc';
-  final bundledPath = [
-    File(Platform.resolvedExecutable).parent.path,
-    'compiler',
-    compilerName,
-  ].join(Platform.pathSeparator);
-  if (File(bundledPath).existsSync()) {
-    return ProcessCompilerRepository(
-      executable: bundledPath,
-      arguments: const ['--protocol'],
-      processWorkingDirectory: File(Platform.resolvedExecutable).parent.path,
-    );
-  }
-  final localBuildPath = [
-    Directory.current.path,
-    'packages',
-    'compiler_c',
-    'build',
-    compilerName,
-  ].join(Platform.pathSeparator);
-  if (File(localBuildPath).existsSync()) {
-    return ProcessCompilerRepository(
-      executable: localBuildPath,
-      arguments: const ['--protocol'],
-      processWorkingDirectory: Directory.current.path,
-    );
+  final executableDirectory = File(Platform.resolvedExecutable).parent.path;
+  final root = Directory.current.path;
+  final candidates = <String>[
+    [executableDirectory, 'compiler', compilerName].join(Platform.pathSeparator),
+    [root, 'build', 'windows', 'x64', 'runner', 'Release', 'compiler', compilerName].join(Platform.pathSeparator),
+    [root, 'build', 'windows', 'x64', 'runner', 'Debug', 'compiler', compilerName].join(Platform.pathSeparator),
+    [root, 'packages', 'compiler_c', 'build', 'Release', compilerName].join(Platform.pathSeparator),
+    [root, 'packages', 'compiler_c', 'build', compilerName].join(Platform.pathSeparator),
+  ];
+  for (final candidate in candidates) {
+    if (File(candidate).existsSync()) {
+      return ProcessCompilerRepository(
+        executable: candidate,
+        arguments: const ['--protocol'],
+        processWorkingDirectory: root,
+      );
+    }
   }
   return ProcessCompilerRepository(
     executable: compilerName,

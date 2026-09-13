@@ -6,7 +6,7 @@ void main() {
   const highlighter = ArabicSyntaxHighlighter();
 
   test('uses compiler lexer categories and keeps comment ranges', () {
-    const source = 'برنامج اختبار {\n  س = "// ليس تعليقًا"; // تعليق\n}.';
+    const source = 'برنامج اختبار؛ {\n  س = "// ليس تعليقًا"; // تعليق\n}.';
     final tokens = highlighter.tokenize(source);
 
     expect(

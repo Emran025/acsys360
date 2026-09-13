@@ -17,7 +17,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class FakeWorkspaceRepository implements WorkspaceRepository {
-  final document = const Document(path: 'main.arb', text: 'برنامج اختبار {}.');
+  final document = const Document(path: 'main.arb', text: 'برنامج اختبار؛ {}.');
   String? lastCreateRoot;
   String? lastCreateDirectoryRoot;
 
@@ -134,7 +134,7 @@ void main() {
   });
 
   testWidgets('uses Arabic direction and right-aligns code', (tester) async {
-    final textController = TextEditingController(text: 'برنامج اختبار {}.');
+    final textController = TextEditingController(text: 'برنامج اختبار؛ {}.');
     addTearDown(textController.dispose);
 
     await tester.pumpWidget(
@@ -221,7 +221,7 @@ void main() {
     await tester.pump();
     expect(find.byType(LineNumberedEditor), findsOneWidget);
     expect(find.text('1'), findsOneWidget);
-    expect(controller.activeDocument?.text, 'برنامج اختبار {}.');
+    expect(controller.activeDocument?.text, 'برنامج اختبار؛ {}.');
     expect(
       find.byKey(const ValueKey('arabic-file-icon')),
       findsAtLeastNWidgets(2),
@@ -283,7 +283,7 @@ void main() {
 
   testWidgets('renders miniature token strokes in the minimap', (tester) async {
     final controller = ArabicCodeController(
-      text: 'برنامج سعيد {\n  اطبع("السلام")؛\n  س = 42؛',
+      text: 'برنامج سعيد؛ {\n  اطبع("السلام")؛\n  س = 42؛',
     );
     addTearDown(controller.dispose);
 
@@ -409,7 +409,7 @@ void main() {
     controller.edit(
       const TextEdit(
         offset: 0,
-        before: 'برنامج اختبار {}.',
+        before: 'برنامج اختبار؛ {}.',
         after: 'اكتب اكتب',
       ),
     );
@@ -510,7 +510,7 @@ void main() {
     );
     await controller.open('main.arb');
     controller.edit(
-      const TextEdit(offset: 0, before: 'برنامج اختبار {}.', after: 'بر'),
+      const TextEdit(offset: 0, before: 'برنامج اختبار؛ {}.', after: 'بر'),
     );
     controller.assistance = const AssistResponse(
       action: AssistAction.completion,
@@ -546,8 +546,8 @@ void main() {
     controller.edit(
       const TextEdit(
         offset: 0,
-        before: 'برنامج اختبار {}.',
-        after: 'برنامج اختبار {',
+        before: 'برنامج اختبار؛ {}.',
+        after: 'برنامج اختبار؛ {',
       ),
     );
 
@@ -562,7 +562,7 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump();
 
-    expect(controller.activeDocument?.text, 'برنامج اختبار {\n  ');
+    expect(controller.activeDocument?.text, 'برنامج اختبار؛ {\n  ');
     expect(
       tester.widget<TextField>(field).controller?.selection.extentOffset,
       controller.activeDocument?.text.length,
@@ -585,7 +585,7 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump();
 
-    expect(controller.activeDocument?.text, '\nبرنامج اختبار {}.');
+    expect(controller.activeDocument?.text, '\nبرنامج اختبار؛ {}.');
     expect(textFieldController.selection.extentOffset, 1);
   });
 
@@ -628,7 +628,7 @@ void main() {
     controller.edit(
       const TextEdit(
         offset: 0,
-        before: 'برنامج اختبار {}.',
+        before: 'برنامج اختبار؛ {}.',
         after: 'سعيد\nاطبع',
       ),
     );
@@ -665,7 +665,7 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
     await tester.pump();
 
-    expect(controller.activeDocument?.text, '// برنامج اختبار {}.');
+    expect(controller.activeDocument?.text, '// برنامج اختبار؛ {}.');
   });
 
   testWidgets('changes global text scale once and resets it', (tester) async {

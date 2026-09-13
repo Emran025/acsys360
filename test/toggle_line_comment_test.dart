@@ -5,7 +5,7 @@ void main() {
   const toggle = ToggleLineComment();
 
   test('comments selected lines while preserving indentation', () {
-    const source = 'برنامج اختبار {\n  س = 1;\n  ص = 2;\n}.';
+    const source = 'برنامج اختبار؛ {\n  س = 1;\n  ص = 2;\n}.';
     final result = toggle.apply(
       source,
       source.indexOf('س'),

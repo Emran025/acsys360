@@ -18,8 +18,8 @@ void main() {
         '/workspace/project/lib.arb',
       ],
       sourceTexts: {
-        '/workspace/project/main.arb': 'برنامج رئيسي {}.',
-        '/workspace/project/lib.arb': 'برنامج مساعد {}.',
+        '/workspace/project/main.arb': 'برنامج رئيسي؛ {}.',
+        '/workspace/project/lib.arb': 'برنامج مساعد؛ {}.',
       },
       mode: CompilationMode.project,
       entryPath: '/workspace/project/main.arb',
