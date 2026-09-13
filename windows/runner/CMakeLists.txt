@@ -38,3 +38,27 @@ target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)
+
+# Copy the locally built compiler beside the Debug executable when available.
+# This command belongs here because the application target is created in this
+# directory; CMake rejects TARGET post-build commands from the parent scope.
+set(ARABICC_PROJECT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../..")
+set(ARABICC_LOCAL_CANDIDATES
+  "${ARABICC_PROJECT_ROOT}/packages/compiler_c/build/Release/arabicc.exe"
+  "${ARABICC_PROJECT_ROOT}/packages/compiler_c/build/arabicc.exe"
+)
+foreach(ARABICC_CANDIDATE IN LISTS ARABICC_LOCAL_CANDIDATES)
+  if(EXISTS "${ARABICC_CANDIDATE}" AND NOT ARABICC_LOCAL_SOURCE)
+    set(ARABICC_LOCAL_SOURCE "${ARABICC_CANDIDATE}")
+  endif()
+endforeach()
+if(ARABICC_LOCAL_SOURCE)
+  add_custom_command(TARGET ${BINARY_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+      "$<TARGET_FILE_DIR:${BINARY_NAME}>/compiler"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${ARABICC_LOCAL_SOURCE}"
+      "$<TARGET_FILE_DIR:${BINARY_NAME}>/compiler/arabicc.exe"
+    VERBATIM
+  )
+endif()

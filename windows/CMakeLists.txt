@@ -52,31 +52,6 @@ add_subdirectory(${FLUTTER_MANAGED_DIR})
 # Application build; see runner/CMakeLists.txt.
 add_subdirectory("runner")
 
-# The local Flutter/Visual Studio build does not run the release bundling
-# script. Copy the compiler built from packages/compiler_c beside the Debug
-# executable so `flutter run -d windows` uses the current source tree too.
-set(ARABICC_PROJECT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
-set(ARABICC_LOCAL_CANDIDATES
-  "${ARABICC_PROJECT_ROOT}/packages/compiler_c/build/Release/arabicc.exe"
-  "${ARABICC_PROJECT_ROOT}/packages/compiler_c/build/arabicc.exe"
-)
-foreach(ARABICC_CANDIDATE IN LISTS ARABICC_LOCAL_CANDIDATES)
-  if(EXISTS "${ARABICC_CANDIDATE}" AND NOT ARABICC_LOCAL_SOURCE)
-    set(ARABICC_LOCAL_SOURCE "${ARABICC_CANDIDATE}")
-  endif()
-endforeach()
-if(ARABICC_LOCAL_SOURCE)
-  add_custom_command(TARGET ${BINARY_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory
-      "$<TARGET_FILE_DIR:${BINARY_NAME}>/compiler"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${ARABICC_LOCAL_SOURCE}"
-      "$<TARGET_FILE_DIR:${BINARY_NAME}>/compiler/arabicc.exe"
-    VERBATIM
-  )
-endif()
-
-
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
 include(flutter/generated_plugins.cmake)
