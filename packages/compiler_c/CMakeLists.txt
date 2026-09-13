@@ -45,3 +45,7 @@ add_test(NAME arabicc_protocol_smoke
   COMMAND Python3::Interpreter
           ${CMAKE_CURRENT_SOURCE_DIR}/tests/protocol_smoke.py
           $<TARGET_FILE:arabicc>)
+add_test(NAME arabicc_manual_examples
+  COMMAND Python3::Interpreter
+          ${CMAKE_CURRENT_SOURCE_DIR}/tests/manual_examples.py
+          $<TARGET_FILE:arabicc>)

@@ -79,20 +79,26 @@ DIGIT         [0-9]
 "نوع"          { emit_token("keyword", yytext); return TOK_TYPE; }
 "متغير"        { emit_token("keyword", yytext); return TOK_VAR; }
 "اجراء"        { emit_token("keyword", yytext); return TOK_PROCEDURE; }
+"إجراء"        { emit_token("keyword", yytext); return TOK_PROCEDURE; }
 "بالقيمة"      { emit_token("keyword", yytext); return TOK_BY_VALUE; }
 "بالمرجع"      { emit_token("keyword", yytext); return TOK_BY_REF; }
 "اطبع"         { emit_token("keyword", yytext); return TOK_PRINT; }
 "اقرا"         { emit_token("keyword", yytext); return TOK_READ; }
+"اقرأ"         { emit_token("keyword", yytext); return TOK_READ; }
 "اذا"          { emit_token("keyword", yytext); return TOK_IF; }
+"إذا"          { emit_token("keyword", yytext); return TOK_IF; }
 "فان"          { emit_token("keyword", yytext); return TOK_THEN; }
 "والا"         { emit_token("keyword", yytext); return TOK_ELSE; }
+"وإلا"         { emit_token("keyword", yytext); return TOK_ELSE; }
 "كرر"          { emit_token("keyword", yytext); return TOK_REPEAT; }
 "طالما"        { emit_token("keyword", yytext); return TOK_WHILE; }
 "استمر"        { emit_token("keyword", yytext); return TOK_DO; }
 "اعد"          { emit_token("keyword", yytext); return TOK_AGAIN; }
+"أعد"          { emit_token("keyword", yytext); return TOK_AGAIN; }
 "من"           { emit_token("keyword", yytext); return TOK_FROM; }
 "الى"          { emit_token("keyword", yytext); return TOK_TO; }
 "اضف"          { emit_token("keyword", yytext); return TOK_STEP; }
+"أضف"          { emit_token("keyword", yytext); return TOK_STEP; }
 "حتى"          { emit_token("keyword", yytext); return TOK_UNTIL; }
 "صحيح"         { emit_token("keyword", yytext); return TOK_TYPE_INT; }
 "حقيقي"        { emit_token("keyword", yytext); return TOK_TYPE_REAL; }
@@ -146,6 +152,11 @@ DIGIT         [0-9]
   yylval.str = duplicate_string(yytext);
   return TOK_CHAR_LITERAL;
 }
+’([^\n]|\\.)*‘ {
+  emit_token("character", yytext);
+  yylval.str = duplicate_string(yytext);
+  return TOK_CHAR_LITERAL;
+}
 
 {ID}          {
   emit_token("identifier", yytext);
@@ -159,6 +170,7 @@ DIGIT         [0-9]
 "/"           { emit_token("operator", yytext); return '/'; }
 "%"           { emit_token("operator", yytext); return '%'; }
 "\\"          { emit_token("operator", yytext); return '\\'; }
+"\\\\"        { emit_token("operator", "\\"); return '\\'; }
 "^"           { emit_token("operator", yytext); return '^'; }
 "!"           { emit_token("operator", yytext); return '!'; }
 "="           { emit_token("operator", yytext); return '='; }
