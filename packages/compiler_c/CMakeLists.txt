@@ -8,7 +8,8 @@ set(CMAKE_C_EXTENSIONS OFF)
 find_package(BISON REQUIRED)
 find_package(FLEX REQUIRED)
 
-bison_target(ArabicParser src/parser.y ${CMAKE_CURRENT_BINARY_DIR}/parser.tab.c COMPILE_FLAGS "-d")
+bison_target(ArabicParser src/parser.y ${CMAKE_CURRENT_BINARY_DIR}/parser.tab.c
+  COMPILE_FLAGS "-d -Wno-other -Wno-conflicts-sr")
 set(ARABICC_FLEX_FLAGS "")
 if(WIN32)
   # win_flex otherwise emits an unconditional <unistd.h> include, which is

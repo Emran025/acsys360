@@ -41,7 +41,7 @@ if (!(Test-Path "build")) { New-Item -ItemType Directory "build" | Out-Null }
 
 if (Test-Path "src/parser.y") {
     Write-Host "[1/3] Running Bison ($bison)..."
-    & $bison -d -o "src/parser.tab.c" "src/parser.y"
+    & $bison -d -Wno-other -Wno-conflicts-sr -o "src/parser.tab.c" "src/parser.y"
 }
 
 if (Test-Path "src/lexer.l") {

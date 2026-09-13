@@ -62,6 +62,7 @@ static void emit_token(const char *kind, const char *lexeme) {
 %option yylineno
 %option nounput
 %option noinput
+%option never-interactive
 
 ARABIC_CHAR   (\xD8[\x80-\x8B\x8D-\x9A\x9C-\xBF]|\xD9[\x80-\xBF]|\xDA[\x80-\xBF]|\xDB[\x80-\xBF])
 ID            ({ARABIC_CHAR}|[a-zA-Z_])({ARABIC_CHAR}|[a-zA-Z0-9_])*

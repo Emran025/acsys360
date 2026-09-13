@@ -33,7 +33,7 @@ if not exist build mkdir build
 
 echo [1/3] Running Bison...
 if exist src\parser.y (
-    bison -d -o src\parser.tab.c src\parser.y
+    bison -d -Wno-other -Wno-conflicts-sr -o src\parser.tab.c src\parser.y
 )
 
 echo [2/3] Running Flex...
