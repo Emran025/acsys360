@@ -737,6 +737,16 @@ static ExecValue exec_lookup(ExecVar *vars, size_t count, const char *name) {
   return exec_number(0);
 }
 static long long eval_ast_expr(const CAstNode *, ExecVar *, size_t);
+static size_t literal_quote_width(const char *text, size_t len, size_t offset) {
+  if (offset >= len) return 0;
+  if (text[offset] == '"' || text[offset] == '\'') return 1;
+  if (len - offset >= 3 &&
+      (unsigned char)text[offset] == 0xE2 &&
+      (unsigned char)text[offset + 1] == 0x80 &&
+      ((unsigned char)text[offset + 2] == 0x98 ||
+       (unsigned char)text[offset + 2] == 0x99)) return 3;
+  return 0;
+}
 static char *exec_access_key(const char *name, const CAstNodeList *selectors, ExecVar *vars, size_t count) {
   size_t cap = 256, len = strlen(name); char *key = malloc(cap); strcpy(key, name);
   for (size_t i=0; i<selectors->count; i++) {
@@ -753,8 +763,13 @@ static ExecValue eval_ast_value(const CAstNode *e, ExecVar *vars, size_t count) 
   if (e->kind == C_AST_LITERAL) {
     const char *raw = e->data.literal.value ? e->data.literal.value : "";
     if (e->data.literal.literal_kind == C_TOKEN_STRING || e->data.literal.literal_kind == C_TOKEN_CHARACTER) {
-      size_t len = strlen(raw), begin = len && (raw[0] == '"' || raw[0] == '\'' || raw[0] == '‘' || raw[0] == '’') ? 1 : 0;
-      size_t end = len > begin && (raw[len-1] == '"' || raw[len-1] == '\'' || raw[len-1] == '‘' || raw[len-1] == '’') ? len-1 : len;
+      size_t len = strlen(raw), begin = literal_quote_width(raw, len, 0);
+      size_t trailing_quote = 0;
+      if (len > begin) {
+        if (len >= 3) trailing_quote = literal_quote_width(raw, len, len - 3);
+        if (!trailing_quote) trailing_quote = literal_quote_width(raw, len, len - 1);
+      }
+      size_t end = len >= begin + trailing_quote ? len - trailing_quote : len;
       char *text = malloc(end - begin + 1); memcpy(text, raw + begin, end - begin); text[end - begin] = '\0';
       ExecValue v = {e->data.literal.literal_kind == C_TOKEN_CHARACTER ? 3 : 1, 0, text}; return v;
     }
