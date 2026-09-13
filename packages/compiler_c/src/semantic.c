@@ -110,6 +110,8 @@ static int check_expression(Analyzer *analyzer, const CAstNode *node) {
 static int check_node(Analyzer *analyzer, const CAstNode *node) {
   if (node == NULL) return 0;
   switch (node->kind) {
+    case C_AST_PROGRAM:
+      return check_list(analyzer, &node->data.program.statements);
     case C_AST_VARIABLE_DECLARATION:
       for (size_t index = 0U; index < node->data.variable.name_count; index++) {
         if (!add_symbol(analyzer, node->data.variable.names[index],
@@ -127,6 +129,25 @@ static int check_node(Analyzer *analyzer, const CAstNode *node) {
         if (!check_expression(analyzer, node->data.print.values.items[index])) return 0;
       }
       return 1;
+    case C_AST_READ:
+      return find_symbol(analyzer->result, node->data.access.name) != NULL;
+    case C_AST_CALL:
+      for (size_t index = 0U; index < node->data.call.arguments.count; index++) {
+        if (!check_expression(analyzer, node->data.call.arguments.items[index])) return 0;
+      }
+      return 1;
+    case C_AST_IF:
+      return check_expression(analyzer, node->data.conditional.condition) &&
+          check_list(analyzer, &node->data.conditional.then_branch) &&
+          check_list(analyzer, &node->data.conditional.else_branch);
+    case C_AST_WHILE:
+      return check_expression(analyzer, node->data.loop.condition) &&
+          check_list(analyzer, &node->data.loop.body);
+    case C_AST_REPEAT:
+      return check_expression(analyzer, node->data.repeat.from) &&
+          check_expression(analyzer, node->data.repeat.to) &&
+          (node->data.repeat.step == NULL || check_expression(analyzer, node->data.repeat.step)) &&
+          check_list(analyzer, &node->data.repeat.body);
     case C_AST_EMPTY:
       return 1;
     default:

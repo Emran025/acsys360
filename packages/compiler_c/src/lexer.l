@@ -109,6 +109,7 @@ DIGIT         [0-9]
 
 "=="          { emit_token("operator", yytext); return TOK_EQ; }
 "!="          { emit_token("operator", yytext); return TOK_NE; }
+"=!"          { emit_token("operator", yytext); return TOK_NE; }
 "<="          { emit_token("operator", yytext); return TOK_LE; }
 "=<"          { emit_token("operator", yytext); return TOK_LE; }
 ">="          { emit_token("operator", yytext); return TOK_GE; }
@@ -116,22 +117,28 @@ DIGIT         [0-9]
 "&&"          { emit_token("operator", yytext); return TOK_AND; }
 "||"          { emit_token("operator", yytext); return TOK_OR; }
 
-{DIGIT}+      {
-  emit_token("integer", yytext);
-  yylval.str = duplicate_string(yytext);
-  return TOK_INTEGER_LITERAL;
-}
-
 {DIGIT}+\.{DIGIT}+ {
   emit_token("real", yytext);
   yylval.str = duplicate_string(yytext);
   return TOK_REAL_LITERAL;
 }
 
+{DIGIT}+      {
+  emit_token("integer", yytext);
+  yylval.str = duplicate_string(yytext);
+  return TOK_INTEGER_LITERAL;
+}
+
 \"([^\"\\]|\\.)*\" {
   emit_token("string", yytext);
   yylval.str = duplicate_string(yytext);
   return TOK_STRING_LITERAL;
+}
+
+\'([^\'\\]|\\.)\' {
+  emit_token("character", yytext);
+  yylval.str = duplicate_string(yytext);
+  return TOK_CHAR_LITERAL;
 }
 
 {ID}          {
@@ -145,6 +152,7 @@ DIGIT         [0-9]
 "*"           { emit_token("operator", yytext); return '*'; }
 "/"           { emit_token("operator", yytext); return '/'; }
 "%"           { emit_token("operator", yytext); return '%'; }
+"\\"          { emit_token("operator", yytext); return '\\'; }
 "^"           { emit_token("operator", yytext); return '^'; }
 "!"           { emit_token("operator", yytext); return '!'; }
 "="           { emit_token("operator", yytext); return '='; }

@@ -21,6 +21,12 @@ extern ProtocolResponse *g_protocol_response;
 extern const char *g_current_source_path;
 
 CAstNode *g_root_ast = NULL;
+static char *parser_strdup(const char *value) {
+  size_t length = strlen(value);
+  char *copy = malloc(length + 1U);
+  if (copy != NULL) memcpy(copy, value, length + 1U);
+  return copy;
+}
 %}
 
 %union {
@@ -46,8 +52,19 @@ CAstNode *g_root_ast = NULL;
 %token TOK_EQ TOK_NE TOK_LE TOK_GE TOK_AND TOK_OR
 %token TOK_ASSIGN
 
+%left TOK_OR
+%left TOK_AND
+%left TOK_EQ TOK_NE TOK_LE TOK_GE '<' '>'
+%left '+' '-'
+%left '*' '/' '%' '\\'
+%right '^'
+%right UPLUS UMINUS '!'
+
 %type <node> program statement var_decl assign_stmt print_stmt expr term factor
 %type <list> declaration_list statement_list print_arg_list
+%type <node> read_stmt call_stmt if_stmt while_stmt repeat_stmt
+%type <node> repeat_step block_stmt
+%type <list> argument_list
 
 %start program
 
@@ -65,6 +82,11 @@ program
       empty_decls.items = NULL;
       empty_decls.count = 0;
       $$ = c_ast_new_program($2, empty_decls, $4);
+      g_root_ast = $$;
+    }
+  | TOK_PROGRAM TOK_IDENTIFIER ';' '{' declaration_list statement_list '}' '.'
+    {
+      $$ = c_ast_new_program($2, $5, $6);
       g_root_ast = $$;
     }
   | error
@@ -128,6 +150,12 @@ statement_list
       $$.count = 0;
       c_ast_list_append(&$$, $1);
     }
+  | statement
+    {
+      $$.items = NULL;
+      $$.count = 0;
+      c_ast_list_append(&$$, $1);
+    }
   | /* empty */
     {
       $$.items = NULL;
@@ -138,6 +166,100 @@ statement_list
 statement
   : assign_stmt { $$ = $1; }
   | print_stmt  { $$ = $1; }
+  | read_stmt   { $$ = $1; }
+  | call_stmt   { $$ = $1; }
+  | if_stmt     { $$ = $1; }
+  | while_stmt  { $$ = $1; }
+  | repeat_stmt { $$ = $1; }
+  | block_stmt  { $$ = $1; }
+  ;
+
+block_stmt
+  : '{' statement_list '}'
+    {
+      $$ = calloc(1, sizeof(CAstNode));
+      $$->kind = C_AST_PROGRAM;
+      $$->data.program.statements = $2;
+    }
+  ;
+
+read_stmt
+  : TOK_READ '(' TOK_IDENTIFIER ')'
+    {
+      $$ = calloc(1, sizeof(CAstNode));
+      $$->kind = C_AST_READ;
+      $$->data.access.name = $3;
+    }
+  ;
+
+call_stmt
+  : TOK_IDENTIFIER '(' argument_list ')'
+    {
+      $$ = calloc(1, sizeof(CAstNode));
+      $$->kind = C_AST_CALL;
+      $$->data.call.name = $1;
+      $$->data.call.arguments = $3;
+    }
+  ;
+
+if_stmt
+  : TOK_IF '(' expr ')' TOK_THEN statement
+    {
+      $$ = calloc(1, sizeof(CAstNode));
+      $$->kind = C_AST_IF;
+      $$->data.conditional.condition = $3;
+      c_ast_list_append(&$$->data.conditional.then_branch, $6);
+    }
+  | TOK_IF '(' expr ')' TOK_THEN statement TOK_ELSE statement
+    {
+      $$ = calloc(1, sizeof(CAstNode));
+      $$->kind = C_AST_IF;
+      $$->data.conditional.condition = $3;
+      c_ast_list_append(&$$->data.conditional.then_branch, $6);
+      c_ast_list_append(&$$->data.conditional.else_branch, $8);
+    }
+  | TOK_IF '(' expr ')' TOK_THEN statement ';' TOK_ELSE statement
+    {
+      $$ = calloc(1, sizeof(CAstNode));
+      $$->kind = C_AST_IF;
+      $$->data.conditional.condition = $3;
+      c_ast_list_append(&$$->data.conditional.then_branch, $6);
+      c_ast_list_append(&$$->data.conditional.else_branch, $9);
+    }
+  ;
+
+while_stmt
+  : TOK_WHILE '(' expr ')' TOK_DO statement
+    {
+      $$ = calloc(1, sizeof(CAstNode));
+      $$->kind = C_AST_WHILE;
+      $$->data.loop.condition = $3;
+      c_ast_list_append(&$$->data.loop.body, $6);
+    }
+  ;
+
+repeat_stmt
+  : TOK_REPEAT '(' TOK_IDENTIFIER '=' expr TOK_TO expr repeat_step ')' statement
+    {
+      $$ = calloc(1, sizeof(CAstNode));
+      $$->kind = C_AST_REPEAT;
+      $$->data.repeat.variable = $3;
+      $$->data.repeat.from = $5;
+      $$->data.repeat.to = $7;
+      $$->data.repeat.step = $8;
+      c_ast_list_append(&$$->data.repeat.body, $10);
+    }
+  ;
+
+repeat_step
+  : TOK_STEP expr { $$ = $2; }
+  | /* empty */ { $$ = NULL; }
+  ;
+
+argument_list
+  : argument_list ',' expr { $$ = $1; c_ast_list_append(&$$, $3); }
+  | expr { $$.items = NULL; $$.count = 0; c_ast_list_append(&$$, $1); }
+  | /* empty */ { $$.items = NULL; $$.count = 0; }
   ;
 
 assign_stmt
@@ -182,12 +304,22 @@ print_stmt
 expr
   : expr '+' term { $$ = c_ast_new_binary($1, "+", $3); }
   | expr '-' term { $$ = c_ast_new_binary($1, "-", $3); }
+  | expr TOK_EQ term { $$ = c_ast_new_binary($1, "==", $3); }
+  | expr TOK_NE term { $$ = c_ast_new_binary($1, "!=", $3); }
+  | expr TOK_LE term { $$ = c_ast_new_binary($1, "<=", $3); }
+  | expr TOK_GE term { $$ = c_ast_new_binary($1, ">=", $3); }
+  | expr '<' term { $$ = c_ast_new_binary($1, "<", $3); }
+  | expr '>' term { $$ = c_ast_new_binary($1, ">", $3); }
+  | expr TOK_AND term { $$ = c_ast_new_binary($1, "&&", $3); }
+  | expr TOK_OR term { $$ = c_ast_new_binary($1, "||", $3); }
   | term          { $$ = $1; }
   ;
 
 term
   : term '*' factor { $$ = c_ast_new_binary($1, "*", $3); }
   | term '/' factor { $$ = c_ast_new_binary($1, "/", $3); }
+  | term '%' factor { $$ = c_ast_new_binary($1, "%", $3); }
+  | term '\\' factor { $$ = c_ast_new_binary($1, "\\", $3); }
   | factor          { $$ = $1; }
   ;
 
@@ -198,6 +330,8 @@ factor
   | TOK_TRUE            { $$ = c_ast_new_integer("1"); }
   | TOK_FALSE           { $$ = c_ast_new_integer("0"); }
   | TOK_IDENTIFIER      { $$ = c_ast_new_reference($1); }
+  | '!' factor          { CAstNode *n = calloc(1, sizeof(CAstNode)); n->kind = C_AST_UNARY; n->data.unary.operator = parser_strdup("!"); n->data.unary.operand = $2; $$ = n; }
+  | '-' factor          { CAstNode *n = calloc(1, sizeof(CAstNode)); n->kind = C_AST_UNARY; n->data.unary.operator = parser_strdup("-"); n->data.unary.operand = $2; $$ = n; }
   | '(' expr ')'        { $$ = $2; }
   ;
 
