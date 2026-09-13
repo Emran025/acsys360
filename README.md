@@ -43,7 +43,7 @@
 
 يحتوي المحرر على workspace حقيقي وشجرة ملفات وتبويبات وتحرير وحفظ وتنسيق وتشخيصات وquick fixes محدودة وcompletion وhelp وghost text وsyntax/semantic highlighting وMinimap واختصارات التحرير وthemes ونتائج مراحل المترجم. توجد عشرة أمثلة نجاح مختلفة في `examples/`، وfixtures سلبية مستقلة في `examples/errors/` لاختبار syntax وsemantic diagnostics.
 
-الإصدار الحالي هو [`v0.0.1`](https://github.com/Emran025/acsys360/releases/tag/v0.0.1)، ويشمل إصلاحات بناء المترجم على Linux وWindows وmacOS. لا تُسمى Assembly binary، ولا يُعلن `dart-native` مترجمًا عامًا لكل قواعد اللغة؛ كلا الحدين موثق ومغطى فقط ضمن subset المثبت.
+الإصدار الحالي هو [`v0.0.2`](https://github.com/Emran025/acsys360/releases/tag/v0.0.2)، ويشمل اكتمال قواعد المترجم العربي الأساسية، وتوحيد أمثلة اللغة، وتحسين AST ومخرجات بروتوكول compiler. لا تُسمى Assembly binary، ولا يُعلن `dart-native` مترجمًا عامًا لكل قواعد اللغة؛ كلا الحدين موثق ومغطى فقط ضمن subset المثبت.
 
 ## بناء المترجم المستقل
 
