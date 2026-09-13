@@ -35,6 +35,14 @@ def main():
     assert valid_response["syntaxTree"]["kind"] == "program"
     assert valid_response["symbolTable"][0]["name"] == "س"
 
+    power, power_response = run(
+        executable,
+        "برنامج قوة؛ { اطبع(2 ^ 3)؛ اطبع(9 ^ 0.5)؛ }.",
+    )
+    assert power.returncode == 0, power.stderr
+    assert power_response["success"] is True
+    assert power_response["executionOutput"] == ["8", "3"]
+
     invalid, invalid_response = run(
         executable,
         "برنامج اختبار؛ متغير س: صحيح؛ { اطبع(مفقود)؛ }.",

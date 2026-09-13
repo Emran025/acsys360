@@ -789,6 +789,7 @@ static ExecValue eval_ast_value(const CAstNode *e, ExecVar *vars, size_t count) 
     if (strcmp(op,"-")==0) return exec_number(a-b);
     if (strcmp(op,"*")==0) return exec_number(a*b);
     if (strcmp(op,"/")==0) return exec_number(b!=0?a/b:0);
+    if (strcmp(op,"^")==0) return exec_number(pow(a, b));
     if (strcmp(op,"%")==0 || strcmp(op,"\\")==0) return exec_number(b != 0 ? (strcmp(op, "%") == 0 ? fmod(a, b) : trunc(a / b)) : 0);
     if (strcmp(op,"==")==0) return exec_bool(l.kind==r.kind && (l.text ? strcmp(l.text,r.text)==0 : a==b));
     if (strcmp(op,"!=")==0) return exec_bool(!(l.kind==r.kind && (l.text ? strcmp(l.text,r.text)==0 : a==b)));
