@@ -804,7 +804,10 @@ static ExecValue eval_ast_value(const CAstNode *e, ExecVar *vars, size_t count) 
 static long long eval_ast_expr(const CAstNode *e, ExecVar *vars, size_t count) { return (long long)exec_num(eval_ast_value(e, vars, count)); }
 static void set_exec_var(ExecVar *vars, size_t *count, const char *name, ExecValue value) {
   for (size_t i=0;i<*count;i++) if (strcmp(vars[i].name,name)==0) { vars[i].value=value; return; }
-  if (*count<128) { vars[*count]=(ExecVar){(char*)name,value}; (*count)++; }
+  if (*count<128) {
+    vars[*count]=(ExecVar){c_strdup(name),value};
+    (*count)++;
+  }
 }
 
 static void execute_statements(ProtocolResponse *resp, const CAstNodeList *statements, ExecVar *vars, size_t *count);
