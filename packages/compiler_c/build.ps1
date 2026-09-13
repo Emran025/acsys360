@@ -57,6 +57,15 @@ if (Test-Path "src/lexer.yy.c") { $sources += "src/lexer.yy.c" }
 & $gcc -O2 -Wall -Wextra -Iinclude -Isrc $sources -o "build/arabicc.exe"
 if ($LASTEXITCODE -eq 0) {
     Write-Host "[OK] Build succeeded: build/arabicc.exe" -ForegroundColor Green
+    $projectRoot = Split-Path -Parent $scriptDir
+    foreach ($configuration in @("Debug", "Release")) {
+        $destination = Join-Path $projectRoot "build\windows\x64\runner\$configuration\compiler\arabicc.exe"
+        $destinationDirectory = Split-Path -Parent $destination
+        if (Test-Path $destinationDirectory) {
+            Copy-Item "build/arabicc.exe" $destination -Force
+            Write-Host "[OK] Copied compiler to $destination" -ForegroundColor Green
+        }
+    }
 } else {
     Write-Host "[ERROR] Build failed!" -ForegroundColor Red
     Pop-Location
