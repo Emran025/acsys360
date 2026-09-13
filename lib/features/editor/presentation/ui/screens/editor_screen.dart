@@ -347,8 +347,8 @@ class _EditorShellState extends State<EditorShell> {
     final end = selection.end;
     final current = selection.extentOffset;
     final offset = extend
-        ? (right ? current + 1 : current - 1).clamp(0, text.length).toInt()
-        : (start == end ? (right ? current + 1 : current - 1) : right ? end : start)
+        ? (right ? current - 1 : current + 1).clamp(0, text.length).toInt()
+        : (start == end ? (right ? current - 1 : current + 1) : right ? start : end)
               .clamp(0, text.length)
               .toInt();
     final affinity = offset < text.length && text[offset] == '\n'

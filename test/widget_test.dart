@@ -639,9 +639,9 @@ void main() {
     await tester.tap(field);
     final textFieldController = tester.widget<TextField>(field).controller!;
     textFieldController.selection = const TextSelection.collapsed(offset: 4);
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
-    expect(textFieldController.selection.extentOffset, 5);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    expect(textFieldController.selection.extentOffset, 3);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
     expect(textFieldController.selection.extentOffset, 4);
   });
 
