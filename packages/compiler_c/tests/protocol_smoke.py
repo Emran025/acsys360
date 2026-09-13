@@ -27,7 +27,7 @@ def main():
     executable = sys.argv[1]
     valid, valid_response = run(
         executable,
-        "برنامج اختبار؛ { متغير س: صحيح; س = 42; اطبع(س); }.",
+        "برنامج اختبار؛ { متغير س: صحيح؛ س = 42؛ اطبع(س)؛ }.",
     )
     assert valid.returncode == 0, valid.stderr
     assert valid_response["success"] is True
@@ -37,7 +37,7 @@ def main():
 
     invalid, invalid_response = run(
         executable,
-        "برنامج اختبار؛ { متغير س: صحيح; اطبع(مفقود); }.",
+        "برنامج اختبار؛ { متغير س: صحيح؛ اطبع(مفقود)؛ }.",
     )
     assert invalid.returncode != 0
     assert invalid_response["success"] is False
@@ -49,7 +49,7 @@ def main():
 
     syntax, syntax_response = run(
         executable,
-        "برنامج اختبار؛ { متغير س: صحيح; س = ; }.",
+        "برنامج اختبار؛ { متغير س: صحيح؛ س = ؛ }.",
     )
     assert syntax.returncode != 0
     assert syntax_response["success"] is False

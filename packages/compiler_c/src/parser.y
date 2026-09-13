@@ -28,6 +28,17 @@ static char *parser_strdup(const char *value) {
   if (copy != NULL) memcpy(copy, value, length + 1U);
   return copy;
 }
+static CAstNode *parser_literal(char *value, CTokenKind kind) {
+  CAstNode *node = calloc(1, sizeof(*node));
+  if (node != NULL) {
+    node->kind = C_AST_LITERAL;
+    node->data.literal.value = value;
+    node->data.literal.literal_kind = kind;
+  } else {
+    free(value);
+  }
+  return node;
+}
 %}
 
 %union {
@@ -113,7 +124,7 @@ full_repeat : TOK_REPEAT '(' TOK_IDENTIFIER '=' full_expr TOK_TO full_expr repea
 full_repeat_until : TOK_AGAIN full_statement TOK_UNTIL '(' full_expr ')' {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_REPEAT_UNTIL;c_ast_list_append(&$$->data.repeat_until.body,$2);$$->data.repeat_until.condition=$5;} ;
 full_expr : full_expr TOK_OR full_term {$$=c_ast_new_binary($1,"||",$3);} | full_expr TOK_AND full_term {$$=c_ast_new_binary($1,"&&",$3);} | full_expr TOK_EQ full_term {$$=c_ast_new_binary($1,"==",$3);} | full_expr TOK_NE full_term {$$=c_ast_new_binary($1,"!=",$3);} | full_expr TOK_LE full_term {$$=c_ast_new_binary($1,"<=",$3);} | full_expr TOK_GE full_term {$$=c_ast_new_binary($1,">=",$3);} | full_expr '<' full_term {$$=c_ast_new_binary($1,"<",$3);} | full_expr '>' full_term {$$=c_ast_new_binary($1,">",$3);} | full_expr '+' full_term {$$=c_ast_new_binary($1,"+",$3);} | full_expr '-' full_term {$$=c_ast_new_binary($1,"-",$3);} | full_term {$$=$1;} ;
 full_term : full_term '*' full_factor {$$=c_ast_new_binary($1,"*",$3);} | full_term '/' full_factor {$$=c_ast_new_binary($1,"/",$3);} | full_term '%' full_factor {$$=c_ast_new_binary($1,"%",$3);} | full_term '\\' full_factor {$$=c_ast_new_binary($1,"\\",$3);} | full_term '^' full_factor {$$=c_ast_new_binary($1,"^",$3);} | full_factor {$$=$1;} ;
-full_factor : TOK_INTEGER_LITERAL {$$=c_ast_new_integer($1);} | TOK_REAL_LITERAL {$$=c_ast_new_integer($1);} | TOK_STRING_LITERAL {$$=c_ast_new_string($1);} | TOK_CHAR_LITERAL {$$=c_ast_new_string($1);} | TOK_TRUE {$$=c_ast_new_string(parser_strdup("صح"));} | TOK_FALSE {$$=c_ast_new_string(parser_strdup("خطأ"));} | full_access {$$=$1;} | '!' full_factor {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_UNARY;$$->data.unary.operator=parser_strdup("!");$$->data.unary.operand=$2;} | '+' full_factor {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_UNARY;$$->data.unary.operator=parser_strdup("+");$$->data.unary.operand=$2;} | '-' full_factor {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_UNARY;$$->data.unary.operator=parser_strdup("-");$$->data.unary.operand=$2;} | '(' full_expr ')' {$$=$2;} ;
+full_factor : TOK_INTEGER_LITERAL {$$=c_ast_new_integer($1);} | TOK_REAL_LITERAL {$$=parser_literal($1,C_TOKEN_REAL);} | TOK_STRING_LITERAL {$$=parser_literal($1,C_TOKEN_STRING);} | TOK_CHAR_LITERAL {$$=parser_literal($1,C_TOKEN_CHARACTER);} | TOK_TRUE {$$=parser_literal(parser_strdup("صح"),C_TOKEN_BOOLEAN);} | TOK_FALSE {$$=parser_literal(parser_strdup("خطأ"),C_TOKEN_BOOLEAN);} | full_access {$$=$1;} | '!' full_factor {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_UNARY;$$->data.unary.operator=parser_strdup("!");$$->data.unary.operand=$2;} | '+' full_factor {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_UNARY;$$->data.unary.operator=parser_strdup("+");$$->data.unary.operand=$2;} | '-' full_factor {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_UNARY;$$->data.unary.operator=parser_strdup("-");$$->data.unary.operand=$2;} | '(' full_expr ')' {$$=$2;} ;
 
 program
   : full_program { $$ = $1; g_root_ast = $$; }
@@ -366,10 +377,10 @@ term
 
 factor
   : TOK_INTEGER_LITERAL { $$ = c_ast_new_integer($1); }
-  | TOK_REAL_LITERAL    { $$ = c_ast_new_integer($1); }
-  | TOK_STRING_LITERAL  { $$ = c_ast_new_string($1); }
-  | TOK_TRUE            { $$ = c_ast_new_integer("1"); }
-  | TOK_FALSE           { $$ = c_ast_new_integer("0"); }
+  | TOK_REAL_LITERAL    { $$ = parser_literal($1, C_TOKEN_REAL); }
+  | TOK_STRING_LITERAL  { $$ = parser_literal($1, C_TOKEN_STRING); }
+  | TOK_TRUE            { $$ = parser_literal(parser_strdup("صح"), C_TOKEN_BOOLEAN); }
+  | TOK_FALSE           { $$ = parser_literal(parser_strdup("خطأ"), C_TOKEN_BOOLEAN); }
   | TOK_IDENTIFIER      { $$ = c_ast_new_reference($1); }
   | '!' factor          { CAstNode *n = calloc(1, sizeof(CAstNode)); n->kind = C_AST_UNARY; n->data.unary.operator = parser_strdup("!"); n->data.unary.operand = $2; $$ = n; }
   | '-' factor          { CAstNode *n = calloc(1, sizeof(CAstNode)); n->kind = C_AST_UNARY; n->data.unary.operator = parser_strdup("-"); n->data.unary.operand = $2; $$ = n; }

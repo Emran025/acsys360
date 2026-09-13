@@ -504,6 +504,22 @@ static char *extract_source_code(const char *payload) {
   return buf;
 }
 
+static void serialize_type(Buffer *b, const CTypeSpec *type) {
+  if (!type) { buf_append(b, "null"); return; }
+  buf_append(b, "{\"kind\":");
+  buf_append_escaped(b, type->kind == C_TYPE_ARRAY ? "array" : type->kind == C_TYPE_RECORD ? "record" : "named");
+  if (type->name) { buf_append(b, ",\"name\":"); buf_append_escaped(b, type->name); }
+  if (type->kind == C_TYPE_ARRAY) {
+    char number[32]; snprintf(number, sizeof(number), "%zu", type->length);
+    buf_append(b, ",\"length\":"); buf_append(b, number); buf_append(b, ",\"elementType\":"); serialize_type(b, type->element_type);
+  } else if (type->kind == C_TYPE_RECORD) {
+    buf_append(b, ",\"fields\":[");
+    for (size_t i = 0; i < type->fields.count; i++) { if (i) buf_append_char(b, ','); buf_append(b, "{\"name\":"); buf_append_escaped(b, type->fields.items[i].name); buf_append(b, ",\"type\":"); serialize_type(b, type->fields.items[i].type); buf_append_char(b, '}'); }
+    buf_append_char(b, ']');
+  }
+  buf_append_char(b, '}');
+}
+
 /* AST to JSON Serializer for the Syntax Tree Tab */
 static void serialize_ast_node(Buffer *b, const CAstNode *n) {
   if (!n) { buf_append(b, "null"); return; }
@@ -525,6 +541,15 @@ static void serialize_ast_node(Buffer *b, const CAstNode *n) {
       buf_append(b, "]");
       break;
 
+    case C_AST_CONSTANT_DECLARATION:
+      buf_append(b, "\"kind\":\"constant_declaration\",\"name\":"); buf_append_escaped(b, n->data.constant.name); buf_append(b, ",\"value\":"); serialize_ast_node(b, n->data.constant.value); break;
+
+    case C_AST_TYPE_DECLARATION:
+      buf_append(b, "\"kind\":\"type_declaration\",\"name\":"); buf_append_escaped(b, n->data.type_declaration.name); buf_append(b, ",\"type\":"); serialize_type(b, n->data.type_declaration.type); break;
+
+    case C_AST_PROCEDURE_DECLARATION:
+      buf_append(b, "\"kind\":\"procedure_declaration\",\"name\":"); buf_append_escaped(b, n->data.procedure.name); buf_append(b, ",\"parameterCount\":"); char pc[32]; snprintf(pc, sizeof(pc), "%zu", n->data.procedure.parameter_count); buf_append(b, pc); break;
+
     case C_AST_VARIABLE_DECLARATION:
       buf_append(b, "\"kind\":\"variable_declaration\",\"names\":[");
       for (size_t i = 0; i < n->data.variable.name_count; i++) {
@@ -540,6 +565,7 @@ static void serialize_ast_node(Buffer *b, const CAstNode *n) {
       buf_append_escaped(b, n->data.assignment.name);
       buf_append(b, ",\"expression\":");
       serialize_ast_node(b, n->data.assignment.expression);
+      buf_append(b, ",\"selectorCount\":"); char sc[32]; snprintf(sc, sizeof(sc), "%zu", n->data.assignment.selectors.count); buf_append(b, sc);
       break;
 
     case C_AST_PRINT:
@@ -550,6 +576,9 @@ static void serialize_ast_node(Buffer *b, const CAstNode *n) {
       }
       buf_append(b, "]");
       break;
+
+    case C_AST_UNARY:
+      buf_append(b, "\"kind\":\"unary\",\"operator\":"); buf_append_escaped(b, n->data.unary.operator); buf_append(b, ",\"operand\":"); serialize_ast_node(b, n->data.unary.operand); break;
 
     case C_AST_BINARY:
       buf_append(b, "\"kind\":\"binary\",\"operator\":");
@@ -565,6 +594,8 @@ static void serialize_ast_node(Buffer *b, const CAstNode *n) {
       const char *lk = "integer";
       if (n->data.literal.literal_kind == C_TOKEN_STRING) lk = "string";
       else if (n->data.literal.literal_kind == C_TOKEN_REAL) lk = "real";
+      else if (n->data.literal.literal_kind == C_TOKEN_CHARACTER) lk = "character";
+      else if (n->data.literal.literal_kind == C_TOKEN_BOOLEAN) lk = "boolean";
       buf_append_escaped(b, lk);
       buf_append(b, ",\"value\":");
       buf_append_escaped(b, n->data.literal.value ? n->data.literal.value : "");
@@ -573,6 +604,7 @@ static void serialize_ast_node(Buffer *b, const CAstNode *n) {
     case C_AST_VARIABLE_REFERENCE:
       buf_append(b, "\"kind\":\"variable_reference\",\"name\":");
       buf_append_escaped(b, n->data.reference.name);
+      buf_append(b, ",\"selectorCount\":"); char rc[32]; snprintf(rc, sizeof(rc), "%zu", n->data.reference.selectors.count); buf_append(b, rc);
       break;
 
     default:
