@@ -20,6 +20,7 @@ extern char *yytext;
 extern ProtocolResponse *g_protocol_response;
 extern const char *g_current_source_path;
 
+typedef struct { CParameter *items; size_t count; } ParserParameters;
 CAstNode *g_root_ast = NULL;
 static char *parser_strdup(const char *value) {
   size_t length = strlen(value);
@@ -33,6 +34,9 @@ static char *parser_strdup(const char *value) {
   char *str;
   CAstNode *node;
   CAstNodeList list;
+  CTypeSpec *type;
+  struct { CParameter *items; size_t count; } parameters;
+  struct { char **items; size_t count; } names;
 }
 
 %token <str> TOK_IDENTIFIER
@@ -64,14 +68,56 @@ static char *parser_strdup(const char *value) {
 %type <list> declaration_list statement_list print_arg_list
 %type <node> read_stmt call_stmt if_stmt while_stmt repeat_stmt
 %type <node> repeat_step block_stmt
-%type <list> argument_list
+%type <list> argument_list full_arguments full_declarations full_statements full_fields full_selectors
+%type <node> full_program full_block full_declaration full_const full_type_decl full_var full_proc full_statement full_assign full_read full_call full_if full_while full_repeat full_repeat_until full_print full_access full_selector full_expr full_term full_factor
+%type <type> full_type
+%type <parameters> full_parameters full_parameter_group
+%type <names> full_names
 
 %start program
 
+
 %%
 
+full_program
+  : TOK_PROGRAM TOK_IDENTIFIER ';' full_block '.' { $$ = c_ast_new_program($2, $4->data.program.declarations, $4->data.program.statements); free($4); }
+  ;
+full_block
+  : '{' full_declarations full_statements '}' { $$ = calloc(1, sizeof(CAstNode)); $$->kind = C_AST_PROGRAM; $$->data.program.declarations = $2; $$->data.program.statements = $3; }
+  ;
+full_declarations : /* empty */ { $$.items = NULL; $$.count = 0; } | full_declarations full_declaration ';' { $$=$1; c_ast_list_append(&$$,$2); } ;
+full_declaration : full_const {$$=$1;} | full_type_decl {$$=$1;} | full_var {$$=$1;} | full_proc {$$=$1;} ;
+full_const : TOK_CONST TOK_IDENTIFIER '=' full_factor { $$=calloc(1,sizeof(CAstNode)); $$->kind=C_AST_CONSTANT_DECLARATION; $$->data.constant.name=$2; $$->data.constant.value=$4; } ;
+full_type_decl : TOK_TYPE TOK_IDENTIFIER '=' full_type { $$=calloc(1,sizeof(CAstNode)); $$->kind=C_AST_TYPE_DECLARATION; $$->data.type_declaration.name=$2; $$->data.type_declaration.type=$4; } ;
+full_var : TOK_VAR full_names ':' full_type { $$=calloc(1,sizeof(CAstNode)); $$->kind=C_AST_VARIABLE_DECLARATION; $$->data.variable.names=$2.items; $$->data.variable.name_count=$2.count; $$->data.variable.type=$4; } ;
+full_names : TOK_IDENTIFIER {$$.items=NULL;$$.count=0; char **p=realloc($$.items,sizeof(char*)); $$.items=p; $$.items[$$.count++]=$1;} | full_names ',' TOK_IDENTIFIER {$$=$1; char **p=realloc($$.items,($$.count+1)*sizeof(char*)); $$.items=p; $$.items[$$.count++]=$3;} ;
+full_type : TOK_TYPE_INT {$$=calloc(1,sizeof(*$$));$$->kind=C_TYPE_NAMED;$$->name=parser_strdup("صحيح");} | TOK_TYPE_REAL {$$=calloc(1,sizeof(*$$));$$->kind=C_TYPE_NAMED;$$->name=parser_strdup("حقيقي");} | TOK_TYPE_BOOL {$$=calloc(1,sizeof(*$$));$$->kind=C_TYPE_NAMED;$$->name=parser_strdup("منطقي");} | TOK_TYPE_CHAR {$$=calloc(1,sizeof(*$$));$$->kind=C_TYPE_NAMED;$$->name=parser_strdup("حرفي");} | TOK_TYPE_STRING {$$=calloc(1,sizeof(*$$));$$->kind=C_TYPE_NAMED;$$->name=parser_strdup("خيط_رمزي");} | TOK_IDENTIFIER {$$=calloc(1,sizeof(*$$));$$->kind=C_TYPE_NAMED;$$->name=$1;} | TOK_ARRAY '[' TOK_INTEGER_LITERAL ']' TOK_FROM full_type {$$=calloc(1,sizeof(*$$));$$->kind=C_TYPE_ARRAY;$$->length=strtoul($3,NULL,10);$$->element_type=$6;free($3);} | TOK_RECORD '{' full_fields full_field_end '}' {$$=calloc(1,sizeof(*$$));$$->kind=C_TYPE_RECORD;$$->fields.items=NULL;$$->fields.count=0; for(size_t i=0;i<$3.count;i++){CAstNode *f=$3.items[i]; CField *p=realloc($$->fields.items,($$->fields.count+1)*sizeof(CField));$$->fields.items=p;$$->fields.items[$$->fields.count].name=f->data.variable.names[0];$$->fields.items[$$->fields.count].type=f->data.variable.type;$$->fields.count++;free(f->data.variable.names);free(f);} free($3.items);} ;
+full_field_end : ';' | /* empty */ ;
+full_fields : TOK_IDENTIFIER ':' full_type {$$.items=NULL;$$.count=0;CAstNode*f=calloc(1,sizeof(CAstNode));f->kind=C_AST_VARIABLE_DECLARATION;f->data.variable.names=malloc(sizeof(char*));f->data.variable.names[0]=$1;f->data.variable.name_count=1;f->data.variable.type=$3;c_ast_list_append(&$$,f);} | full_fields ';' TOK_IDENTIFIER ':' full_type {$$=$1;CAstNode*f=calloc(1,sizeof(CAstNode));f->kind=C_AST_VARIABLE_DECLARATION;f->data.variable.names=malloc(sizeof(char*));f->data.variable.names[0]=$3;f->data.variable.name_count=1;f->data.variable.type=$5;c_ast_list_append(&$$,f);} ;
+full_proc : TOK_PROCEDURE TOK_IDENTIFIER '(' full_parameters ')' ';' full_block {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_PROCEDURE_DECLARATION;$$->data.procedure.name=$2;$$->data.procedure.parameters=$4.items;$$->data.procedure.parameter_count=$4.count;$$->data.procedure.body=$7->data.program.statements;free($7);} | TOK_PROCEDURE TOK_IDENTIFIER '(' ')' ';' full_block {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_PROCEDURE_DECLARATION;$$->data.procedure.name=$2;$$->data.procedure.body=$6->data.program.statements;free($6);} ;
+full_parameters : full_parameter_group {$$=$1;} | full_parameters ';' full_parameter_group {$$=$1;for(size_t i=0;i<$3.count;i++){CParameter*p=realloc($$.items,($$.count+1)*sizeof(CParameter));$$.items=p;$$.items[$$.count++]=$3.items[i];}free($3.items);} ;
+full_parameter_group : TOK_BY_VALUE full_names ':' full_type {$$.items=NULL;$$.count=0;for(size_t i=0;i<$2.count;i++){CParameter*p=realloc($$.items,($$.count+1)*sizeof(CParameter));$$.items=p;$$.items[$$.count++]=(CParameter){$2.items[i],$4,0};}free($2.items);} | TOK_BY_REF full_names ':' full_type {$$.items=NULL;$$.count=0;for(size_t i=0;i<$2.count;i++){CParameter*p=realloc($$.items,($$.count+1)*sizeof(CParameter));$$.items=p;$$.items[$$.count++]=(CParameter){$2.items[i],$4,1};}free($2.items);} ;
+full_statements : /* empty */ {$$.items=NULL;$$.count=0;} | full_statements full_statement ';' {$$=$1;c_ast_list_append(&$$,$2);} | full_statements full_statement {$$=$1;c_ast_list_append(&$$,$2);} ;
+full_statement : full_assign {$$=$1;} | full_read {$$=$1;} | full_print {$$=$1;} | full_call {$$=$1;} | full_if {$$=$1;} | full_while {$$=$1;} | full_repeat {$$=$1;} | full_repeat_until {$$=$1;} | full_block {$$=$1;} ;
+full_selectors : full_selector {$$.items=NULL;$$.count=0;c_ast_list_append(&$$,$1);} | full_selectors full_selector {$$=$1;c_ast_list_append(&$$,$2);} ;
+full_selector : '[' full_expr ']' {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_VARIABLE_REFERENCE;$$->data.reference.name=parser_strdup("[]");c_ast_list_append(&$$->data.reference.selectors,$2);} | '.' TOK_IDENTIFIER {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_VARIABLE_REFERENCE;$$->data.reference.name=$2;} ;
+full_access : TOK_IDENTIFIER {$$=c_ast_new_reference($1);} | TOK_IDENTIFIER full_selectors {$$=c_ast_new_reference($1);$$->data.reference.selectors=$2;} ;
+full_assign : full_access '=' full_expr {$$=c_ast_new_assignment($1->data.reference.name,$3);$$->data.assignment.selectors=$1->data.reference.selectors;free($1);} ;
+full_read : TOK_READ '(' full_access ')' {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_READ;$$->data.access.name=$3->data.reference.name;$$->data.access.selectors=$3->data.reference.selectors;free($3);} ;
+full_arguments : /* empty */ {$$.items=NULL;$$.count=0;} | full_expr {$$.items=NULL;$$.count=0;c_ast_list_append(&$$,$1);} | full_arguments ',' full_expr {$$=$1;c_ast_list_append(&$$,$3);} ;
+full_print : TOK_PRINT '(' full_arguments ')' {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_PRINT;$$->data.print.values=$3;} ;
+full_call : TOK_IDENTIFIER '(' full_arguments ')' {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_CALL;$$->data.call.name=$1;$$->data.call.arguments=$3;} ;
+full_if : TOK_IF '(' full_expr ')' TOK_THEN full_statement ';' {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_IF;$$->data.conditional.condition=$3;c_ast_list_append(&$$->data.conditional.then_branch,$6);} | TOK_IF '(' full_expr ')' TOK_THEN full_statement ';' TOK_ELSE full_statement {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_IF;$$->data.conditional.condition=$3;c_ast_list_append(&$$->data.conditional.then_branch,$6);c_ast_list_append(&$$->data.conditional.else_branch,$9);} ;
+full_while : TOK_WHILE '(' full_expr ')' TOK_DO full_statement {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_WHILE;$$->data.loop.condition=$3;c_ast_list_append(&$$->data.loop.body,$6);} ;
+full_repeat : TOK_REPEAT '(' TOK_IDENTIFIER '=' full_expr TOK_TO full_expr repeat_step ')' full_statement {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_REPEAT;$$->data.repeat.variable=$3;$$->data.repeat.from=$5;$$->data.repeat.to=$7;$$->data.repeat.step=$8;c_ast_list_append(&$$->data.repeat.body,$10);} ;
+full_repeat_until : TOK_AGAIN full_statement TOK_UNTIL '(' full_expr ')' {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_REPEAT_UNTIL;c_ast_list_append(&$$->data.repeat_until.body,$2);$$->data.repeat_until.condition=$5;} ;
+full_expr : full_expr TOK_OR full_term {$$=c_ast_new_binary($1,"||",$3);} | full_expr TOK_AND full_term {$$=c_ast_new_binary($1,"&&",$3);} | full_expr TOK_EQ full_term {$$=c_ast_new_binary($1,"==",$3);} | full_expr TOK_NE full_term {$$=c_ast_new_binary($1,"!=",$3);} | full_expr TOK_LE full_term {$$=c_ast_new_binary($1,"<=",$3);} | full_expr TOK_GE full_term {$$=c_ast_new_binary($1,">=",$3);} | full_expr '<' full_term {$$=c_ast_new_binary($1,"<",$3);} | full_expr '>' full_term {$$=c_ast_new_binary($1,">",$3);} | full_expr '+' full_term {$$=c_ast_new_binary($1,"+",$3);} | full_expr '-' full_term {$$=c_ast_new_binary($1,"-",$3);} | full_term {$$=$1;} ;
+full_term : full_term '*' full_factor {$$=c_ast_new_binary($1,"*",$3);} | full_term '/' full_factor {$$=c_ast_new_binary($1,"/",$3);} | full_term '%' full_factor {$$=c_ast_new_binary($1,"%",$3);} | full_term '\\' full_factor {$$=c_ast_new_binary($1,"\\",$3);} | full_term '^' full_factor {$$=c_ast_new_binary($1,"^",$3);} | full_factor {$$=$1;} ;
+full_factor : TOK_INTEGER_LITERAL {$$=c_ast_new_integer($1);} | TOK_REAL_LITERAL {$$=c_ast_new_integer($1);} | TOK_STRING_LITERAL {$$=c_ast_new_string($1);} | TOK_CHAR_LITERAL {$$=c_ast_new_string($1);} | TOK_TRUE {$$=c_ast_new_string(parser_strdup("صح"));} | TOK_FALSE {$$=c_ast_new_string(parser_strdup("خطأ"));} | full_access {$$=$1;} | '!' full_factor {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_UNARY;$$->data.unary.operator=parser_strdup("!");$$->data.unary.operand=$2;} | '-' full_factor {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_UNARY;$$->data.unary.operator=parser_strdup("-");$$->data.unary.operand=$2;} | '(' full_expr ')' {$$=$2;} ;
+
 program
-  : TOK_PROGRAM TOK_IDENTIFIER '{' declaration_list statement_list '}' '.'
+  : full_program { $$ = $1; g_root_ast = $$; }
+  | TOK_PROGRAM TOK_IDENTIFIER '{' declaration_list statement_list '}' '.'
     {
       $$ = c_ast_new_program($2, $4, $5);
       g_root_ast = $$;
@@ -82,11 +128,6 @@ program
       empty_decls.items = NULL;
       empty_decls.count = 0;
       $$ = c_ast_new_program($2, empty_decls, $4);
-      g_root_ast = $$;
-    }
-  | TOK_PROGRAM TOK_IDENTIFIER ';' '{' declaration_list statement_list '}' '.'
-    {
-      $$ = c_ast_new_program($2, $5, $6);
       g_root_ast = $$;
     }
   | error

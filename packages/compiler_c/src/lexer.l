@@ -141,6 +141,12 @@ DIGIT         [0-9]
   return TOK_CHAR_LITERAL;
 }
 
+‘([^\n]|\\.)*’ {
+  emit_token("character", yytext);
+  yylval.str = duplicate_string(yytext);
+  return TOK_CHAR_LITERAL;
+}
+
 {ID}          {
   emit_token("identifier", yytext);
   yylval.str = duplicate_string(yytext);

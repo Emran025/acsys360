@@ -112,16 +112,45 @@ static int check_node(Analyzer *analyzer, const CAstNode *node) {
   switch (node->kind) {
     case C_AST_PROGRAM:
       return check_list(analyzer, &node->data.program.statements);
+    case C_AST_CONSTANT_DECLARATION:
+      if (!add_symbol(analyzer, node->data.constant.name, "ثابت", node)) return 0;
+      return check_expression(analyzer, node->data.constant.value);
+    case C_AST_TYPE_DECLARATION:
+      return add_symbol(analyzer, node->data.type_declaration.name, "نوع", node);
     case C_AST_VARIABLE_DECLARATION:
       for (size_t index = 0U; index < node->data.variable.name_count; index++) {
         if (!add_symbol(analyzer, node->data.variable.names[index],
-                        node->data.variable.type->name, node)) return 0;
+                        node->data.variable.type && node->data.variable.type->name
+                            ? node->data.variable.type->name : "نوع مركب", node)) return 0;
       }
       return 1;
+    case C_AST_PROCEDURE_DECLARATION:
+      if (!add_symbol(analyzer, node->data.procedure.name, "اجراء", node)) return 0;
+      for (size_t index = 0U; index < node->data.procedure.parameter_count; index++) {
+        const CParameter *parameter = &node->data.procedure.parameters[index];
+        const char *type = parameter->type && parameter->type->name
+            ? parameter->type->name : "نوع مركب";
+        if (!add_symbol(analyzer, parameter->name, type, node)) return 0;
+      }
+      return check_list(analyzer, &node->data.procedure.body);
     case C_AST_ASSIGNMENT:
-      if (find_symbol(analyzer->result, node->data.assignment.name) == NULL) {
-        return diagnostic(analyzer, node, "رمز غير معرف: %s",
-                          node->data.assignment.name);
+      {
+        const CSymbol *symbol = find_symbol(analyzer->result, node->data.assignment.name);
+        if (symbol == NULL) {
+          return diagnostic(analyzer, node, "رمز غير معرف: %s",
+                            node->data.assignment.name);
+        }
+        if (node->data.assignment.expression &&
+            node->data.assignment.expression->kind == C_AST_LITERAL &&
+            symbol->type && strcmp(symbol->type, "ثابت") != 0 &&
+            ((strcmp(symbol->type, "صحيح") == 0 &&
+              (strcmp(node->data.assignment.expression->data.literal.value, "صح") == 0 ||
+               strcmp(node->data.assignment.expression->data.literal.value, "خطأ") == 0)) ||
+             (strcmp(symbol->type, "منطقي") == 0 &&
+              node->data.assignment.expression->data.literal.literal_kind == C_TOKEN_INTEGER))) {
+          return diagnostic(analyzer, node, "عدم توافق نوع الإسناد للرمز: %s",
+                            node->data.assignment.name);
+        }
       }
       return check_expression(analyzer, node->data.assignment.expression);
     case C_AST_PRINT:
@@ -148,6 +177,9 @@ static int check_node(Analyzer *analyzer, const CAstNode *node) {
           check_expression(analyzer, node->data.repeat.to) &&
           (node->data.repeat.step == NULL || check_expression(analyzer, node->data.repeat.step)) &&
           check_list(analyzer, &node->data.repeat.body);
+    case C_AST_REPEAT_UNTIL:
+      return check_list(analyzer, &node->data.repeat_until.body) &&
+          check_expression(analyzer, node->data.repeat_until.condition);
     case C_AST_EMPTY:
       return 1;
     default:
