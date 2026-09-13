@@ -102,3 +102,19 @@ powershell -ExecutionPolicy Bypass -File .\tool\build_windows_release.ps1 -Clean
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\tool\build_windows_release.ps1 -SkipChecks
 ```
+
+## بناء compiler محليًا مع نسخة Windows Debug
+
+لتوليد `arabicc.exe` من الكود الحالي ونسخه إلى المسار الذي يستخدمه التطبيق المحلي، شغّل من جذر المشروع في PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tool\build_windows_debug.ps1 -Run
+```
+
+ينتج السكربت الملف التالي:
+
+```text
+build\windows\x64\runner\Debug\compiler\arabicc.exe
+```
+
+يتطلب ذلك وجود CMake وVisual Studio C++ وFlex/Bison وFlutter في `PATH`.
