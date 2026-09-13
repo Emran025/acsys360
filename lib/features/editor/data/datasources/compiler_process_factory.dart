@@ -58,9 +58,13 @@ ProcessCompilerRepository createCompilerRepository() {
         'Release',
         compilerName,
       ].join(Platform.pathSeparator),
-      [root, 'packages', 'compiler_c', 'build', compilerName].join(
-        Platform.pathSeparator,
-      ),
+      [
+        root,
+        'packages',
+        'compiler_c',
+        'build',
+        compilerName,
+      ].join(Platform.pathSeparator),
     ],
   ];
 
