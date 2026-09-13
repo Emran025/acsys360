@@ -152,11 +152,11 @@ class _LineNumberedEditorState extends State<LineNumberedEditor> {
                       expands: true,
                       maxLines: null,
                       minLines: null,
-                      // Keep logical keyboard movement conventional: left decrements
-                      // the text offset and right increments it. The paragraph is
-                      // still visually right-aligned, while Unicode bidi handling
-                      // keeps Arabic runs rendered correctly.
-                      textDirection: TextDirection.ltr,
+                      // Use an RTL paragraph base so mouse and touch selections
+                      // follow the visual Arabic text across mixed-direction runs.
+                      // Horizontal keyboard movement is normalized by the parent
+                      // Focus handler before TextField processes the key.
+                      textDirection: TextDirection.rtl,
                       textAlign: TextAlign.right,
                       cursorColor: colors.primary,
                       style: editorStyle,

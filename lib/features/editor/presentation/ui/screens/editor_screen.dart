@@ -223,9 +223,11 @@ class _EditorShellState extends State<EditorShell> {
         !hardware.isMetaPressed &&
         !hardware.isAltPressed) {
       if (hasCompletion) widget.controller.clearAssist();
-      // Let TextField handle bidi-aware caret movement and Shift selection.
-      // Manually reversing logical offsets breaks mixed Arabic/code lines.
-      return KeyEventResult.ignored;
+      _moveHorizontalCaret(
+        right: key == LogicalKeyboardKey.arrowRight,
+        extend: hardware.isShiftPressed,
+      );
+      return KeyEventResult.handled;
     }
     if (hasCompletion && _dismissesCompletion(key, hardware)) {
       widget.controller.clearAssist();
@@ -278,6 +280,30 @@ class _EditorShellState extends State<EditorShell> {
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
+  }
+
+  void _moveHorizontalCaret({required bool right, required bool extend}) {
+    final text = textController.text;
+    final selection = textController.selection;
+    if (!selection.isValid) return;
+    final start = selection.start;
+    final end = selection.end;
+    final current = selection.extentOffset;
+    final offset = extend
+        ? (right ? current + 1 : current - 1).clamp(0, text.length).toInt()
+        : (start == end ? (right ? current + 1 : current - 1) : right ? end : start)
+              .clamp(0, text.length)
+              .toInt();
+    final affinity = offset < text.length && text[offset] == '\n'
+        ? TextAffinity.upstream
+        : TextAffinity.downstream;
+    textController.selection = extend
+        ? TextSelection(
+            baseOffset: selection.baseOffset,
+            extentOffset: offset,
+            affinity: affinity,
+          )
+        : TextSelection.collapsed(offset: offset, affinity: affinity);
   }
 
   bool _dismissesCompletion(LogicalKeyboardKey key, HardwareKeyboard hardware) {
