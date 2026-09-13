@@ -152,8 +152,11 @@ class _LineNumberedEditorState extends State<LineNumberedEditor> {
                       expands: true,
                       maxLines: null,
                       minLines: null,
-                      // RTL يجعل caret يتقدم مع الكتابة العربية؛ المحاذاة تتطابق معه.
-                      textDirection: TextDirection.rtl,
+                      // Keep logical keyboard movement conventional: left decrements
+                      // the text offset and right increments it. The paragraph is
+                      // still visually right-aligned, while Unicode bidi handling
+                      // keeps Arabic runs rendered correctly.
+                      textDirection: TextDirection.ltr,
                       textAlign: TextAlign.right,
                       cursorColor: colors.primary,
                       style: editorStyle,
