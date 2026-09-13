@@ -31,6 +31,10 @@ add_executable(arabicc
 
 set_target_properties(arabicc PROPERTIES OUTPUT_NAME "arabicc")
 
+if(UNIX)
+  target_link_libraries(arabicc PRIVATE m)
+endif()
+
 target_include_directories(arabicc PRIVATE
   include
   src

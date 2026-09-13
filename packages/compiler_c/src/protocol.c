@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 /* Dynamic String Buffer */
 typedef struct {
@@ -717,129 +718,96 @@ static char *generate_typed_ir(const CAstNode *root, const CSemanticResult *sema
 
 /* Simple AST Execution for the Execution Output Tab */
 typedef struct {
-  char *name;
-  long long value;
-} ExecVar;
+  int kind; /* 0 numeric, 1 string, 2 boolean, 3 character */
+  double number;
+  char *text;
+} ExecValue;
+typedef struct { char *name; ExecValue value; } ExecVar;
 
-static long long eval_ast_expr(const CAstNode *e, ExecVar *vars, size_t var_count) {
-  if (!e) return 0;
-  if (e->kind == C_AST_LITERAL) {
-    if (e->data.literal.value) {
-      return atoll(e->data.literal.value);
-    }
-    return 0;
+static ExecValue exec_number(double n) { return (ExecValue){0, n, NULL}; }
+static ExecValue exec_text(int kind, const char *s) {
+  ExecValue v = {kind, 0, NULL};
+  v.text = c_strdup(s ? s : "");
+  return v;
+}
+static ExecValue exec_bool(int b) { return (ExecValue){2, b ? 1.0 : 0.0, NULL}; }
+static double exec_num(ExecValue v) { return v.kind == 2 ? (v.number != 0) : v.number; }
+static ExecValue exec_lookup(ExecVar *vars, size_t count, const char *name) {
+  for (size_t i = 0; i < count; i++) if (strcmp(vars[i].name, name) == 0) return vars[i].value;
+  return exec_number(0);
+}
+static long long eval_ast_expr(const CAstNode *, ExecVar *, size_t);
+static char *exec_access_key(const char *name, const CAstNodeList *selectors, ExecVar *vars, size_t count) {
+  size_t cap = 256, len = strlen(name); char *key = malloc(cap); strcpy(key, name);
+  for (size_t i=0; i<selectors->count; i++) {
+    const CAstNode *sel=selectors->items[i]; char part[96];
+    if (sel->data.reference.name && strcmp(sel->data.reference.name,"[]")==0) snprintf(part,sizeof(part),"[%lld]",eval_ast_expr(sel->data.reference.selectors.items[0],vars,count));
+    else snprintf(part,sizeof(part),".%s",sel->data.reference.name ? sel->data.reference.name : "");
+    size_t plen=strlen(part); if(len+plen+1>cap){cap*=2;key=realloc(key,cap);} strcpy(key+len,part);len+=plen;
   }
-  if (e->kind == C_AST_VARIABLE_REFERENCE && e->data.reference.name) {
-    for (size_t i = 0; i < var_count; i++) {
-      if (strcmp(vars[i].name, e->data.reference.name) == 0) {
-        return vars[i].value;
-      }
+  return key;
+}
+
+static ExecValue eval_ast_value(const CAstNode *e, ExecVar *vars, size_t count) {
+  if (!e) return exec_number(0);
+  if (e->kind == C_AST_LITERAL) {
+    const char *raw = e->data.literal.value ? e->data.literal.value : "";
+    if (e->data.literal.literal_kind == C_TOKEN_STRING || e->data.literal.literal_kind == C_TOKEN_CHARACTER) {
+      size_t len = strlen(raw), begin = len && (raw[0] == '"' || raw[0] == '\'' || raw[0] == '‘' || raw[0] == '’') ? 1 : 0;
+      size_t end = len > begin && (raw[len-1] == '"' || raw[len-1] == '\'' || raw[len-1] == '‘' || raw[len-1] == '’') ? len-1 : len;
+      char *text = malloc(end - begin + 1); memcpy(text, raw + begin, end - begin); text[end - begin] = '\0';
+      ExecValue v = {e->data.literal.literal_kind == C_TOKEN_CHARACTER ? 3 : 1, 0, text}; return v;
     }
-    return 0;
+    if (e->data.literal.literal_kind == C_TOKEN_BOOLEAN) return exec_bool(strcmp(raw, "صح") == 0);
+    return exec_number(strtod(raw, NULL));
+  }
+  if (e->kind == C_AST_VARIABLE_REFERENCE && e->data.reference.name) { char *key=exec_access_key(e->data.reference.name,&e->data.reference.selectors,vars,count); ExecValue v=exec_lookup(vars,count,key); free(key); return v; }
+  if (e->kind == C_AST_UNARY) {
+    ExecValue v = eval_ast_value(e->data.unary.operand, vars, count);
+    if (strcmp(e->data.unary.operator, "!") == 0) return exec_bool(!exec_num(v));
+    return exec_number(strcmp(e->data.unary.operator, "-") == 0 ? -exec_num(v) : exec_num(v));
   }
   if (e->kind == C_AST_BINARY) {
-    long long l = eval_ast_expr(e->data.binary.left, vars, var_count);
-    long long r = eval_ast_expr(e->data.binary.right, vars, var_count);
+    ExecValue l = eval_ast_value(e->data.binary.left, vars, count), r = eval_ast_value(e->data.binary.right, vars, count);
     const char *op = e->data.binary.operator ? e->data.binary.operator : "+";
-    if (strcmp(op, "+") == 0) return l + r;
-    if (strcmp(op, "-") == 0) return l - r;
-    if (strcmp(op, "*") == 0) return l * r;
-    if (strcmp(op, "/") == 0) return r != 0 ? l / r : 0;
-    if (strcmp(op, "%") == 0) return r != 0 ? l % r : 0;
-  }
-  return 0;
-}
-
-static void execute_statements(ProtocolResponse *resp,
-                               const CAstNodeList *statements,
-                               ExecVar *vars, size_t *var_count);
-
-static void set_exec_var(ExecVar *vars, size_t *var_count, const char *name,
-                         long long value) {
-  for (size_t i = 0; i < *var_count; i++) {
-    if (strcmp(vars[i].name, name) == 0) { vars[i].value = value; return; }
-  }
-  if (*var_count < 128) {
-    vars[*var_count].name = (char *)name;
-    vars[*var_count].value = value;
-    (*var_count)++;
-  }
-}
-
-static void execute_print(ProtocolResponse *resp, const CAstNode *s,
-                          ExecVar *vars, size_t var_count) {
-  for (size_t j = 0; j < s->data.print.values.count; j++) {
-    const CAstNode *v = s->data.print.values.items[j];
-    if (!v) continue;
-    if (v->kind == C_AST_LITERAL && v->data.literal.literal_kind == C_TOKEN_STRING) {
-      const char *raw = v->data.literal.value ? v->data.literal.value : "";
-      size_t len = strlen(raw);
-      char *clean = malloc(len + 1);
-      size_t ci = 0;
-      size_t begin = raw[0] == '"' ? 1 : 0;
-      size_t end = len > begin && raw[len - 1] == '"' ? len - 1 : len;
-      for (size_t k = begin; k < end; k++) {
-        if (raw[k] == '\\' && k + 1 < end) {
-          k++;
-          clean[ci++] = raw[k] == 'n' ? '\n' : raw[k] == 't' ? '\t' : raw[k];
-        } else clean[ci++] = raw[k];
-      }
-      clean[ci] = '\0';
-      protocol_add_output(resp, clean);
-      free(clean);
-    } else {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%lld", eval_ast_expr(v, vars, var_count));
-      protocol_add_output(resp, buf);
+    if (strcmp(op, "+") == 0 && (l.kind == 1 || l.kind == 3 || r.kind == 1 || r.kind == 3)) {
+      char a[128], b[128]; snprintf(a, sizeof(a), "%s", l.text ? l.text : ""); snprintf(b, sizeof(b), "%s", r.text ? r.text : "");
+      char *joined = malloc(strlen(a)+strlen(b)+1); strcpy(joined,a); strcat(joined,b); ExecValue v={1,0,joined}; return v;
     }
+    double a=exec_num(l), b=exec_num(r);
+    if (strcmp(op,"+")==0) return exec_number(a+b); if (strcmp(op,"-")==0) return exec_number(a-b);
+    if (strcmp(op,"*")==0) return exec_number(a*b); if (strcmp(op,"/")==0) return exec_number(b!=0?a/b:0);
+    if (strcmp(op,"%")==0 || strcmp(op,"\\")==0) return exec_number(b != 0 ? (strcmp(op, "%") == 0 ? fmod(a, b) : trunc(a / b)) : 0);
+    if (strcmp(op,"==")==0) return exec_bool(l.kind==r.kind && (l.text ? strcmp(l.text,r.text)==0 : a==b));
+    if (strcmp(op,"!=")==0) return exec_bool(!(l.kind==r.kind && (l.text ? strcmp(l.text,r.text)==0 : a==b)));
+    if (strcmp(op,"<")==0) return exec_bool(a<b); if (strcmp(op,">")==0) return exec_bool(a>b);
+    if (strcmp(op,"<=")==0) return exec_bool(a<=b); if (strcmp(op,">=")==0) return exec_bool(a>=b);
+    if (strcmp(op,"&&")==0) return exec_bool(a!=0 && b!=0); if (strcmp(op,"||")==0) return exec_bool(a!=0 || b!=0);
   }
+  return exec_number(0);
+}
+static long long eval_ast_expr(const CAstNode *e, ExecVar *vars, size_t count) { return (long long)exec_num(eval_ast_value(e, vars, count)); }
+static void set_exec_var(ExecVar *vars, size_t *count, const char *name, ExecValue value) {
+  for (size_t i=0;i<*count;i++) if (strcmp(vars[i].name,name)==0) { vars[i].value=value; return; }
+  if (*count<128) { vars[*count]=(ExecVar){(char*)name,value}; (*count)++; }
 }
 
-static void execute_statement(ProtocolResponse *resp, const CAstNode *s,
-                              ExecVar *vars, size_t *var_count) {
-  if (!s) return;
-  if (s->kind == C_AST_PROGRAM) {
-    execute_statements(resp, &s->data.program.statements, vars, var_count);
-  } else if (s->kind == C_AST_ASSIGNMENT && s->data.assignment.name) {
-    set_exec_var(vars, var_count, s->data.assignment.name,
-                 eval_ast_expr(s->data.assignment.expression, vars, *var_count));
-  } else if (s->kind == C_AST_PRINT) {
-    execute_print(resp, s, vars, *var_count);
-  } else if (s->kind == C_AST_REPEAT) {
-    long long from = eval_ast_expr(s->data.repeat.from, vars, *var_count);
-    long long to = eval_ast_expr(s->data.repeat.to, vars, *var_count);
-    long long step = s->data.repeat.step ? eval_ast_expr(s->data.repeat.step, vars, *var_count) : 1;
-    if (step == 0) step = 1;
-    for (long long value = from; step > 0 ? value <= to : value >= to; value += step) {
-      set_exec_var(vars, var_count, s->data.repeat.variable, value);
-      execute_statements(resp, &s->data.repeat.body, vars, var_count);
-      if ((step > 0 && value > to - step) || (step < 0 && value < to - step)) break;
-    }
-  } else if (s->kind == C_AST_WHILE) {
-    size_t guard = 0;
-    while (eval_ast_expr(s->data.loop.condition, vars, *var_count) != 0 && guard++ < 100000) {
-      execute_statements(resp, &s->data.loop.body, vars, var_count);
-    }
-  } else if (s->kind == C_AST_IF) {
-    const CAstNodeList *branch = eval_ast_expr(s->data.conditional.condition, vars, *var_count) ? &s->data.conditional.then_branch : &s->data.conditional.else_branch;
-    execute_statements(resp, branch, vars, var_count);
+static void execute_statements(ProtocolResponse *resp, const CAstNodeList *statements, ExecVar *vars, size_t *count);
+static void execute_print(ProtocolResponse *resp, const CAstNode *s, ExecVar *vars, size_t count) {
+  for (size_t j=0;j<s->data.print.values.count;j++) { ExecValue v=eval_ast_value(s->data.print.values.items[j],vars,count); char buf[256];
+    if (v.text) snprintf(buf,sizeof(buf),"%s",v.text); else if (v.kind==2) snprintf(buf,sizeof(buf),"%s",v.number?"صح":"خطأ"); else if (fabs(v.number-round(v.number))<1e-9) snprintf(buf,sizeof(buf),"%.0f",v.number); else snprintf(buf,sizeof(buf),"%.15g",v.number); protocol_add_output(resp,buf);
   }
 }
-
-static void execute_statements(ProtocolResponse *resp,
-                               const CAstNodeList *statements,
-                               ExecVar *vars, size_t *var_count) {
-  for (size_t i = 0; i < statements->count; i++) {
-    execute_statement(resp, statements->items[i], vars, var_count);
-  }
+static void execute_statement(ProtocolResponse *resp,const CAstNode *s,ExecVar *vars,size_t *count) {
+  if(!s)return; if(s->kind==C_AST_PROGRAM) execute_statements(resp,&s->data.program.statements,vars,count);
+  else if(s->kind==C_AST_ASSIGNMENT&&s->data.assignment.name) { char *key=exec_access_key(s->data.assignment.name,&s->data.assignment.selectors,vars,*count); set_exec_var(vars,count,key,eval_ast_value(s->data.assignment.expression,vars,*count)); free(key); }
+  else if(s->kind==C_AST_PRINT) execute_print(resp,s,vars,*count);
+  else if(s->kind==C_AST_REPEAT){long long from=eval_ast_expr(s->data.repeat.from,vars,*count),to=eval_ast_expr(s->data.repeat.to,vars,*count),step=s->data.repeat.step?eval_ast_expr(s->data.repeat.step,vars,*count):1;if(!step)step=1;for(long long v=from;step>0?v<=to:v>=to;v+=step){set_exec_var(vars,count,s->data.repeat.variable,exec_number(v));execute_statements(resp,&s->data.repeat.body,vars,count);if((step>0&&v>to-step)||(step<0&&v<to-step))break;}}
+  else if(s->kind==C_AST_WHILE){size_t guard=0;while(eval_ast_expr(s->data.loop.condition,vars,*count)&&guard++<100000)execute_statements(resp,&s->data.loop.body,vars,count);}
+  else if(s->kind==C_AST_IF){const CAstNodeList *b=eval_ast_expr(s->data.conditional.condition,vars,*count)?&s->data.conditional.then_branch:&s->data.conditional.else_branch;execute_statements(resp,b,vars,count);}
 }
-
-static void execute_ast_program(ProtocolResponse *resp, const CAstNode *root) {
-  if (!root || root->kind != C_AST_PROGRAM) return;
-  ExecVar vars[128];
-  size_t var_count = 0;
-  execute_statements(resp, &root->data.program.statements, vars, &var_count);
-}
+static void execute_statements(ProtocolResponse *resp,const CAstNodeList *statements,ExecVar *vars,size_t *count){for(size_t i=0;i<statements->count;i++)execute_statement(resp,statements->items[i],vars,count);}
+static void execute_ast_program(ProtocolResponse *resp,const CAstNode *root){if(!root||root->kind!=C_AST_PROGRAM)return;ExecVar vars[128];size_t count=0;for(size_t i=0;i<root->data.program.declarations.count;i++){CAstNode*d=root->data.program.declarations.items[i];if(d->kind==C_AST_CONSTANT_DECLARATION)set_exec_var(vars,&count,d->data.constant.name,eval_ast_value(d->data.constant.value,vars,count));else if(d->kind==C_AST_VARIABLE_DECLARATION)for(size_t n=0;n<d->data.variable.name_count;n++)set_exec_var(vars,&count,d->data.variable.names[n],exec_number(0));}execute_statements(resp,&root->data.program.statements,vars,&count);}
 
 typedef struct {
   const char *keyword;

@@ -91,16 +91,19 @@ static CAstNode *parser_literal(char *value, CTokenKind kind) {
 %%
 
 full_program
-  : TOK_PROGRAM TOK_IDENTIFIER ';' full_block '.' { $$ = c_ast_new_program($2, $4->data.program.declarations, $4->data.program.statements); free($4); }
-  | TOK_PROGRAM TOK_IDENTIFIER ';' full_declarations full_block '.' {
-      for (size_t i = 0; i < $5->data.program.declarations.count; i++) c_ast_list_append(&$4, $5->data.program.declarations.items[i]);
-      free($5->data.program.declarations.items);
+  : TOK_PROGRAM TOK_IDENTIFIER ';' full_declarations full_block '.' {
       $$ = c_ast_new_program($2, $4, $5->data.program.statements);
       free($5);
     }
   ;
 full_block
-  : '{' full_declarations full_statements '}' { $$ = calloc(1, sizeof(CAstNode)); $$->kind = C_AST_PROGRAM; $$->data.program.declarations = $2; $$->data.program.statements = $3; }
+  : '{' full_statements '}' {
+      $$ = calloc(1, sizeof(CAstNode));
+      $$->kind = C_AST_PROGRAM;
+      $$->data.program.declarations.items = NULL;
+      $$->data.program.declarations.count = 0;
+      $$->data.program.statements = $2;
+    }
   ;
 full_declarations : /* empty */ { $$.items = NULL; $$.count = 0; } | full_declarations full_declaration ';' { $$=$1; c_ast_list_append(&$$,$2); } ;
 full_declaration : full_const {$$=$1;} | full_type_decl {$$=$1;} | full_var {$$=$1;} | full_proc {$$=$1;} ;
@@ -134,24 +137,7 @@ full_factor : TOK_INTEGER_LITERAL {$$=c_ast_new_integer($1);} | TOK_REAL_LITERAL
 
 program
   : full_program { $$ = $1; g_root_ast = $$; }
-  | TOK_PROGRAM TOK_IDENTIFIER '{' declaration_list statement_list '}' '.'
-    {
-      $$ = c_ast_new_program($2, $4, $5);
-      g_root_ast = $$;
-    }
-  | TOK_PROGRAM TOK_IDENTIFIER '{' statement_list '}' '.'
-    {
-      CAstNodeList empty_decls;
-      empty_decls.items = NULL;
-      empty_decls.count = 0;
-      $$ = c_ast_new_program($2, empty_decls, $4);
-      g_root_ast = $$;
-    }
-  | error
-    {
-      g_root_ast = NULL;
-      $$ = NULL;
-    }
+  | error { g_root_ast = NULL; $$ = NULL; }
   ;
 
 declaration_list
