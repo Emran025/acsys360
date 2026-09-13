@@ -38,6 +38,7 @@ class DiagnosticCompiler implements CompilerRepository {
     String target = 'none',
     String? artifactDirectory,
     CompilationMode? mode,
+    Map<String, String> inputValues = const {},
   }) async => {
     'success': false,
     'diagnostics': [

@@ -148,6 +148,63 @@ class _EditorShellState extends State<EditorShell> {
     });
   }
 
+  Future<void> _compileActive() async {
+    final document = widget.controller.activeDocument;
+    if (document == null) return;
+    final names = <String>[];
+    final pattern = RegExp(
+      r'(?:اقرأ|اقرا)\s*\(\s*([ء-يA-Za-z_][ء-يA-Za-z0-9_]*)',
+    );
+    for (final match in pattern.allMatches(document.text)) {
+      final name = match.group(1)!;
+      if (!names.contains(name)) names.add(name);
+    }
+    final values = <String, String>{};
+    if (names.isNotEmpty && mounted) {
+      final fields = <String, TextEditingController>{
+        for (final name in names) name: TextEditingController(),
+      };
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('إدخال قيم اقرأ'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final name in names)
+                  TextField(
+                    controller: fields[name],
+                    autofocus: name == names.first,
+                    keyboardType: TextInputType.text,
+                    decoration: InputDecoration(labelText: name),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton(
+              onPressed: () {
+                for (final name in names) {
+                  values[name] = fields[name]!.text.trim();
+                }
+                Navigator.pop(context, true);
+              },
+              child: const Text('تنفيذ'),
+            ),
+          ],
+        ),
+      );
+      for (final field in fields.values) field.dispose();
+      if (result != true) return;
+    }
+    await widget.controller.compile(inputValues: values);
+  }
+
   bool get _shouldSuggest {
     final offset = _cursorOffset;
     if (offset == 0 || offset > textController.text.length) return false;
@@ -1010,7 +1067,7 @@ class _EditorShellState extends State<EditorShell> {
             onInvoke: (_) => controller.redo(),
           ),
           CompileIntent: CallbackAction<CompileIntent>(
-            onInvoke: (_) => controller.compile(),
+            onInvoke: (_) => _compileActive(),
           ),
           BuildArtifactIntent: CallbackAction<BuildArtifactIntent>(
             onInvoke: (_) => controller.buildNative(),

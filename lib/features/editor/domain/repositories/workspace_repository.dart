@@ -23,6 +23,7 @@ abstract interface class CompilerRepository {
     String target = 'none',
     String? artifactDirectory,
     CompilationMode? mode,
+    Map<String, String> inputValues = const {},
   });
 }
 

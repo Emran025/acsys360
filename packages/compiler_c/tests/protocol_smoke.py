@@ -42,6 +42,33 @@ def main():
     assert power.returncode == 0, power.stderr
     assert power_response["success"] is True
     assert power_response["executionOutput"] == ["8", "3"]
+    read, read_response = run(
+        executable,
+        "برنامج قراءة؛ متغير س: صحيح؛ { اقرأ(س)؛ اطبع(س)؛ }.",
+    )
+    assert read.returncode == 0, read.stderr
+    assert read_response["success"] is True
+
+    read_request = {
+        "protocolVersion": "0.5.0",
+        "rootPath": ".",
+        "sourcePaths": ["main.arb"],
+        "sourceTexts": {
+            "main.arb": "برنامج قراءة؛ متغير س: صحيح؛ { اقرأ(س)؛ اطبع(س)؛ }."
+        },
+        "mode": "active",
+        "entryPath": "main.arb",
+        "inputValues": {"س": "42"},
+    }
+    completed = subprocess.run(
+        [executable, "--protocol"],
+        input=json.dumps(read_request, ensure_ascii=False),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout)["executionOutput"] == ["42"]
 
     invalid, invalid_response = run(
         executable,

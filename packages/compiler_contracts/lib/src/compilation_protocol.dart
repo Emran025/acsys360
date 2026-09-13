@@ -163,6 +163,7 @@ class CompilationRequest {
   final String? entryPath;
   final String target;
   final String? artifactDirectory;
+  final Map<String, String> inputValues;
 
   const CompilationRequest({
     required this.rootPath,
@@ -172,6 +173,7 @@ class CompilationRequest {
     this.entryPath,
     this.target = 'none',
     this.artifactDirectory,
+    this.inputValues = const {},
   });
 
   Map<String, Object?> toJson() => {
@@ -183,6 +185,7 @@ class CompilationRequest {
     'entryPath': entryPath,
     'target': target,
     'artifactDirectory': artifactDirectory,
+    'inputValues': inputValues,
   };
 
   factory CompilationRequest.fromJson(Map<String, dynamic> json) {
@@ -200,6 +203,7 @@ class CompilationRequest {
       entryPath: _optionalString(json['entryPath']),
       target: _optionalString(json['target']) ?? 'none',
       artifactDirectory: _optionalString(json['artifactDirectory']),
+      inputValues: _optionalStringMap(json['inputValues']),
     );
   }
 }

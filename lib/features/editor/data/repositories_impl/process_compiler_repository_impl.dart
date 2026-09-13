@@ -41,6 +41,7 @@ class ProcessCompilerRepository
     String target = 'none',
     String? artifactDirectory,
     CompilationMode? mode,
+    Map<String, String> inputValues = const {},
   }) async {
     if (sourcePath.isEmpty) {
       return _processFailure('لا يوجد ملف للترجمة', -1);
@@ -67,6 +68,7 @@ class ProcessCompilerRepository
       entryPath: sourcePath,
       target: target,
       artifactDirectory: artifactDirectory,
+      inputValues: inputValues,
     );
 
     try {

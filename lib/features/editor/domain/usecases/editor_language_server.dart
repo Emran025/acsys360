@@ -34,6 +34,7 @@ class EditorLanguageServer {
     String target = 'none',
     String? artifactDirectory,
     CompilationMode? mode,
+    Map<String, String> inputValues = const {},
   }) async {
     final response = await compiler.compile(
       rootPath: rootPath,
@@ -42,6 +43,7 @@ class EditorLanguageServer {
       target: target,
       artifactDirectory: artifactDirectory,
       mode: mode,
+      inputValues: inputValues,
     );
     final compilation = CompilationResult(
       success: response['success'] == true,

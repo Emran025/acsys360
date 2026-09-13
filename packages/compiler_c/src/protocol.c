@@ -723,6 +723,34 @@ typedef struct {
   char *text;
 } ExecValue;
 typedef struct { char *name; ExecValue value; } ExecVar;
+static const char *g_input_values_payload = NULL;
+static ExecValue exec_number(double n);
+static ExecValue exec_bool(int b);
+static char *c_strdup(const char *src);
+
+static ExecValue exec_input_value(const char *name) {
+  if (!g_input_values_payload || !name) return exec_number(0);
+  char key[256];
+  snprintf(key, sizeof(key), "\"%s\"", name);
+  const char *p = strstr(g_input_values_payload, key);
+  if (!p) return exec_number(0);
+  p = strchr(p + strlen(key), ':');
+  if (!p) return exec_number(0);
+  while (*++p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') {}
+  if (*p != '"') return exec_number(strtod(p, NULL));
+  p++;
+  char value[256];
+  size_t length = 0;
+  while (*p && *p != '"' && length + 1 < sizeof(value)) value[length++] = *p++;
+  value[length] = '\0';
+  if (strcmp(value, "صح") == 0) return exec_bool(1);
+  if (strcmp(value, "خطأ") == 0) return exec_bool(0);
+  char *end = NULL;
+  const double number = strtod(value, &end);
+  if (end != value && *end == '\0') return exec_number(number);
+  ExecValue text = {1, 0, c_strdup(value)};
+  return text;
+}
 
 static ExecValue exec_number(double n) { return (ExecValue){0, n, NULL}; }
 static ExecValue exec_bool(int b) { return (ExecValue){2, b ? 1.0 : 0.0, NULL}; }
@@ -820,6 +848,7 @@ static void execute_print(ProtocolResponse *resp, const CAstNode *s, ExecVar *va
 static void execute_statement(ProtocolResponse *resp,const CAstNode *s,ExecVar *vars,size_t *count) {
   if(!s)return;
   if(s->kind==C_AST_PROGRAM) execute_statements(resp,&s->data.program.statements,vars,count);
+  else if(s->kind==C_AST_READ&&s->data.access.name) set_exec_var(vars,count,s->data.access.name,exec_input_value(s->data.access.name));
   else if(s->kind==C_AST_ASSIGNMENT&&s->data.assignment.name) { char *key=exec_access_key(s->data.assignment.name,&s->data.assignment.selectors,vars,*count); set_exec_var(vars,count,key,eval_ast_value(s->data.assignment.expression,vars,*count)); free(key); }
   else if(s->kind==C_AST_PRINT) execute_print(resp,s,vars,*count);
   else if(s->kind==C_AST_REPEAT){long long from=eval_ast_expr(s->data.repeat.from,vars,*count),to=eval_ast_expr(s->data.repeat.to,vars,*count),step=s->data.repeat.step?eval_ast_expr(s->data.repeat.step,vars,*count):1;if(!step)step=1;for(long long v=from;step>0?v<=to:v>=to;v+=step){set_exec_var(vars,count,s->data.repeat.variable,exec_number(v));execute_statements(resp,&s->data.repeat.body,vars,count);if((step>0&&v>to-step)||(step<0&&v<to-step))break;}}
@@ -1096,7 +1125,9 @@ int c_run_protocol(const char *payload) {
       generate_tac(&resp, g_root_ast);
 
       /* 6. Execution output */
+      g_input_values_payload = strstr(payload, "\"inputValues\"");
       execute_ast_program(&resp, g_root_ast);
+      g_input_values_payload = NULL;
 
       /* 7. Artifacts */
       char *artifact_dir = extract_string_value(payload, "\"artifactDirectory\"");

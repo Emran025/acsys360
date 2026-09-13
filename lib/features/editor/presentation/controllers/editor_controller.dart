@@ -600,7 +600,7 @@ class EditorController extends ChangeNotifier {
     assistanceIndex = 0;
   }
 
-  Future<void> compile() async {
+  Future<void> compile({Map<String, String> inputValues = const {}}) async {
     final version = _stateVersion;
     final service = languageServer;
     final active = workspace.activeDocument;
@@ -610,6 +610,8 @@ class EditorController extends ChangeNotifier {
         rootPath: workspace.rootPath,
         sourcePath: active.path,
         documents: workspace.documents,
+        mode: CompilationMode.active,
+        inputValues: inputValues,
       );
       if (version != _stateVersion) return;
       compilation = analysis.compilation;
