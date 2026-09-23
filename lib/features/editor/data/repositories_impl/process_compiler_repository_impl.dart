@@ -95,7 +95,11 @@ class ProcessCompilerRepository
       final response = CompilationResponse.fromJson(
         Map<String, dynamic>.from(decoded),
       );
-      return Map<String, dynamic>.from(response.toJson());
+      final result = Map<String, dynamic>.from(response.toJson());
+      // Keep analysis side-effect free even when an older bundled arabicc
+      // ignores the optional `execute` request field and emits read defaults.
+      if (!execute) result['executionOutput'] = const <String>[];
+      return result;
     } on TimeoutException {
       return _processFailure(
         'تجاوز المترجم حد الانتظار (${processTimeout.inSeconds} ثانية)',

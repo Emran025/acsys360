@@ -47,9 +47,13 @@ class EditorLanguageServer {
       inputValues: inputValues,
       execute: execute,
     );
+    final analysisResponse = Map<String, dynamic>.from(response);
+    // Analysis must never expose runtime output. This also protects the UI
+    // when a bundled/legacy compiler still returns default values for اقرأ.
+    if (!execute) analysisResponse['executionOutput'] = const <String>[];
     final compilation = CompilationResult(
-      success: response['success'] == true,
-      payload: response,
+      success: analysisResponse['success'] == true,
+      payload: analysisResponse,
     );
     final active = documents.firstWhere(
       (document) => document.path == sourcePath,

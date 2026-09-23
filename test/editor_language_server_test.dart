@@ -19,11 +19,13 @@ void main() {
         Document(path: '/workspace/lib.arb', text: 'ص = 2;'),
       ],
       mode: CompilationMode.project,
+      execute: false,
     );
 
     expect(analysis.diagnostics, hasLength(1));
     expect(analysis.diagnostics.single.sourcePath, '/workspace/main.arb');
     expect(analysis.diagnostics.single.offset, 0);
+    expect(analysis.compilation.executionOutput, isEmpty);
   });
 }
 
@@ -42,6 +44,7 @@ class DiagnosticCompiler implements CompilerRepository {
     bool execute = true,
   }) async => {
     'success': false,
+    'executionOutput': ['0'],
     'diagnostics': [
       {
         'severity': 'error',
