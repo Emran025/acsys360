@@ -463,7 +463,7 @@ class EditorController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> analyze() => compile();
+  Future<void> analyze() => compile(execute: false);
 
   Future<void> buildNative() async {
     final version = _stateVersion;
@@ -600,7 +600,10 @@ class EditorController extends ChangeNotifier {
     assistanceIndex = 0;
   }
 
-  Future<void> compile({Map<String, String> inputValues = const {}}) async {
+  Future<void> compile({
+    Map<String, String> inputValues = const {},
+    bool execute = true,
+  }) async {
     final version = _stateVersion;
     final service = languageServer;
     final active = workspace.activeDocument;
@@ -612,6 +615,7 @@ class EditorController extends ChangeNotifier {
         documents: workspace.documents,
         mode: CompilationMode.active,
         inputValues: inputValues,
+        execute: execute,
       );
       if (version != _stateVersion) return;
       compilation = analysis.compilation;

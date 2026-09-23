@@ -70,6 +70,18 @@ def main():
     assert completed.returncode == 0, completed.stderr
     assert json.loads(completed.stdout)["executionOutput"] == ["42"]
 
+    analysis_request = dict(read_request)
+    analysis_request["execute"] = False
+    analysis = subprocess.run(
+        [executable, "--protocol"],
+        input=json.dumps(analysis_request, ensure_ascii=False),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert analysis.returncode == 0, analysis.stderr
+    assert json.loads(analysis.stdout)["executionOutput"] == []
+
     invalid, invalid_response = run(
         executable,
         "برنامج اختبار؛ متغير س: صحيح؛ { اطبع(مفقود)؛ }.",

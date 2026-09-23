@@ -164,6 +164,7 @@ class CompilationRequest {
   final String target;
   final String? artifactDirectory;
   final Map<String, String> inputValues;
+  final bool execute;
 
   const CompilationRequest({
     required this.rootPath,
@@ -174,6 +175,7 @@ class CompilationRequest {
     this.target = 'none',
     this.artifactDirectory,
     this.inputValues = const {},
+    this.execute = true,
   });
 
   Map<String, Object?> toJson() => {
@@ -186,6 +188,7 @@ class CompilationRequest {
     'target': target,
     'artifactDirectory': artifactDirectory,
     'inputValues': inputValues,
+    'execute': execute,
   };
 
   factory CompilationRequest.fromJson(Map<String, dynamic> json) {
@@ -204,6 +207,7 @@ class CompilationRequest {
       target: _optionalString(json['target']) ?? 'none',
       artifactDirectory: _optionalString(json['artifactDirectory']),
       inputValues: _optionalStringMap(json['inputValues']),
+      execute: _optionalBool(json['execute']) ?? true,
     );
   }
 }
@@ -450,6 +454,12 @@ bool _requiredBool(Map<String, dynamic> json, String key) {
   final value = json[key];
   if (value is bool) return value;
   throw FormatException('الحقل $key يجب أن يكون منطقيًا');
+}
+
+bool? _optionalBool(Object? value) {
+  if (value == null) return null;
+  if (value is bool) return value;
+  throw const FormatException('الحقل الاختياري يجب أن يكون منطقيًا');
 }
 
 int _requiredPositiveInt(Map<String, dynamic> json, String key) {

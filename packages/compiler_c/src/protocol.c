@@ -1032,6 +1032,15 @@ static int handle_assist_request(const char *payload) {
   return 0;
 }
 
+static int request_executes(const char *payload) {
+  const char *p = payload ? strstr(payload, "\"execute\"") : NULL;
+  if (!p) return 1;
+  p = strchr(p + strlen("\"execute\""), ':');
+  if (!p) return 1;
+  while (*++p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') {}
+  return strncmp(p, "false", 5) != 0;
+}
+
 int c_run_protocol(const char *payload) {
   if (payload == NULL || payload[0] == '\0') {
     fputs("{\"protocolVersion\":\"" ARABICC_PROTOCOL_VERSION "\",\"success\":false,\"diagnostics\":[{\"severity\":\"error\",\"phase\":\"driver\",\"code\":\"P001\",\"message\":\"حزمة الطلب فارغة\",\"span\":null}],\"tokens\":[],\"syntaxTree\":null,\"symbolTable\":[],\"threeAddressCode\":[],\"assembly\":\"\",\"executionOutput\":[],\"artifacts\":[],\"intermediateRepresentation\":{}}\n", stdout);
@@ -1124,10 +1133,13 @@ int c_run_protocol(const char *payload) {
       /* 5. Three Address Code (3AC) */
       generate_tac(&resp, g_root_ast);
 
-      /* 6. Execution output */
-      g_input_values_payload = strstr(payload, "\"inputValues\"");
-      execute_ast_program(&resp, g_root_ast);
-      g_input_values_payload = NULL;
+      /* 6. Execution output. Analysis requests must not run read() with a
+         missing value: that used to make an unprovided input look like 0. */
+      if (request_executes(payload)) {
+        g_input_values_payload = strstr(payload, "\"inputValues\"");
+        execute_ast_program(&resp, g_root_ast);
+        g_input_values_payload = NULL;
+      }
 
       /* 7. Artifacts */
       char *artifact_dir = extract_string_value(payload, "\"artifactDirectory\"");

@@ -24,6 +24,7 @@ abstract interface class CompilerRepository {
     String? artifactDirectory,
     CompilationMode? mode,
     Map<String, String> inputValues = const {},
+    bool execute = true,
   });
 }
 

@@ -97,6 +97,7 @@ class DeferredCompiler implements CompilerRepository {
     String? artifactDirectory,
     CompilationMode? mode,
     Map<String, String> inputValues = const {},
+    bool execute = true,
   }) => response.future;
 }
 
@@ -112,6 +113,7 @@ class EmptyCompiler implements CompilerRepository {
     String? artifactDirectory,
     CompilationMode? mode,
     Map<String, String> inputValues = const {},
+    bool execute = true,
   }) async => _successResponse();
 }
 
