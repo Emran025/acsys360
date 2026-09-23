@@ -29,6 +29,21 @@ ProcessCompilerRepository createCompilerRepository() {
 
   final candidates = <String>[
     for (final root in roots) ...[
+      [
+        root,
+        'packages',
+        'compiler_c',
+        'build',
+        'Release',
+        compilerName,
+      ].join(Platform.pathSeparator),
+      [
+        root,
+        'packages',
+        'compiler_c',
+        'build',
+        compilerName,
+      ].join(Platform.pathSeparator),
       [root, 'compiler', compilerName].join(Platform.pathSeparator),
       [
         root,
@@ -48,21 +63,6 @@ ProcessCompilerRepository createCompilerRepository() {
         'runner',
         'Debug',
         'compiler',
-        compilerName,
-      ].join(Platform.pathSeparator),
-      [
-        root,
-        'packages',
-        'compiler_c',
-        'build',
-        'Release',
-        compilerName,
-      ].join(Platform.pathSeparator),
-      [
-        root,
-        'packages',
-        'compiler_c',
-        'build',
         compilerName,
       ].join(Platform.pathSeparator),
     ],
