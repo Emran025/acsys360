@@ -82,6 +82,37 @@ def main():
     assert analysis.returncode == 0, analysis.stderr
     assert json.loads(analysis.stdout)["executionOutput"] == []
 
+    interactive_request = dict(read_request)
+    interactive_request["sourceTexts"] = {
+        "main.arb": (
+            "برنامج قراءة؛ متغير س: صحيح؛ متغير ص: صحيح؛ "
+            "{ اقرأ(س)؛ اقرأ(ص)؛ اطبع(س)؛ اطبع(ص)؛ }."
+        )
+    }
+    interactive_request["inputValues"] = {}
+    interactive_request["interactive"] = True
+    session = subprocess.Popen(
+        [executable, "--protocol"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    session.stdin.write(json.dumps(interactive_request, ensure_ascii=False) + "\n")
+    session.stdin.flush()
+    first_input = json.loads(session.stdout.readline())
+    assert first_input == {"requestType": "input", "name": "س"}
+    session.stdin.write(json.dumps({"value": "11"}) + "\n")
+    session.stdin.flush()
+    second_input = json.loads(session.stdout.readline())
+    assert second_input == {"requestType": "input", "name": "ص"}
+    session.stdin.write(json.dumps({"value": "22"}) + "\n")
+    session.stdin.flush()
+    final_response = json.loads(session.stdout.readline())
+    assert final_response["executionOutput"] == ["11", "22"]
+    session.stdin.close()
+    assert session.wait(timeout=5) == 0
+
     invalid, invalid_response = run(
         executable,
         "برنامج اختبار؛ متغير س: صحيح؛ { اطبع(مفقود)؛ }.",

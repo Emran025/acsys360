@@ -36,6 +36,8 @@ class EditorLanguageServer {
     CompilationMode? mode,
     Map<String, String> inputValues = const {},
     bool execute = true,
+    bool interactive = false,
+    InputRequestHandler? onInputRequest,
   }) async {
     final response = await compiler.compile(
       rootPath: rootPath,
@@ -46,6 +48,8 @@ class EditorLanguageServer {
       mode: mode,
       inputValues: inputValues,
       execute: execute,
+      interactive: interactive,
+      onInputRequest: onInputRequest,
     );
     final analysisResponse = Map<String, dynamic>.from(response);
     // Analysis must never expose runtime output. This also protects the UI

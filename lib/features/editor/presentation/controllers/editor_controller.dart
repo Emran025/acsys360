@@ -603,6 +603,8 @@ class EditorController extends ChangeNotifier {
   Future<void> compile({
     Map<String, String> inputValues = const {},
     bool execute = true,
+    bool interactive = false,
+    InputRequestHandler? onInputRequest,
   }) async {
     final version = _stateVersion;
     final service = languageServer;
@@ -616,6 +618,8 @@ class EditorController extends ChangeNotifier {
         mode: CompilationMode.active,
         inputValues: inputValues,
         execute: execute,
+        interactive: interactive,
+        onInputRequest: onInputRequest,
       );
       if (version != _stateVersion) return;
       compilation = analysis.compilation;

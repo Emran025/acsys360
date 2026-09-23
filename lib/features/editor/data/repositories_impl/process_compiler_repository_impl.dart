@@ -43,6 +43,8 @@ class ProcessCompilerRepository
     CompilationMode? mode,
     Map<String, String> inputValues = const {},
     bool execute = true,
+    bool interactive = false,
+    InputRequestHandler? onInputRequest,
   }) async {
     if (sourcePath.isEmpty) {
       return _processFailure('لا يوجد ملف للترجمة', -1);
@@ -71,6 +73,7 @@ class ProcessCompilerRepository
       artifactDirectory: artifactDirectory,
       inputValues: inputValues,
       execute: execute,
+      interactive: interactive,
     );
 
     try {
@@ -80,8 +83,9 @@ class ProcessCompilerRepository
         workingDirectory: processWorkingDirectory ?? rootPath,
       ).timeout(processTimeout);
       process.stdin.writeln(jsonEncode(request.toJson()));
-      await process.stdin.close();
-      final completed = await _collect(process);
+      final completed = interactive && onInputRequest != null
+          ? await _collectInteractive(process, onInputRequest)
+          : await _collectAndClose(process);
       final output = completed.stdout;
       final errorOutput = completed.stderr;
       final exitCode = completed.exitCode;
@@ -96,8 +100,6 @@ class ProcessCompilerRepository
         Map<String, dynamic>.from(decoded),
       );
       final result = Map<String, dynamic>.from(response.toJson());
-      // Keep analysis side-effect free even when an older bundled arabicc
-      // ignores the optional `execute` request field and emits read defaults.
       if (!execute) result['executionOutput'] = const <String>[];
       return result;
     } on TimeoutException {
@@ -182,6 +184,52 @@ class ProcessCompilerRepository
       rethrow;
     } on Object catch (error) {
       throw FormatException('تعذر تشغيل خدمة المساعدة: $error');
+    }
+  }
+
+  Future<_ProcessResult> _collectAndClose(Process process) async {
+    await process.stdin.close();
+    return _collect(process);
+  }
+
+  Future<_ProcessResult> _collectInteractive(
+    Process process,
+    InputRequestHandler onInputRequest,
+  ) async {
+    final output = StringBuffer();
+    final stderrFuture = process.stderr.transform(utf8.decoder).join();
+    final exitCodeFuture = process.exitCode;
+    try {
+      await () async {
+        await for (final line in process.stdout
+            .transform(utf8.decoder)
+            .transform(const LineSplitter())) {
+          final decoded = jsonDecode(line);
+          if (decoded is Map && decoded['requestType'] == 'input') {
+            final name = decoded['name'];
+            if (name is! String || name.isEmpty) {
+              throw const FormatException('طلب الإدخال من المترجم غير صالح');
+            }
+            final value = await onInputRequest(name);
+            process.stdin.writeln(jsonEncode({'value': value ?? ''}));
+          } else {
+            output.writeln(line);
+          }
+        }
+      }().timeout(processTimeout);
+      await process.stdin.close();
+      final result = await Future.wait<Object?>([
+        stderrFuture,
+        exitCodeFuture,
+      ]).timeout(processTimeout);
+      return _ProcessResult(
+        stdout: output.toString(),
+        stderr: result[0]! as String,
+        exitCode: result[1]! as int,
+      );
+    } on TimeoutException {
+      process.kill();
+      rethrow;
     }
   }
 

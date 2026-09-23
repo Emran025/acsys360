@@ -165,6 +165,7 @@ class CompilationRequest {
   final String? artifactDirectory;
   final Map<String, String> inputValues;
   final bool execute;
+  final bool interactive;
 
   const CompilationRequest({
     required this.rootPath,
@@ -176,6 +177,7 @@ class CompilationRequest {
     this.artifactDirectory,
     this.inputValues = const {},
     this.execute = true,
+    this.interactive = false,
   });
 
   Map<String, Object?> toJson() => {
@@ -189,6 +191,7 @@ class CompilationRequest {
     'artifactDirectory': artifactDirectory,
     'inputValues': inputValues,
     'execute': execute,
+    'interactive': interactive,
   };
 
   factory CompilationRequest.fromJson(Map<String, dynamic> json) {
@@ -208,6 +211,7 @@ class CompilationRequest {
       artifactDirectory: _optionalString(json['artifactDirectory']),
       inputValues: _optionalStringMap(json['inputValues']),
       execute: _optionalBool(json['execute']) ?? true,
+      interactive: _optionalBool(json['interactive']) ?? false,
     );
   }
 }

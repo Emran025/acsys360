@@ -65,6 +65,7 @@ class _EditorShellState extends State<EditorShell> {
   int _editGeneration = 0;
   double _zoomScale = 1.0;
   List<String> pendingInputNames = const [];
+  Completer<String?>? pendingInput;
 
   @override
   void initState() {
@@ -150,34 +151,41 @@ class _EditorShellState extends State<EditorShell> {
   }
 
   Future<void> _compileActive() async {
-    final document = widget.controller.activeDocument;
-    if (document == null) return;
-    final names = <String>[];
-    final pattern = RegExp(
-      r'(?:اقرأ|اقرا)\s*\(\s*([ء-يA-Za-z_][ء-يA-Za-z0-9_]*)',
+    if (widget.controller.activeDocument == null) return;
+    await widget.controller.compile(
+      interactive: true,
+      onInputRequest: _requestInput,
     );
-    for (final match in pattern.allMatches(document.text)) {
-      final name = match.group(1)!;
-      if (!names.contains(name)) names.add(name);
-    }
-    if (names.isNotEmpty && mounted) {
-      setState(() {
-        pendingInputNames = List<String>.unmodifiable(names);
-        resultsExpanded = true;
-      });
-      return;
-    }
-    await widget.controller.compile();
   }
 
-  Future<void> _submitPendingInputs(Map<String, String> values) async {
+  Future<String?> _requestInput(String name) {
+    final completer = Completer<String?>();
+    if (!mounted) {
+      completer.complete(null);
+      return completer.future;
+    }
+    setState(() {
+      pendingInput = completer;
+      pendingInputNames = [name];
+      resultsExpanded = true;
+    });
+    return completer.future;
+  }
+
+  void _submitPendingInputs(Map<String, String> values) {
     if (!mounted) return;
+    final completer = pendingInput;
+    final name = pendingInputNames.isEmpty ? null : pendingInputNames.first;
+    pendingInput = null;
     setState(() => pendingInputNames = const []);
-    await widget.controller.compile(inputValues: values);
+    completer?.complete(name == null ? '' : values[name] ?? '');
   }
 
   void _cancelPendingInputs() {
+    final completer = pendingInput;
+    pendingInput = null;
     if (mounted) setState(() => pendingInputNames = const []);
+    completer?.complete(null);
   }
 
   bool get _shouldSuggest {
@@ -899,7 +907,10 @@ class _EditorShellState extends State<EditorShell> {
     final document = widget.controller.activeDocument;
     if (document == null || value == document.text) return;
     if (pendingInputNames.isNotEmpty) {
+      final completer = pendingInput;
+      pendingInput = null;
       setState(() => pendingInputNames = const []);
+      completer?.complete(null);
     }
     _editGeneration++;
     final before = document.text;

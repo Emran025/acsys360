@@ -42,6 +42,8 @@ class DiagnosticCompiler implements CompilerRepository {
     CompilationMode? mode,
     Map<String, String> inputValues = const {},
     bool execute = true,
+    bool interactive = false,
+    InputRequestHandler? onInputRequest,
   }) async => {
     'success': false,
     'executionOutput': ['0'],

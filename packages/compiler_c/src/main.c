@@ -29,9 +29,31 @@ static char *read_stdin(void) {
   return buffer;
 }
 
+static char *read_stdin_line(void) {
+  size_t length = 0U;
+  size_t capacity = 1024U;
+  char *buffer = malloc(capacity);
+  if (buffer == NULL) return NULL;
+  int value;
+  while ((value = fgetc(stdin)) != EOF && value != '\n') {
+    if (length + 1U >= capacity) {
+      capacity *= 2U;
+      char *next = realloc(buffer, capacity);
+      if (next == NULL) {
+        free(buffer);
+        return NULL;
+      }
+      buffer = next;
+    }
+    buffer[length++] = (char)value;
+  }
+  buffer[length] = '\0';
+  return buffer;
+}
+
 int main(int argc, char **argv) {
   if (argc >= 2 && (strcmp(argv[1], "--protocol") == 0 || strcmp(argv[1], "--assist") == 0)) {
-    char *payload = read_stdin();
+    char *payload = read_stdin_line();
     if (payload == NULL) {
       fputs("{\"protocolVersion\":\"0.5.0\",\"success\":false,\"diagnostics\":[{\"severity\":\"error\",\"phase\":\"driver\",\"code\":\"P002\",\"message\":\"فشل قراءة الدخل القياسي\",\"span\":null}],\"tokens\":[],\"syntaxTree\":null,\"symbolTable\":[],\"threeAddressCode\":[],\"assembly\":\"\",\"executionOutput\":[],\"artifacts\":[],\"intermediateRepresentation\":null}\n", stdout);
       return 70;

@@ -3,6 +3,8 @@ import 'package:compiler_contracts/compiler_contracts.dart';
 import '../entities/document.dart';
 import '../entities/file_node.dart';
 
+typedef InputRequestHandler = Future<String?> Function(String name);
+
 abstract interface class WorkspaceRepository {
   Future<List<String>> listFiles(String rootPath);
   Future<List<FileNode>> listTree(String rootPath);
@@ -25,6 +27,8 @@ abstract interface class CompilerRepository {
     CompilationMode? mode,
     Map<String, String> inputValues = const {},
     bool execute = true,
+    bool interactive = false,
+    InputRequestHandler? onInputRequest,
   });
 }
 

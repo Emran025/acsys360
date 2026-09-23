@@ -724,11 +724,44 @@ typedef struct {
 } ExecValue;
 typedef struct { char *name; ExecValue value; } ExecVar;
 static const char *g_input_values_payload = NULL;
+static int g_interactive_execution = 0;
 static ExecValue exec_number(double n);
 static ExecValue exec_bool(int b);
 static char *c_strdup(const char *src);
 
+static ExecValue exec_value_from_text(const char *text) {
+  if (!text) return exec_number(0);
+  if (strcmp(text, "صح") == 0) return exec_bool(1);
+  if (strcmp(text, "خطأ") == 0) return exec_bool(0);
+  char *end = NULL;
+  const double number = strtod(text, &end);
+  if (end != text && *end == '\0') return exec_number(number);
+  ExecValue value = {1, 0, c_strdup(text)};
+  return value;
+}
+
+static ExecValue exec_interactive_input(const char *name) {
+  char line[4096];
+  printf("{\"requestType\":\"input\",\"name\":\"%s\"}\n", name);
+  fflush(stdout);
+  if (!fgets(line, sizeof(line), stdin)) return exec_number(0);
+  const char *value = strstr(line, "\"value\"");
+  if (!value) return exec_number(0);
+  value = strchr(value + strlen("\"value\""), ':');
+  if (!value) return exec_number(0);
+  while (*++value == ' ' || *value == '\t' || *value == '\n' || *value == '\r') {}
+  if (*value == '"') value++;
+  char parsed[1024];
+  size_t length = 0;
+  while (*value && *value != '"' && *value != '\n' && *value != '\r' && length + 1 < sizeof(parsed)) {
+    parsed[length++] = *value++;
+  }
+  parsed[length] = '\0';
+  return exec_value_from_text(parsed);
+}
+
 static ExecValue exec_input_value(const char *name) {
+  if (g_interactive_execution) return exec_interactive_input(name);
   if (!g_input_values_payload || !name) return exec_number(0);
   char key[256];
   snprintf(key, sizeof(key), "\"%s\"", name);
@@ -743,13 +776,7 @@ static ExecValue exec_input_value(const char *name) {
   size_t length = 0;
   while (*p && *p != '"' && length + 1 < sizeof(value)) value[length++] = *p++;
   value[length] = '\0';
-  if (strcmp(value, "صح") == 0) return exec_bool(1);
-  if (strcmp(value, "خطأ") == 0) return exec_bool(0);
-  char *end = NULL;
-  const double number = strtod(value, &end);
-  if (end != value && *end == '\0') return exec_number(number);
-  ExecValue text = {1, 0, c_strdup(value)};
-  return text;
+  return exec_value_from_text(value);
 }
 
 static ExecValue exec_number(double n) { return (ExecValue){0, n, NULL}; }
@@ -1041,6 +1068,15 @@ static int request_executes(const char *payload) {
   return strncmp(p, "false", 5) != 0;
 }
 
+static int request_interactive(const char *payload) {
+  const char *p = payload ? strstr(payload, "\"interactive\"") : NULL;
+  if (!p) return 0;
+  p = strchr(p + strlen("\"interactive\""), ':');
+  if (!p) return 0;
+  while (*++p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') {}
+  return strncmp(p, "true", 4) == 0;
+}
+
 int c_run_protocol(const char *payload) {
   if (payload == NULL || payload[0] == '\0') {
     fputs("{\"protocolVersion\":\"" ARABICC_PROTOCOL_VERSION "\",\"success\":false,\"diagnostics\":[{\"severity\":\"error\",\"phase\":\"driver\",\"code\":\"P001\",\"message\":\"حزمة الطلب فارغة\",\"span\":null}],\"tokens\":[],\"syntaxTree\":null,\"symbolTable\":[],\"threeAddressCode\":[],\"assembly\":\"\",\"executionOutput\":[],\"artifacts\":[],\"intermediateRepresentation\":{}}\n", stdout);
@@ -1137,7 +1173,9 @@ int c_run_protocol(const char *payload) {
          missing value: that used to make an unprovided input look like 0. */
       if (request_executes(payload)) {
         g_input_values_payload = strstr(payload, "\"inputValues\"");
+        g_interactive_execution = request_interactive(payload);
         execute_ast_program(&resp, g_root_ast);
+        g_interactive_execution = 0;
         g_input_values_payload = NULL;
       }
 
