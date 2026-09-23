@@ -20,32 +20,27 @@ ProcessCompilerRepository createCompilerRepository() {
   }
 
   current = Directory(executableDirectory);
-  for (var level = 0; level < 5; level++) {
+  for (var level = 0; level < 8; level++) {
     addRoot(current.path);
     final parent = current.parent;
     if (parent.path == current.path) break;
     current = parent;
   }
 
-  final candidates = <String>[
+  String join(List<String> parts) => parts.join(Platform.pathSeparator);
+
+  // Search all source-tree compiler locations before any bundled Release copy.
+  // A stale bundled executable must never shadow the freshly built compiler.
+  final developmentCandidates = <String>[
     for (final root in roots) ...[
-      [
-        root,
-        'packages',
-        'compiler_c',
-        'build',
-        'Release',
-        compilerName,
-      ].join(Platform.pathSeparator),
-      [
-        root,
-        'packages',
-        'compiler_c',
-        'build',
-        compilerName,
-      ].join(Platform.pathSeparator),
-      [root, 'compiler', compilerName].join(Platform.pathSeparator),
-      [
+      join([root, 'packages', 'compiler_c', 'build', 'Release', compilerName]),
+      join([root, 'packages', 'compiler_c', 'build', compilerName]),
+    ],
+  ];
+  final bundledCandidates = <String>[
+    for (final root in roots) ...[
+      join([root, 'compiler', compilerName]),
+      join([
         root,
         'build',
         'windows',
@@ -54,8 +49,8 @@ ProcessCompilerRepository createCompilerRepository() {
         'Release',
         'compiler',
         compilerName,
-      ].join(Platform.pathSeparator),
-      [
+      ]),
+      join([
         root,
         'build',
         'windows',
@@ -64,11 +59,11 @@ ProcessCompilerRepository createCompilerRepository() {
         'Debug',
         'compiler',
         compilerName,
-      ].join(Platform.pathSeparator),
+      ]),
     ],
   ];
 
-  for (final candidate in candidates) {
+  for (final candidate in [...developmentCandidates, ...bundledCandidates]) {
     if (File(candidate).existsSync()) {
       return ProcessCompilerRepository(
         executable: candidate,

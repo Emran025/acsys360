@@ -86,6 +86,15 @@ class ProcessCompilerRepository
       final completed = interactive && onInputRequest != null
           ? await _collectInteractive(process, onInputRequest)
           : await _collectAndClose(process);
+      final sourceContainsRead = sourceTexts.values.any(
+        (text) => RegExp(r'(?:اقرأ|اقرا)\s*\(').hasMatch(text),
+      );
+      if (interactive && sourceContainsRead && completed.inputRequests == 0) {
+        return _processFailure(
+          'المترجم الذي تم تشغيله لم يفتح قناة الإدخال التفاعلية؛ أعد تشغيل التطبيق بالكامل وابنِ arabicc.exe الجديد.',
+          completed.exitCode,
+        );
+      }
       final output = completed.stdout;
       final errorOutput = completed.stderr;
       final exitCode = completed.exitCode;
@@ -197,6 +206,7 @@ class ProcessCompilerRepository
     InputRequestHandler onInputRequest,
   ) async {
     final output = StringBuffer();
+    var inputRequests = 0;
     final stderrFuture = process.stderr.transform(utf8.decoder).join();
     final exitCodeFuture = process.exitCode;
     try {
@@ -210,6 +220,7 @@ class ProcessCompilerRepository
             if (name is! String || name.isEmpty) {
               throw const FormatException('طلب الإدخال من المترجم غير صالح');
             }
+            inputRequests++;
             final value = await onInputRequest(name);
             process.stdin.writeln(jsonEncode({'value': value ?? ''}));
           } else {
@@ -226,6 +237,7 @@ class ProcessCompilerRepository
         stdout: output.toString(),
         stderr: result[0]! as String,
         exitCode: result[1]! as int,
+        inputRequests: inputRequests,
       );
     } on TimeoutException {
       process.kill();
@@ -286,10 +298,12 @@ class _ProcessResult {
   final String stdout;
   final String stderr;
   final int exitCode;
+  final int inputRequests;
 
   const _ProcessResult({
     required this.stdout,
     required this.stderr,
     required this.exitCode,
+    this.inputRequests = 0,
   });
 }
