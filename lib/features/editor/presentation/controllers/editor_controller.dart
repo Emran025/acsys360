@@ -41,6 +41,7 @@ class EditorController extends ChangeNotifier {
   String? selectedExplorerPath;
   String? selectedDirectoryPath;
   int _stateVersion = 0;
+  int _compileGeneration = 0;
 
   EditorLanguageServer? get languageServer {
     final compilerService = compiler;
@@ -608,6 +609,7 @@ class EditorController extends ChangeNotifier {
     InputRequestHandler? onInputRequest,
   }) async {
     final version = _stateVersion;
+    final generation = ++_compileGeneration;
     final service = languageServer;
     final active = workspace.activeDocument;
     if (service == null || active == null) return;
@@ -622,13 +624,17 @@ class EditorController extends ChangeNotifier {
         interactive: interactive,
         onInputRequest: onInputRequest,
       );
-      if (version != _stateVersion) return;
+      if (version != _stateVersion || generation != _compileGeneration) return;
       compilation = analysis.compilation;
       diagnostics = analysis.diagnostics;
       error = null;
     } catch (exception) {
-      if (version == _stateVersion) error = exception;
+      if (version == _stateVersion && generation == _compileGeneration) {
+        error = exception;
+      }
     }
-    if (version == _stateVersion) notifyListeners();
+    if (version == _stateVersion && generation == _compileGeneration) {
+      notifyListeners();
+    }
   }
 }

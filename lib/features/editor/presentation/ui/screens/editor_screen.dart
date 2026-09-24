@@ -66,6 +66,7 @@ class _EditorShellState extends State<EditorShell> {
   double _zoomScale = 1.0;
   List<String> pendingInputNames = const [];
   Completer<String?>? pendingInput;
+  bool _executionRunning = false;
 
   @override
   void initState() {
@@ -136,9 +137,12 @@ class _EditorShellState extends State<EditorShell> {
     if (widget.controller.activeDocument == null) return;
     final generation = _editGeneration;
     analysisTimer = Timer(const Duration(milliseconds: 350), () async {
-      if (!mounted || generation != _editGeneration) return;
+      if (!mounted || generation != _editGeneration || _executionRunning) return;
       await widget.controller.analyze();
-      if (!mounted || generation != _editGeneration || !_shouldSuggest) {
+      if (!mounted ||
+          generation != _editGeneration ||
+          _executionRunning ||
+          !_shouldSuggest) {
         widget.controller.clearAssist();
         return;
       }
@@ -152,10 +156,17 @@ class _EditorShellState extends State<EditorShell> {
 
   Future<void> _compileActive() async {
     if (widget.controller.activeDocument == null) return;
-    await widget.controller.compile(
-      interactive: true,
-      onInputRequest: _requestInput,
-    );
+    analysisTimer?.cancel();
+    analysisTimer = null;
+    setState(() => _executionRunning = true);
+    try {
+      await widget.controller.compile(
+        interactive: true,
+        onInputRequest: _requestInput,
+      );
+    } finally {
+      if (mounted) setState(() => _executionRunning = false);
+    }
   }
 
   Future<String?> _requestInput(String name) {
