@@ -12,6 +12,7 @@ import '../../domain/usecases/editor_language_server.dart';
 import '../../domain/usecases/format_arabic_source.dart';
 import '../../domain/usecases/workspace_actions.dart';
 import '../../../../core/services/workspace_path_service.dart';
+import '../../data/datasources/native_artifact_builder.dart';
 
 /// مصدر حالة المحرر: workspace والوثائق والنتائج، بينما تبقى الملفات والمترجم خلف عقود repositories.
 class EditorController extends ChangeNotifier {
@@ -26,6 +27,7 @@ class EditorController extends ChangeNotifier {
   final CompilerRepository? compiler;
   final AssistRepository? assistant;
   final WorkspacePathService pathService;
+  final NativeArtifactBuilder artifactBuilder;
 
   Workspace workspace;
   List<String> files = const [];
@@ -59,6 +61,7 @@ class EditorController extends ChangeNotifier {
     this.compiler,
     this.assistant,
     this.pathService = const DefaultWorkspacePathService(),
+    this.artifactBuilder = const NativeArtifactBuilder(),
   }) : workspace = Workspace(rootPath: rootPath),
        openDocument = OpenDocument(repository),
        saveDocument = SaveDocument(repository),
@@ -487,7 +490,22 @@ class EditorController extends ChangeNotifier {
         execute: false,
       );
       if (version != _stateVersion) return;
-      compilation = analysis.compilation;
+      final assembly = analysis.compilation.assembly;
+      if (assembly.isEmpty) {
+        throw StateError('لم ينتج المترجم Assembly قابلة للبناء');
+      }
+      final artifact = await artifactBuilder.build(
+        assembly: assembly,
+        outputDirectory: artifactDirectory,
+        baseName: active.path,
+      );
+      final payload = Map<String, dynamic>.from(analysis.compilation.payload)
+        ..['artifacts'] = [artifact]
+        ..['artifactKind'] = 'native-executable';
+      compilation = CompilationResult(
+        success: analysis.compilation.success,
+        payload: payload,
+      );
       diagnostics = analysis.diagnostics;
       error = null;
     } catch (exception) {
