@@ -45,12 +45,12 @@ target_include_directories(arabicc PRIVATE
 enable_testing()
 add_test(NAME arabicc_version COMMAND arabicc --version)
 add_test(NAME arabicc_help COMMAND arabicc --help)
-find_package(Python3 COMPONENTS Interpreter REQUIRED)
+find_program(DART_EXECUTABLE dart REQUIRED)
 add_test(NAME arabicc_protocol_smoke
-  COMMAND Python3::Interpreter
-          ${CMAKE_CURRENT_SOURCE_DIR}/tests/protocol_smoke.py
+  COMMAND ${DART_EXECUTABLE}
+          ${CMAKE_CURRENT_SOURCE_DIR}/tests/protocol_smoke.dart
           $<TARGET_FILE:arabicc>)
 add_test(NAME arabicc_manual_examples
-  COMMAND Python3::Interpreter
-          ${CMAKE_CURRENT_SOURCE_DIR}/tests/manual_examples.py
+  COMMAND ${DART_EXECUTABLE}
+          ${CMAKE_CURRENT_SOURCE_DIR}/tests/manual_examples.dart
           $<TARGET_FILE:arabicc>)
