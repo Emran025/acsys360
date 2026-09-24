@@ -82,7 +82,8 @@ class ProcessCompilerRepository
         arguments,
         workingDirectory: processWorkingDirectory ?? rootPath,
       ).timeout(processTimeout);
-      process.stdin.writeln(jsonEncode(request.toJson()));
+      process.stdin.write('${jsonEncode(request.toJson())}\n');
+      await process.stdin.flush();
       final completed = interactive && onInputRequest != null
           ? await _collectInteractive(process, onInputRequest)
           : await _collectAndClose(process);
@@ -222,7 +223,8 @@ class ProcessCompilerRepository
             }
             inputRequests++;
             final value = await onInputRequest(name);
-            process.stdin.writeln(jsonEncode({'value': value ?? ''}));
+            process.stdin.write('${jsonEncode({'value': value ?? ''})}\n');
+            await process.stdin.flush();
           } else {
             output.writeln(line);
           }

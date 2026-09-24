@@ -483,6 +483,7 @@ class EditorController extends ChangeNotifier {
         target: 'dart-native',
         artifactDirectory: artifactDirectory,
         mode: CompilationMode.active,
+        execute: false,
       );
       if (version != _stateVersion) return;
       compilation = analysis.compilation;
