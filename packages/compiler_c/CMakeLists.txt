@@ -54,3 +54,7 @@ add_test(NAME arabicc_manual_examples
   COMMAND ${DART_EXECUTABLE}
           ${CMAKE_CURRENT_SOURCE_DIR}/tests/manual_examples.dart
           $<TARGET_FILE:arabicc>)
+add_test(NAME arabicc_semicolon_rule
+  COMMAND ${DART_EXECUTABLE}
+          ${CMAKE_CURRENT_SOURCE_DIR}/tests/semicolon_rule.dart
+          $<TARGET_FILE:arabicc>)
