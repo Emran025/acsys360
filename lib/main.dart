@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'features/editor/data/datasources/compiler_process_factory.dart';
-import 'features/editor/data/datasources/local_workspace_path_service.dart';
-import 'features/editor/data/repositories_impl/local_workspace_repository_impl.dart';
+import 'config/di/injection.dart';
 import 'features/editor/presentation/controllers/editor_controller.dart';
 import 'routes/app_router.dart';
 import 'shared/themes/app_theme.dart';
@@ -11,19 +9,7 @@ export 'features/editor/presentation/ui/screens/editor_screen.dart';
 export 'features/editor/presentation/ui/widgets/editor_intents.dart';
 
 void main() {
-  final repository = LocalWorkspaceRepository();
-  final compiler = createCompilerRepository();
-  runApp(
-    ArabicEditorApp(
-      controller: EditorController(
-        repository: repository,
-        compiler: compiler,
-        assistant: compiler,
-        pathService: const LocalWorkspacePathService(),
-        rootPath: '',
-      ),
-    ),
-  );
+  runApp(ArabicEditorApp(controller: ServiceLocator.createEditorController()));
 }
 
 class ArabicEditorApp extends StatefulWidget {
