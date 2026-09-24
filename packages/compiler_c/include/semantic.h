@@ -6,6 +6,8 @@
 typedef struct {
   char *name;
   char *type;
+  /* Borrowed pointer into the AST; owned and freed by c_ast_free. */
+  const CTypeSpec *type_spec;
   size_t offset;
   size_t line;
   size_t column;

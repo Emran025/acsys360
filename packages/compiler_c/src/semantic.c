@@ -54,6 +54,60 @@ static const CSymbol *find_symbol(const CSemanticResult *result,
   return NULL;
 }
 
+static const CTypeSpec *resolve_type(const CSemanticResult *result,
+                                     const CTypeSpec *type) {
+  const CTypeSpec *current = type;
+  size_t guard = 0U;
+  while (current != NULL && current->kind == C_TYPE_NAMED &&
+         current->name != NULL && guard++ < result->count + 1U) {
+    const CSymbol *named = find_symbol(result, current->name);
+    if (named == NULL || named->type == NULL ||
+        strcmp(named->type, "نوع") != 0 || named->type_spec == current) break;
+    current = named->type_spec;
+  }
+  return current;
+}
+
+static const CTypeSpec *selected_type(const CSemanticResult *result,
+                                      const CSymbol *symbol,
+                                      const CAstNodeList *selectors) {
+  const CTypeSpec *type = resolve_type(result, symbol->type_spec);
+  if (selectors == NULL) return type;
+  for (size_t index = 0U; index < selectors->count; index++) {
+    const CAstNode *selector = selectors->items[index];
+    type = resolve_type(result, type);
+    if (type == NULL || selector == NULL ||
+        selector->kind != C_AST_VARIABLE_REFERENCE) return NULL;
+    if (strcmp(selector->data.reference.name, "[]") == 0) {
+      if (type->kind != C_TYPE_ARRAY || selector->data.reference.selectors.count != 1U)
+        return NULL;
+      type = type->element_type;
+    } else {
+      if (type->kind != C_TYPE_RECORD) return NULL;
+      const CTypeSpec *record = type;
+      type = NULL;
+      for (size_t field = 0U; field < record->fields.count; field++) {
+        if (strcmp(selector->data.reference.name,
+                   record->fields.items[field].name) == 0) {
+          type = record->fields.items[field].type;
+          break;
+        }
+      }
+    }
+  }
+  return resolve_type(result, type);
+}
+
+static const char *access_type(const CSemanticResult *result,
+                               const char *name,
+                               const CAstNodeList *selectors) {
+  const CSymbol *symbol = find_symbol(result, name);
+  if (symbol == NULL) return NULL;
+  const CTypeSpec *type = selected_type(result, symbol, selectors);
+  if (type != NULL && type->kind == C_TYPE_NAMED) return type->name;
+  return selectors != NULL && selectors->count > 0U ? NULL : symbol->type;
+}
+
 static const char *expression_type(const CSemanticResult *result,
                                    const CAstNode *node) {
   if (!node) return NULL;
@@ -68,8 +122,8 @@ static const char *expression_type(const CSemanticResult *result,
     }
   }
   if (node->kind == C_AST_VARIABLE_REFERENCE) {
-    const CSymbol *symbol = find_symbol(result, node->data.reference.name);
-    return symbol ? symbol->type : NULL;
+    return access_type(result, node->data.reference.name,
+                       &node->data.reference.selectors);
   }
   if (node->kind == C_AST_UNARY) {
     if (strcmp(node->data.unary.operator, "!") == 0) return "منطقي";
@@ -104,7 +158,8 @@ static int types_compatible(const char *expected, const char *actual) {
 }
 
 static int add_symbol(Analyzer *analyzer, const char *name, const char *type,
-                      const CAstNode *node, int is_constant) {
+                      const CTypeSpec *type_spec, const CAstNode *node,
+                      int is_constant) {
   CSemanticResult *result = analyzer->result;
   if (find_symbol(result, name) != NULL) {
     return diagnostic(analyzer, node, "تعريف مكرر للرمز: %s", name);
@@ -119,6 +174,7 @@ static int add_symbol(Analyzer *analyzer, const char *name, const char *type,
   CSymbol *symbol = &result->items[result->count++];
   symbol->name = duplicate(name);
   symbol->type = duplicate(type);
+  symbol->type_spec = type_spec;
   symbol->offset = node->offset;
   symbol->line = node->line;
   symbol->column = node->column;
@@ -146,6 +202,16 @@ static int check_expression(Analyzer *analyzer, const CAstNode *node) {
         return diagnostic(analyzer, node, "رمز غير معرف: %s",
                           node->data.reference.name);
       }
+      for (size_t index = 0U; index < node->data.reference.selectors.count;
+           index++) {
+        const CAstNode *selector = node->data.reference.selectors.items[index];
+        if (selector != NULL && strcmp(selector->data.reference.name, "[]") == 0 &&
+            selector->data.reference.selectors.count == 1U &&
+            !check_expression(analyzer,
+                              selector->data.reference.selectors.items[0])) {
+          return 0;
+        }
+      }
       return 1;
     case C_AST_BINARY:
       return check_expression(analyzer, node->data.binary.left) &&
@@ -166,24 +232,28 @@ static int check_node(Analyzer *analyzer, const CAstNode *node) {
       if (!check_expression(analyzer, node->data.constant.value)) return 0;
       if (!add_symbol(analyzer, node->data.constant.name,
                       expression_type(analyzer->result, node->data.constant.value),
-                      node, 1)) return 0;
+                      NULL, node, 1)) return 0;
       return 1;
     case C_AST_TYPE_DECLARATION:
-      return add_symbol(analyzer, node->data.type_declaration.name, "نوع", node, 0);
+      return add_symbol(analyzer, node->data.type_declaration.name, "نوع",
+                        node->data.type_declaration.type, node, 0);
     case C_AST_VARIABLE_DECLARATION:
       for (size_t index = 0U; index < node->data.variable.name_count; index++) {
         if (!add_symbol(analyzer, node->data.variable.names[index],
                         node->data.variable.type && node->data.variable.type->name
-                            ? node->data.variable.type->name : "نوع مركب", node, 0)) return 0;
+                            ? node->data.variable.type->name : "نوع مركب",
+                        node->data.variable.type, node, 0)) return 0;
       }
       return 1;
     case C_AST_PROCEDURE_DECLARATION:
-      if (!add_symbol(analyzer, node->data.procedure.name, "اجراء", node, 0)) return 0;
+      if (!add_symbol(analyzer, node->data.procedure.name, "اجراء", NULL,
+                      node, 0)) return 0;
       for (size_t index = 0U; index < node->data.procedure.parameter_count; index++) {
         const CParameter *parameter = &node->data.procedure.parameters[index];
         const char *type = parameter->type && parameter->type->name
             ? parameter->type->name : "نوع مركب";
-        if (!add_symbol(analyzer, parameter->name, type, node, 0)) return 0;
+        if (!add_symbol(analyzer, parameter->name, type, parameter->type,
+                        node, 0)) return 0;
       }
       return check_list(analyzer, &node->data.procedure.body);
     case C_AST_ASSIGNMENT:
@@ -196,13 +266,26 @@ static int check_node(Analyzer *analyzer, const CAstNode *node) {
         if (symbol->is_constant)
           return diagnostic(analyzer, node, "لا يمكن تعديل الثابت: %s",
                             node->data.assignment.name);
+        for (size_t index = 0U; index < node->data.assignment.selectors.count;
+             index++) {
+          const CAstNode *selector = node->data.assignment.selectors.items[index];
+          if (selector != NULL && strcmp(selector->data.reference.name, "[]") == 0 &&
+              selector->data.reference.selectors.count == 1U &&
+              !check_expression(analyzer,
+                                selector->data.reference.selectors.items[0])) {
+            return 0;
+          }
+        }
         if (!check_expression(analyzer, node->data.assignment.expression)) return 0;
         const char *actual = expression_type(analyzer->result,
                                              node->data.assignment.expression);
-        if (!types_compatible(symbol->type, actual))
+        const char *expected = access_type(analyzer->result,
+                                           node->data.assignment.name,
+                                           &node->data.assignment.selectors);
+        if (expected == NULL || !types_compatible(expected, actual))
           return diagnostic(analyzer, node,
                             "عدم توافق نوع الإسناد للرمز «%s»: المتوقع «%s» والمستلم «%s»",
-                            node->data.assignment.name, symbol->type,
+                            node->data.assignment.name, expected ? expected : symbol->type,
                             actual ? actual : "غير معروف");
         return 1;
       }

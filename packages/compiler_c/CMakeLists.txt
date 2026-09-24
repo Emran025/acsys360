@@ -58,3 +58,7 @@ add_test(NAME arabicc_semicolon_rule
   COMMAND ${DART_EXECUTABLE}
           ${CMAKE_CURRENT_SOURCE_DIR}/tests/semicolon_rule.dart
           $<TARGET_FILE:arabicc>)
+add_test(NAME arabicc_composite_types
+  COMMAND ${DART_EXECUTABLE}
+          ${CMAKE_CURRENT_SOURCE_DIR}/tests/composite_types.dart
+          $<TARGET_FILE:arabicc>)
