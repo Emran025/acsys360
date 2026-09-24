@@ -14,6 +14,7 @@
 #else
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <unistd.h>
 #endif
 
 /* Dynamic String Buffer */
@@ -1265,13 +1266,15 @@ static int build_native_artifact(const char *artifact_dir,
            '/'
 #endif
   );
-  snprintf(artifact_path, artifact_path_size, "%s%carabicc%s",
+  snprintf(artifact_path, artifact_path_size, "%s%carabicc_program_%lu%s",
            artifact_dir,
 #ifdef _WIN32
            '\\',
+           (unsigned long)_getpid(),
            ".exe"
 #else
            '/',
+           (unsigned long)getpid(),
            ""
 #endif
   );
@@ -1300,8 +1303,11 @@ static int build_native_artifact(const char *artifact_dir,
     const char *arguments[] = {
       gcc, object_path, "-o", artifact_path, NULL
     };
-    if (_spawnv(_P_WAIT, gcc, arguments) != 0) {
-      snprintf(error, error_size, "فشل تشغيل GCC لربط الملف التنفيذي");
+    const int exit_code = _spawnv(_P_WAIT, gcc, arguments);
+    if (exit_code != 0) {
+      snprintf(error, error_size,
+               "فشل تشغيل GCC لربط الملف التنفيذي (exit=%d، object=%.*s)",
+               exit_code, 150, object_path);
       return 0;
     }
   }

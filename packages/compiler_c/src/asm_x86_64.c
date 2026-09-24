@@ -594,6 +594,21 @@ static int emit_nasm_string(char **text, size_t *length, size_t *capacity,
   return append(text, length, capacity, "0\n");
 }
 
+static int emit_nasm_bytes(char **text, size_t *length, size_t *capacity,
+                           const char *value)
+{
+  if (!append(text, length, capacity, "    db "))
+    return 0;
+  for (size_t i = 0; value[i] != '\0'; i++)
+  {
+    if (i > 0 && !append(text, length, capacity, ", "))
+      return 0;
+    if (!append(text, length, capacity, "%u", (unsigned char)value[i]))
+      return 0;
+  }
+  return append(text, length, capacity, "%s0\n", value[0] ? ", " : "");
+}
+
 int c_generate_nasm_x86_64(const CAstNode *program,
                            const CSemanticResult *semantic,
                            CAssemblyResult *result)
@@ -707,34 +722,33 @@ int c_generate_nasm_x86_64(const CAstNode *program,
       c_assembly_result_free(result);
       return 0;
     }
-    size_t request_label_index = 0U;
-    for (size_t i = 0; i < program->data.program.statements.count; i++)
+  }
+  size_t request_label_index = 0U;
+  for (size_t i = 0; i < program->data.program.statements.count; i++)
+  {
+    const CAstNode *read = program->data.program.statements.items[i];
+    if (read->kind != C_AST_READ)
+      continue;
+    char request_json[1024];
+    const char *read_type = type_for(semantic, read->data.access.name);
+    const int written = snprintf(
+        request_json, sizeof(request_json),
+        "{\"requestType\":\"input\",\"name\":\"%s\",\"type\":\"%s\"}\n",
+        read->data.access.name, read_type ? read_type : "غير معروف");
+    if (written < 0 || (size_t)written >= sizeof(request_json) ||
+        !append(&result->text, &length, &capacity,
+                "fmt_input_request%zu: ", request_label_index) ||
+        !emit_nasm_bytes(&result->text, &length, &capacity, request_json))
     {
-      const CAstNode *read = program->data.program.statements.items[i];
-      if (read->kind != C_AST_READ)
-        continue;
-      char request_json[1024];
-      const char *read_type = type_for(semantic, read->data.access.name);
-      const int written = snprintf(
-          request_json, sizeof(request_json),
-          "{\"requestType\":\"input\",\"name\":\"%s\",\"type\":\"%s\"}",
-          read->data.access.name, read_type ? read_type : "غير معروف");
-      if (written < 0 || (size_t)written >= sizeof(request_json) ||
-          !append(&result->text, &length, &capacity,
-                  "fmt_input_request%zu: ", request_label_index) ||
-          !emit_nasm_string(&result->text, &length, &capacity, request_json) ||
-          !append(&result->text, &length, &capacity, ", 10, 0\n"))
-      {
-        free(strings);
-        free(real_values);
-        free(g_text_values);
-        g_text_values = NULL;
-        g_text_count = 0;
-        c_assembly_result_free(result);
-        return 0;
-      }
-      request_label_index++;
+      free(strings);
+      free(real_values);
+      free(g_text_values);
+      g_text_values = NULL;
+      g_text_count = 0;
+      c_assembly_result_free(result);
+      return 0;
     }
+    request_label_index++;
   }
 
   /* .text / main prologue */
@@ -973,13 +987,6 @@ int c_generate_nasm_x86_64(const CAstNode *program,
                       "rsi"
 #endif
                       ", rax\n"
-                      "    lea "
-#ifdef _WIN32
-                      "rdx"
-#else
-                      "rsi"
-#endif
-                      ", [rel str%d]\n"
                       "    lea "
 #ifdef _WIN32
                       "rcx"

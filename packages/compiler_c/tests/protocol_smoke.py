@@ -4,7 +4,7 @@ import subprocess
 import sys
 
 
-def run(executable, source, target=None):
+def run(executable, source, target=None, execute=True):
     request = {
         "protocolVersion": "0.5.0",
         "rootPath": ".",
@@ -15,6 +15,7 @@ def run(executable, source, target=None):
     }
     if target:
         request["target"] = target
+    request["execute"] = execute
     completed = subprocess.run(
         [executable, "--protocol"],
         input=json.dumps(request, ensure_ascii=False),
@@ -166,6 +167,18 @@ def main():
     assert native_text_response["success"] is True
     assert "text0:" in native_text_response["assembly"]
     assert "fmt_str" in native_text_response["assembly"]
+
+    native_read, native_read_response = run(
+        executable,
+        "برنامج قراءة؛ متغير س: صحيح؛ { اقرأ(س)؛ اطبع(س)؛ }.",
+        target="dart-native",
+        execute=False,
+    )
+    assert native_read.returncode == 0, native_read.stderr
+    assert native_read_response["success"] is True
+    assert "fmt_input_request0:" in native_read_response["assembly"]
+    assert "fmt_read_int" in native_read_response["assembly"]
+    assert "125, 10, 0" in native_read_response["assembly"]
 
     full_native, full_native_response = run(
         executable,

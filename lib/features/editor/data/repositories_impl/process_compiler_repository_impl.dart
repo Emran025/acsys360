@@ -52,7 +52,7 @@ class ProcessCompilerRepository
 
     final effectiveMode = mode ?? this.mode;
     final requestDocuments = effectiveMode == CompilationMode.active
-        ? documents.where((document) => document.path == sourcePath)
+        ? documents.where((document) => _samePath(document.path, sourcePath))
         : documents;
     final sourcePaths = effectiveMode == CompilationMode.active
         ? <String>[sourcePath]
@@ -61,7 +61,9 @@ class ProcessCompilerRepository
             sourcePath,
           }.toList();
     final sourceTexts = <String, String>{
-      for (final document in requestDocuments) document.path: document.text,
+      for (final document in requestDocuments)
+        (effectiveMode == CompilationMode.active ? sourcePath : document.path):
+            document.text,
     };
     final request = CompilationRequest(
       rootPath: rootPath,
@@ -96,6 +98,7 @@ class ProcessCompilerRepository
           completed.exitCode,
         );
       }
+
       final output = completed.stdout;
       final errorOutput = completed.stderr;
       final exitCode = completed.exitCode;
@@ -122,6 +125,11 @@ class ProcessCompilerRepository
     } on Object catch (error) {
       return _processFailure(error.toString(), -1);
     }
+  }
+
+  bool _samePath(String left, String right) {
+    String normalize(String path) => path.replaceAll('\\', '/').toLowerCase();
+    return normalize(left) == normalize(right);
   }
 
   @override
@@ -212,9 +220,10 @@ class ProcessCompilerRepository
     final exitCodeFuture = process.exitCode;
     try {
       await () async {
-        await for (final line in process.stdout
-            .transform(utf8.decoder)
-            .transform(const LineSplitter())) {
+        await for (final line
+            in process.stdout
+                .transform(utf8.decoder)
+                .transform(const LineSplitter())) {
           final decoded = jsonDecode(line);
           if (decoded is Map && decoded['requestType'] == 'input') {
             final name = decoded['name'];
