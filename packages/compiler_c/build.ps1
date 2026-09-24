@@ -16,9 +16,65 @@ $msysFallbacks = @("C:\msys64\ucrt64\bin", "C:\msys64\usr\bin", "C:\msys64\mingw
 $gcc = Find-Tool "gcc" $msysFallbacks
 $bison = Find-Tool "bison" @("C:\msys64\usr\bin", "C:\msys64\ucrt64\bin")
 $flex = Find-Tool "flex" @("C:\msys64\usr\bin", "C:\msys64\ucrt64\bin")
+# === [SURGICAL ADD] NASM helper (invoked only when gcc is missing) ===
+function Ensure-NasmForMsys2 {
+    $msysUsrBin = "C:\msys64\usr\bin"
+    $msysBash   = Join-Path $msysUsrBin "bash.exe"
+
+    # Only act if MSYS2 is actually installed
+    if (-not (Test-Path $msysUsrBin)) {
+        Write-Host "[ERROR] NASM not found and MSYS2 is not installed at $msysUsrBin." -ForegroundColor Red
+        Write-Host "[ERROR] Please install NASM manually (https://www.nasm.us/) and re-run the build." -ForegroundColor Red
+        Pop-Location
+        exit 1
+    }
+
+    # Re-check NASM (maybe installed under ucrt64/mingw64)
+    $nasm = Find-Tool "nasm" @($msysUsrBin, "C:\msys64\ucrt64\bin", "C:\msys64\mingw64\bin")
+    if ($nasm) {
+        Write-Host "[OK] NASM found: $nasm" -ForegroundColor Green
+        return
+    }
+
+    Write-Host "[WARN] NASM not found, but MSYS2 is installed at $msysUsrBin" -ForegroundColor Yellow
+    Write-Host "[WARN] This project needs NASM to assemble x86_64 output." -ForegroundColor Yellow
+
+    if (-not (Test-Path $msysBash)) {
+        Write-Host "[ERROR] Cannot find $msysBash to install NASM." -ForegroundColor Red
+        Write-Host "[ERROR] Please install NASM manually and re-run the build." -ForegroundColor Red
+        Pop-Location
+        exit 1
+    }
+
+    $answer = Read-Host "Install NASM now via 'pacman -S --needed nasm'? [Y/n]"
+    if ([string]::IsNullOrWhiteSpace($answer)) { $answer = "Y" }
+
+    if ($answer -notmatch '^(?i)y(es)?$') {
+        Write-Host "[ERROR] NASM is required. Build aborted by user." -ForegroundColor Red
+        Pop-Location
+        exit 1
+    }
+
+    Write-Host "[INFO] Installing NASM via MSYS2 pacman..." -ForegroundColor Cyan
+    & $msysBash -lc "pacman -S --needed --noconfirm nasm"
+    $pacmanExit = $LASTEXITCODE
+
+    $nasm = Find-Tool "nasm" @($msysUsrBin, "C:\msys64\ucrt64\bin", "C:\msys64\mingw64\bin")
+    if ($pacmanExit -ne 0 -or -not $nasm) {
+        Write-Host "[ERROR] NASM installation failed or NASM still not found. Aborting build." -ForegroundColor Red
+        Pop-Location
+        exit 1
+    }
+
+    Write-Host "[OK] NASM installed: $nasm" -ForegroundColor Green
+    $env:PATH = "$msysUsrBin;$env:PATH"
+}
 
 if (-not $gcc) {
     Write-Host "[ERROR] gcc not found! Please install GCC (via MSYS2: pacman -S mingw-w64-ucrt-x86_64-gcc or MinGW)." -ForegroundColor Red
+    # === [SURGICAL ADD] When gcc is missing, also verify NASM via MSYS2 ===
+    Ensure-NasmForMsys2
+    Write-Host "[ERROR] gcc is still required. Please install GCC and re-run the build." -ForegroundColor Red
     Pop-Location
     exit 1
 }
