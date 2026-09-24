@@ -1159,9 +1159,27 @@ int c_run_protocol(const char *payload) {
         /* 3. Assembly */
         CAssemblyResult assembly;
         memset(&assembly, 0, sizeof(assembly));
-        if (c_generate_nasm_x86_64(g_root_ast, &semantic, &assembly) && assembly.text) {
+        char *backend_target = extract_string_value(payload, "\"target\"");
+        const int requires_native_backend =
+            backend_target && strcmp(backend_target, "dart-native") == 0;
+        const int assembly_ok =
+            c_generate_nasm_x86_64(g_root_ast, &semantic, &assembly);
+        if (assembly_ok && assembly.text && assembly.diagnostic_count == 0) {
           protocol_set_assembly(&resp, assembly.text);
         }
+        if (requires_native_backend &&
+            (!assembly_ok || assembly.diagnostic_count > 0)) {
+          resp.success = 0;
+          for (size_t i = 0; i < assembly.diagnostic_count; i++) {
+            protocol_add_diagnostic(&resp, SEVERITY_ERROR, "backend", "A001",
+                                    assembly.diagnostics[i], NULL);
+          }
+          if (assembly.diagnostic_count == 0) {
+            protocol_add_diagnostic(&resp, SEVERITY_ERROR, "backend", "A001",
+                                    "فشل توليد Assembly للبرنامج", NULL);
+          }
+        }
+        free(backend_target);
         c_assembly_result_free(&assembly);
       }
 
