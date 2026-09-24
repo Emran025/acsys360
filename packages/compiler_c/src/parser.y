@@ -122,7 +122,7 @@ full_statement : full_assign {$$=$1;} | full_read {$$=$1;} | full_print {$$=$1;}
 full_selectors : full_selector {$$.items=NULL;$$.count=0;c_ast_list_append(&$$,$1);} | full_selectors full_selector {$$=$1;c_ast_list_append(&$$,$2);} ;
 full_selector : '[' full_expr ']' {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_VARIABLE_REFERENCE;$$->data.reference.name=parser_strdup("[]");c_ast_list_append(&$$->data.reference.selectors,$2);} | '.' TOK_IDENTIFIER {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_VARIABLE_REFERENCE;$$->data.reference.name=$2;} ;
 full_access : TOK_IDENTIFIER {$$=c_ast_new_reference($1);} | TOK_IDENTIFIER full_selectors {$$=c_ast_new_reference($1);$$->data.reference.selectors=$2;} ;
-full_assign : full_access '=' full_expr {$$=c_ast_new_assignment($1->data.reference.name,$3);$$->data.assignment.selectors=$1->data.reference.selectors;free($1);} ;
+full_assign : full_access '=' full_expr {$$=c_ast_new_assignment($1->data.reference.name,$3);$$->data.assignment.selectors=$1->data.reference.selectors;if($$){$$->offset=(size_t)yy_token_offset;$$->line=(size_t)yy_token_line;$$->column=(size_t)yy_token_column;}free($1);} ;
 full_read : TOK_READ '(' full_access ')' {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_READ;$$->data.access.name=$3->data.reference.name;$$->data.access.selectors=$3->data.reference.selectors;free($3);} ;
 full_arguments : /* empty */ {$$.items=NULL;$$.count=0;} | full_expr {$$.items=NULL;$$.count=0;c_ast_list_append(&$$,$1);} | full_arguments ',' full_expr {$$=$1;c_ast_list_append(&$$,$3);} ;
 full_print : TOK_PRINT '(' full_arguments ')' {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_PRINT;$$->data.print.values=$3;} ;
@@ -310,6 +310,11 @@ assign_stmt
   : TOK_IDENTIFIER '=' expr
     {
       $$ = c_ast_new_assignment($1, $3);
+      if ($$) {
+        $$->offset = (size_t)yy_token_offset;
+        $$->line = (size_t)yy_token_line;
+        $$->column = (size_t)yy_token_column;
+      }
     }
   ;
 

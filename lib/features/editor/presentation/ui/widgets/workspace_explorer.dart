@@ -122,15 +122,15 @@ class WorkspaceExplorer extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: InkWell(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(0),
               onTap: onChooseFolder,
               onSecondaryTapUp: (details) =>
                   _showRootMenu(context, details.globalPosition),
               child: Ink(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                padding: EdgeInsets.zero,
                 decoration: BoxDecoration(
                   color: colors.primaryContainer.withValues(alpha: .42),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.zero,
                 ),
                 child: Row(
                   children: [

@@ -221,8 +221,14 @@ class ProcessCompilerRepository
             if (name is! String || name.isEmpty) {
               throw const FormatException('طلب الإدخال من المترجم غير صالح');
             }
+            final type = decoded['type'];
             inputRequests++;
-            final value = await onInputRequest(name);
+            final value = await onInputRequest(
+              InputRequest(
+                name: name,
+                type: type is String && type.isNotEmpty ? type : 'غير معروف',
+              ),
+            );
             process.stdin.write('${jsonEncode({'value': value ?? ''})}\n');
             await process.stdin.flush();
           } else {

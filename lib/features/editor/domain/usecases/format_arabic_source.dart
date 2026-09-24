@@ -22,7 +22,9 @@ String formatArabicSource(String source) {
 
 int _leadingClosingBraces(String line) {
   var index = 0;
-  while (index < line.length && line[index] == '}') index++;
+  while (index < line.length && line[index] == '}') {
+    index++;
+  }
   return index;
 }
 

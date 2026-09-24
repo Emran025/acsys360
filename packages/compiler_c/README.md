@@ -74,6 +74,19 @@ Windows:     build/Release/arabicc.exe
 printf '%s\n' '{"protocolVersion":"0.5.0","rootPath":"/tmp","sourcePaths":[],"sourceTexts":{},"mode":"project"}' | ./build/arabicc --protocol
 ```
 
+عند تمرير `target: "dart-native"` مع `artifactDirectory`، يتولى backend
+نفسه كتابة Assembly وتشغيل NASM وGCC وإرجاع مساري ملف `.asm` وملف التنفيذ
+ضمن `artifacts`. لا يقوم تطبيق Flutter ببناء Assembly أو إدارة NASM/GCC؛
+وظيفته تقتصر على إرسال الطلب وتشغيل artifact الذي أعاده backend.
+
+يدعم مولّد NASM الحالي في مسار `dart-native` التعبيرات الصحيحة integer
+والعمليات الحسابية الأساسية عليها. أما الإسناد إلى `حقيقي` أو `منطقي` أو
+`حرفي` أو `خيط_رمزي`، وكذلك استخدام الثوابت داخل artifact، فيحتاج إلى
+توسعة typed storage في مولّد Assembly قبل أن يصبح native قابلاً للبناء؛
+ويُبقي التحقق الدلالي مستقلاً عن ذلك. وعندما يكون الإسناد صحيحاً دلالياً
+لكن النوع غير مدعوم في codegen، يعيد backend تشخيص capability واضحاً ولا
+يقدمه كخطأ في نوع البرنامج.
+
 ويتحقق اختبار التكامل من executable المضمن داخل تطبيق Desktop:
 
 ```sh
@@ -86,7 +99,7 @@ dart run tool/verify_compiler_bundle.dart --executable build/arabicc
 |---|---|
 | `src/lexer.l` | قواعد Flex للرموز والكلمات العربية ومواقعها |
 | `src/parser.y` | قواعد Bison وبناء AST |
-| `src/protocol.c` | قراءة JSON request وتجميع JSON response |
+| `src/protocol.c` | قراءة JSON request، بناء artifact native، وتجميع JSON response |
 | `src/main.c` | نقطة التشغيل ومعالجة `--protocol` و`--assist` و`--version` و`--help` |
 | `src/ast.c` | عقد AST والتسلسل المرتبط بها |
 | `src/semantic.c` | الرموز والتحقق الدلالي المحدود |

@@ -49,7 +49,7 @@ CompilationResponse
 | `TypedIrProgram` | إضافة نوع IR والتحقق من labels/types فوق TAC | TAC وsymbol types | typed instructions وIR diagnostics | مخرج معروض في protocol 0.5.0؛ ليس native machine code |
 | `AssemblyGenerator` | عرض target-like assembly لأغراض المقرر | TAC | Assembly text | يجب تسميته نصًا تعليميًا؛ لا يُعد binary assembled دون assembler حقيقي |
 | `Interpreter` | إثبات execution فعلي داخل النطاق المدعوم | AST وinput provider | output وruntime diagnostics | مرجع parity للـdart-native backend في الاختبارات |
-| `DartNativeArtifactBuilder` | بناء executable حقيقي للنطاق المثبت | AST وoutput directory وDart executable | artifact path أو diagnostics | target واحد محدود بتركيبات backend؛ لا يمثل compiler native عامًا لكل اللغة |
+| `NativeArtifactBackend` | بناء executable حقيقي للنطاق المثبت داخل compiler backend | Assembly وoutput directory وtoolchain | artifact paths أو diagnostics | لا تدير واجهة Dart NASM/GCC؛ يعيد protocol مسار الـ artifact الجاهز للتشغيل |
 | `CompilationResponse` | تثبيت seam typed وقابل للتحقق بين executableين | stage payloads وdiagnostics | JSON versioned | protocol `0.5.0` يتحقق من الأنواع والمواقع والقوائم والـIR الاختياري |
 
 ## دورة التعديل

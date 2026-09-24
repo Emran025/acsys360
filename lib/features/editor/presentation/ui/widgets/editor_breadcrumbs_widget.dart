@@ -27,39 +27,42 @@ class EditorBreadcrumbsWidget extends StatelessWidget {
         .where((segment) => segment.isNotEmpty)
         .toList();
     if (segments.isEmpty) return const SizedBox(height: 28);
-    return SizedBox(
-      height: 28,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          border: Border(
-            top: BorderSide(
-              color: Theme.of(context).colorScheme.outlineVariant,
-            ),
-            bottom: BorderSide(
-              color: Theme.of(context).colorScheme.outlineVariant,
+    return Align(
+      alignment: Alignment.centerRight,
+      child: SizedBox(
+        height: 28,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+              bottom: BorderSide(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
             ),
           ),
-        ),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: Row(
-            textDirection: TextDirection.ltr,
-            children: [
-              BreadcrumbItemWidget(
-                icon: Icons.folder_open_outlined,
-                label: root.split(Platform.pathSeparator).last,
-              ),
-              for (final segment in segments) ...[
-                const Icon(Icons.chevron_right_rounded, size: 15),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Row(
+              textDirection: TextDirection.ltr,
+              children: [
                 BreadcrumbItemWidget(
-                  icon: segment == segments.last
-                      ? tabFileIcon(segment)
-                      : Icons.folder_outlined,
-                  label: segment,
+                  icon: Icons.folder_open_outlined,
+                  label: root.split(Platform.pathSeparator).last,
                 ),
+                for (final segment in segments) ...[
+                  const Icon(Icons.chevron_right_rounded, size: 15),
+                  BreadcrumbItemWidget(
+                    icon: segment == segments.last
+                        ? tabFileIcon(segment)
+                        : Icons.folder_outlined,
+                    label: segment,
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

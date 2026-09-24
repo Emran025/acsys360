@@ -12,6 +12,7 @@ import '../../../domain/entities/compilation_result.dart';
 import '../../../domain/entities/document.dart';
 import '../../../domain/entities/editor_diagnostic.dart';
 import '../../../domain/entities/source_token.dart';
+import '../../../domain/repositories/workspace_repository.dart';
 import '../../../domain/usecases/toggle_line_comment.dart';
 import '../../controllers/editor_controller.dart';
 import '../widgets/arabic_code_controller.dart';
@@ -57,7 +58,6 @@ class _EditorShellState extends State<EditorShell> {
   String? boundPath;
   bool showFindReplace = false;
   bool isRefreshing = false;
-  bool topBarExpanded = true;
   bool resultsExpanded = true;
   double resultsHeight = 160;
   EditorDiagnostic? visibleDiagnostic;
@@ -65,7 +65,9 @@ class _EditorShellState extends State<EditorShell> {
   int _editGeneration = 0;
   double _zoomScale = 1.0;
   List<String> pendingInputNames = const [];
+  String pendingInputType = 'غير معروف';
   Completer<String?>? pendingInput;
+  int inputRequestSequence = 0;
   bool _executionRunning = false;
 
   @override
@@ -137,7 +139,9 @@ class _EditorShellState extends State<EditorShell> {
     if (widget.controller.activeDocument == null) return;
     final generation = _editGeneration;
     analysisTimer = Timer(const Duration(milliseconds: 350), () async {
-      if (!mounted || generation != _editGeneration || _executionRunning) return;
+      if (!mounted || generation != _editGeneration || _executionRunning) {
+        return;
+      }
       await widget.controller.analyze();
       if (!mounted ||
           generation != _editGeneration ||
@@ -161,14 +165,22 @@ class _EditorShellState extends State<EditorShell> {
     setState(() => _executionRunning = true);
     try {
       await widget.controller.buildNative();
-      if (widget.controller.error != null) return;
+      if (widget.controller.error != null ||
+          widget.controller.compilation?.success != true ||
+          widget.controller.compilation?.artifacts.isEmpty != false) {
+        return;
+      }
       await widget.controller.runNative(onInputRequest: _requestInput);
+    } on Object catch (exception) {
+      if (mounted) {
+        widget.controller.reportError(exception);
+      }
     } finally {
       if (mounted) setState(() => _executionRunning = false);
     }
   }
 
-  Future<String?> _requestInput(String name) {
+  Future<String?> _requestInput(InputRequest request) {
     final completer = Completer<String?>();
     if (!mounted) {
       completer.complete(null);
@@ -176,7 +188,9 @@ class _EditorShellState extends State<EditorShell> {
     }
     setState(() {
       pendingInput = completer;
-      pendingInputNames = [name];
+      pendingInputNames = [request.name];
+      pendingInputType = request.type;
+      inputRequestSequence++;
       resultsExpanded = true;
     });
     return completer.future;
@@ -187,14 +201,22 @@ class _EditorShellState extends State<EditorShell> {
     final completer = pendingInput;
     final name = pendingInputNames.isEmpty ? null : pendingInputNames.first;
     pendingInput = null;
-    setState(() => pendingInputNames = const []);
+    setState(() {
+      pendingInputNames = const [];
+      pendingInputType = 'غير معروف';
+    });
     completer?.complete(name == null ? '' : values[name] ?? '');
   }
 
   void _cancelPendingInputs() {
     final completer = pendingInput;
     pendingInput = null;
-    if (mounted) setState(() => pendingInputNames = const []);
+    if (mounted) {
+      setState(() {
+        pendingInputNames = const [];
+        pendingInputType = 'غير معروف';
+      });
+    }
     completer?.complete(null);
   }
 
@@ -341,7 +363,11 @@ class _EditorShellState extends State<EditorShell> {
     final current = selection.extentOffset;
     final offset = extend
         ? (right ? current - 1 : current + 1).clamp(0, text.length).toInt()
-        : (start == end ? (right ? current - 1 : current + 1) : right ? start : end)
+        : (start == end
+                  ? (right ? current - 1 : current + 1)
+                  : right
+                  ? start
+                  : end)
               .clamp(0, text.length)
               .toInt();
     final affinity = offset < text.length && text[offset] == '\n'
@@ -888,8 +914,9 @@ class _EditorShellState extends State<EditorShell> {
       replaceController.text,
     );
     if (!mounted || count == 0) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('تم استبدال $count تطابقات')));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('تم استبدال $count تطابقات')));
   }
 
   Future<void> _showEditorMenu(Offset position) async {
@@ -1133,21 +1160,18 @@ class _EditorShellState extends State<EditorShell> {
           ),
         },
         child: MediaQuery(
-          data: MediaQuery.of(context)
-              .copyWith(textScaler: TextScaler.linear(_zoomScale)),
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(_zoomScale)),
           child: Directionality(
             textDirection: TextDirection.rtl,
             child: Scaffold(
               body: Column(
                 children: [
                   EditorTopBar(
-                    rootPath: controller.workspace.rootPath,
-                    activePath: active?.path,
                     isDark: widget.isDark,
-                    expanded: topBarExpanded,
                     onToggleTheme: widget.onToggleTheme ?? () {},
-                    onToggleExpanded: () =>
-                        setState(() => topBarExpanded = !topBarExpanded),
+                    onExecute: _compileActive,
                   ),
                   Expanded(
                     child: Row(
@@ -1289,17 +1313,18 @@ class _EditorShellState extends State<EditorShell> {
                                     () => resultsExpanded = !resultsExpanded,
                                   ),
                                   onResize: (delta) {
-                                    final maxHeight = MediaQuery.sizeOf(context).height * .75;
+                                    final maxHeight =
+                                        MediaQuery.sizeOf(context).height * .75;
                                     setState(() {
-                                      resultsHeight = (resultsHeight - delta).clamp(
-                                        100.0,
-                                        maxHeight,
-                                      );
+                                      resultsHeight = (resultsHeight - delta)
+                                          .clamp(100.0, maxHeight);
                                     });
                                   },
                                   child: DiagnosticsPanelWidget(
                                     controller: controller,
                                     inputNames: pendingInputNames,
+                                    inputType: pendingInputType,
+                                    inputRequestSequence: inputRequestSequence,
                                     onSubmitInputs: _submitPendingInputs,
                                     onCancelInputs: _cancelPendingInputs,
                                   ),

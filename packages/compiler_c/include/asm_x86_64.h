@@ -9,6 +9,10 @@
 typedef struct {
   char *text;
   char **diagnostics;
+  size_t *diagnostic_offsets;
+  size_t *diagnostic_lines;
+  size_t *diagnostic_columns;
+  size_t *diagnostic_lengths;
   size_t diagnostic_count;
   size_t diagnostic_capacity;
 } CAssemblyResult;

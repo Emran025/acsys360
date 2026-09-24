@@ -3,7 +3,14 @@ import 'package:compiler_contracts/compiler_contracts.dart';
 import '../entities/document.dart';
 import '../entities/file_node.dart';
 
-typedef InputRequestHandler = Future<String?> Function(String name);
+class InputRequest {
+  final String name;
+  final String type;
+
+  const InputRequest({required this.name, this.type = 'غير معروف'});
+}
+
+typedef InputRequestHandler = Future<String?> Function(InputRequest request);
 
 abstract interface class WorkspaceRepository {
   Future<List<String>> listFiles(String rootPath);

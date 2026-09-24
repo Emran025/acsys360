@@ -34,7 +34,7 @@ class _EditorTabsWidgetState extends State<EditorTabsWidget> {
     final documents = widget.controller.workspace.documents;
     final welcomeOffset = widget.showWelcome ? 1 : 0;
     return SizedBox(
-      height: 38,
+      height: 28,
       child: Row(
         textDirection: TextDirection.ltr,
         children: [
@@ -101,6 +101,7 @@ class _EditorTabsWidgetState extends State<EditorTabsWidget> {
                             '$name${document.isDirty ? ' *' : ''}',
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
+                              fontSize: 12,
                               fontWeight: active ? FontWeight.w700 : null,
                             ),
                           ),

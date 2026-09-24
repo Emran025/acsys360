@@ -371,15 +371,12 @@ void main() {
     expect(find.byKey(const ValueKey('workspace-new-folder')), findsOneWidget);
     expect(find.byKey(const ValueKey('workspace-open-file')), findsOneWidget);
     expect(find.byKey(const ValueKey('workspace-open-folder')), findsOneWidget);
-    expect(find.byKey(const ValueKey('topbar-toggle')), findsOneWidget);
+    expect(find.byKey(const ValueKey('topbar-execute')), findsOneWidget);
+    expect(find.byTooltip('تنفيذ (F5)'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('collapse-نتائج الترجمة')),
       findsOneWidget,
     );
-
-    await tester.tap(find.byKey(const ValueKey('topbar-toggle')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('topbar-toggle')), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('collapse-نتائج الترجمة')));
     await tester.pumpAndSettle();

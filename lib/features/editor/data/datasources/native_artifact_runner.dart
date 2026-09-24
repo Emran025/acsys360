@@ -4,14 +4,28 @@ import 'dart:io';
 
 import '../../domain/repositories/workspace_repository.dart';
 
+typedef NativeOutputHandler = void Function(String line);
+
 class NativeArtifactRunner {
   const NativeArtifactRunner();
 
   Future<List<String>> run(
     String executable, {
     InputRequestHandler? onInputRequest,
+    NativeOutputHandler? onOutput,
   }) async {
-    final process = await Process.start(executable, const []);
+    final executableFile = File(executable).absolute;
+    if (!executableFile.existsSync()) {
+      throw StateError(
+        'ملف executable الناتج غير موجود: ${executableFile.path}',
+      );
+    }
+    final process = await Process.start(
+      executableFile.path,
+      const [],
+      workingDirectory: executableFile.parent.path,
+      environment: _runtimeEnvironment(),
+    );
     final output = <String>[];
     final stderr = StringBuffer();
     final stderrSubscription = process.stderr
@@ -19,14 +33,17 @@ class NativeArtifactRunner {
         .listen(stderr.write);
 
     try {
-      await for (final line in process.stdout
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())) {
+      await for (final line
+          in process.stdout
+              .transform(utf8.decoder)
+              .transform(const LineSplitter())) {
         final request = _inputRequest(line);
         if (request != null) {
           if (onInputRequest == null) {
             process.kill();
-            throw StateError('البرنامج الهدف طلب إدخالًا ولا توجد نافذة تنفيذ متصلة');
+            throw StateError(
+              'البرنامج الهدف طلب إدخالًا ولا توجد نافذة تنفيذ متصلة',
+            );
           }
           final value = await onInputRequest(request);
           if (value == null) {
@@ -37,6 +54,7 @@ class NativeArtifactRunner {
           await process.stdin.flush();
         } else {
           output.add(line);
+          onOutput?.call(line);
         }
       }
       final exitCode = await process.exitCode;
@@ -56,16 +74,35 @@ class NativeArtifactRunner {
     }
   }
 
-  String? _inputRequest(String line) {
+  InputRequest? _inputRequest(String line) {
     try {
       final decoded = jsonDecode(line);
       if (decoded is Map && decoded['requestType'] == 'input') {
         final name = decoded['name'];
-        return name is String && name.isNotEmpty ? name : 'input';
+        final type = decoded['type'];
+        if (name is String && name.isNotEmpty) {
+          return InputRequest(
+            name: name,
+            type: type is String && type.isNotEmpty ? type : 'غير معروف',
+          );
+        }
       }
     } on FormatException {
       // Normal program output is not JSON and is returned to the execution tab.
     }
     return null;
+  }
+
+  Map<String, String> _runtimeEnvironment() {
+    final environment = Map<String, String>.from(Platform.environment);
+    if (Platform.isWindows) {
+      final paths = [
+        r'C:\msys64\ucrt64\bin',
+        r'C:\msys64\mingw64\bin',
+        environment['Path'] ?? '',
+      ];
+      environment['Path'] = paths.where((path) => path.isNotEmpty).join(';');
+    }
+    return environment;
   }
 }

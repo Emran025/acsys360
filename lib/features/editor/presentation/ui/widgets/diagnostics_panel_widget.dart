@@ -7,6 +7,8 @@ import '../../controllers/editor_controller.dart';
 class DiagnosticsPanelWidget extends StatefulWidget {
   final EditorController controller;
   final List<String> inputNames;
+  final String inputType;
+  final int inputRequestSequence;
   final ValueChanged<Map<String, String>>? onSubmitInputs;
   final VoidCallback? onCancelInputs;
 
@@ -14,6 +16,8 @@ class DiagnosticsPanelWidget extends StatefulWidget {
     super.key,
     required this.controller,
     this.inputNames = const [],
+    this.inputType = 'غير معروف',
+    this.inputRequestSequence = 0,
     this.onSubmitInputs,
     this.onCancelInputs,
   });
@@ -41,7 +45,9 @@ class _DiagnosticsPanelWidgetState extends State<DiagnosticsPanelWidget> {
 
   @override
   void dispose() {
-    for (final field in _inputFields.values) field.dispose();
+    for (final field in _inputFields.values) {
+      field.dispose();
+    }
     super.dispose();
   }
 
@@ -50,6 +56,11 @@ class _DiagnosticsPanelWidgetState extends State<DiagnosticsPanelWidget> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.inputNames.isEmpty && widget.inputNames.isNotEmpty) {
       _stage = 8;
+    }
+    if (oldWidget.inputRequestSequence != widget.inputRequestSequence) {
+      for (final field in _inputFields.values) {
+        field.clear();
+      }
     }
   }
 
@@ -67,6 +78,9 @@ class _DiagnosticsPanelWidgetState extends State<DiagnosticsPanelWidget> {
   Widget build(BuildContext context) {
     final result = widget.controller.compilation;
     if (result == null) {
+      if (widget.controller.error != null) {
+        return _selectable('فشل التنفيذ:\n${widget.controller.error}');
+      }
       return widget.inputNames.isEmpty
           ? const Center(child: Text('لا توجد نتيجة ترجمة'))
           : _inputRequest();
@@ -129,13 +143,14 @@ class _DiagnosticsPanelWidgetState extends State<DiagnosticsPanelWidget> {
     7 => _selectable(
       result.assembly.isEmpty ? 'لا يوجد مخرج Assembly' : result.assembly,
     ),
-    8 => widget.inputNames.isNotEmpty
-        ? _inputRequest()
-        : _selectable(
-            result.executionOutput.isEmpty
-                ? 'لا يوجد خرج تنفيذ'
-                : result.executionOutput.join('\n'),
-          ),
+    8 =>
+      widget.inputNames.isNotEmpty
+          ? _inputRequest()
+          : _selectable(
+              result.executionOutput.isEmpty
+                  ? 'لا يوجد خرج تنفيذ'
+                  : result.executionOutput.join('\n'),
+            ),
     9 => _artifacts(result),
     _ => const SizedBox.shrink(),
   };
@@ -163,7 +178,11 @@ class _DiagnosticsPanelWidgetState extends State<DiagnosticsPanelWidget> {
             style: TextStyle(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 4),
-          const Text('أدخل القيم ثم اضغط «تنفيذ» لإرسالها إلى المترجم.'),
+          Text('النوع المطلوب: ${widget.inputType}'),
+          const SizedBox(height: 4),
+          const Text(
+            'أدخل قيمة الطلب الحالي فقط ثم اضغط «إرسال»؛ سيستمر البرنامج حتى طلب الإدخال التالي.',
+          ),
           const SizedBox(height: 8),
           for (final name in widget.inputNames)
             Padding(
@@ -190,7 +209,7 @@ class _DiagnosticsPanelWidgetState extends State<DiagnosticsPanelWidget> {
                   for (final name in widget.inputNames)
                     name: _inputFields[name]!.text.trim(),
                 }),
-                child: const Text('تنفيذ'),
+                child: const Text('إرسال'),
               ),
             ],
           ),
@@ -200,6 +219,10 @@ class _DiagnosticsPanelWidgetState extends State<DiagnosticsPanelWidget> {
   }
 
   Widget _diagnostics(CompilationResult result) {
+    final runtimeError = widget.controller.error;
+    if (runtimeError != null) {
+      return _selectable('فشل التنفيذ:\n$runtimeError');
+    }
     if (result.diagnostics.isEmpty) {
       return Center(
         child: Text(

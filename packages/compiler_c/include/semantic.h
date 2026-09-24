@@ -9,6 +9,7 @@ typedef struct {
   size_t offset;
   size_t line;
   size_t column;
+  int is_constant;
 } CSymbol;
 
 typedef struct {

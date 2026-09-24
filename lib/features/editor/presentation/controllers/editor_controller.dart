@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:compiler_contracts/compiler_contracts.dart';
 import 'package:flutter/foundation.dart';
 
@@ -12,7 +14,6 @@ import '../../domain/usecases/editor_language_server.dart';
 import '../../domain/usecases/format_arabic_source.dart';
 import '../../domain/usecases/workspace_actions.dart';
 import '../../../../core/services/workspace_path_service.dart';
-import '../../data/datasources/native_artifact_builder.dart';
 import '../../data/datasources/native_artifact_runner.dart';
 
 /// مصدر حالة المحرر: workspace والوثائق والنتائج، بينما تبقى الملفات والمترجم خلف عقود repositories.
@@ -28,7 +29,6 @@ class EditorController extends ChangeNotifier {
   final CompilerRepository? compiler;
   final AssistRepository? assistant;
   final WorkspacePathService pathService;
-  final NativeArtifactBuilder artifactBuilder;
   final NativeArtifactRunner artifactRunner;
 
   Workspace workspace;
@@ -63,7 +63,6 @@ class EditorController extends ChangeNotifier {
     this.compiler,
     this.assistant,
     this.pathService = const DefaultWorkspacePathService(),
-    this.artifactBuilder = const NativeArtifactBuilder(),
     this.artifactRunner = const NativeArtifactRunner(),
   }) : workspace = Workspace(rootPath: rootPath),
        openDocument = OpenDocument(repository),
@@ -493,31 +492,32 @@ class EditorController extends ChangeNotifier {
         execute: false,
       );
       if (version != _stateVersion) return;
-      final assembly = analysis.compilation.assembly;
-      if (assembly.isEmpty) {
-        throw StateError('لم ينتج المترجم Assembly قابلة للبناء');
+      if (!analysis.compilation.success) {
+        compilation = analysis.compilation;
+        diagnostics = analysis.diagnostics;
+        error = null;
+        return;
       }
-      final artifact = await artifactBuilder.build(
-        assembly: assembly,
-        outputDirectory: artifactDirectory,
-        baseName: active.path,
-      );
-      final payload = Map<String, dynamic>.from(analysis.compilation.payload)
-        ..['artifacts'] = [artifact]
-        ..['artifactKind'] = 'native-executable';
-      compilation = CompilationResult(
-        success: analysis.compilation.success,
-        payload: payload,
-      );
+      compilation = analysis.compilation;
       diagnostics = analysis.diagnostics;
+      if (analysis.compilation.artifacts.isEmpty) {
+        throw StateError(
+          'لم ينتج backend ملفاً تنفيذياً. راجع تشخيصات مرحلة backend.',
+        );
+      }
       error = null;
     } catch (exception) {
-      if (version == _stateVersion) error = exception;
+      if (version == _stateVersion) {
+        error = StateError('فشل بناء البرنامج التنفيذي: $exception');
+      }
     }
     if (version == _stateVersion) notifyListeners();
   }
 
-  Future<void> runNative({InputRequestHandler? onInputRequest}) async {
+  Future<void> runNative({
+    InputRequestHandler? onInputRequest,
+    NativeOutputHandler? onOutput,
+  }) async {
     final artifact = compilation?.artifacts.firstWhere(
       (path) => !path.endsWith('.asm') && !path.endsWith('.o'),
       orElse: () => '',
@@ -525,9 +525,23 @@ class EditorController extends ChangeNotifier {
     if (artifact == null || artifact.isEmpty) {
       throw StateError('لا يوجد executable ناتج. نفّذ البناء أولًا');
     }
+    if (!File(artifact).existsSync()) {
+      throw StateError('ملف executable الناتج غير موجود: $artifact');
+    }
     final output = await artifactRunner.run(
       artifact,
       onInputRequest: onInputRequest,
+      onOutput: (line) {
+        final current = compilation;
+        if (current == null) return;
+        final executionOutput = [...current.executionOutput, line];
+        compilation = CompilationResult(
+          success: current.success,
+          payload: {...current.payload, 'executionOutput': executionOutput},
+        );
+        notifyListeners();
+        onOutput?.call(line);
+      },
     );
     final payload = Map<String, dynamic>.from(compilation?.payload ?? const {})
       ..['executionOutput'] = output;
@@ -588,6 +602,11 @@ class EditorController extends ChangeNotifier {
     if (assistance == null && assistanceIndex == 0) return;
     assistance = null;
     assistanceIndex = 0;
+    notifyListeners();
+  }
+
+  void reportError(Object exception) {
+    error = exception;
     notifyListeners();
   }
 

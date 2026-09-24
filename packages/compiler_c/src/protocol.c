@@ -6,7 +6,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <math.h>
+#ifdef _WIN32
+#include <direct.h>
+#include <process.h>
+#else
+#include <sys/stat.h>
+#include <sys/types.h>
+#endif
 
 /* Dynamic String Buffer */
 typedef struct {
@@ -722,13 +730,81 @@ typedef struct {
   double number;
   char *text;
 } ExecValue;
-typedef struct { char *name; ExecValue value; } ExecVar;
+typedef struct { char *name; const char *type; ExecValue value; } ExecVar;
 static const char *g_input_values_payload = NULL;
 static int g_interactive_execution = 0;
 static int g_input_error = 0;
+static const CAstNode *g_input_program = NULL;
 static ExecValue exec_number(double n);
 static ExecValue exec_bool(int b);
 static char *c_strdup(const char *src);
+
+static const char *input_type_for(const char *name) {
+  if (!g_input_program || !name) return NULL;
+  for (size_t i = 0; i < g_input_program->data.program.declarations.count; i++) {
+    const CAstNode *declaration =
+        g_input_program->data.program.declarations.items[i];
+    if (declaration->kind != C_AST_VARIABLE_DECLARATION ||
+        !declaration->data.variable.type ||
+        !declaration->data.variable.type->name) {
+      continue;
+    }
+    for (size_t j = 0; j < declaration->data.variable.name_count; j++) {
+      if (strcmp(declaration->data.variable.names[j], name) == 0) {
+        return declaration->data.variable.type->name;
+      }
+    }
+  }
+  return NULL;
+}
+
+static const char *literal_type(const CAstNode *node) {
+  if (!node || node->kind != C_AST_LITERAL) return NULL;
+  switch (node->data.literal.literal_kind) {
+    case C_TOKEN_INTEGER: return "صحيح";
+    case C_TOKEN_REAL: return "حقيقي";
+    case C_TOKEN_BOOLEAN: return "منطقي";
+    case C_TOKEN_CHARACTER: return "حرفي";
+    case C_TOKEN_STRING: return "خيط_رمزي";
+    default: return NULL;
+  }
+}
+
+static int utf8_value_length(const char *value) {
+  int count = 0;
+  for (const unsigned char *p = (const unsigned char *)value; *p; p++) {
+    if ((*p & 0xC0) != 0x80) count++;
+  }
+  return count;
+}
+
+static int input_matches_type(const char *value, const char *type) {
+  if (!value || !type) return 0;
+  if (strcmp(type, "خيط_رمزي") == 0) return 1;
+  if (strcmp(type, "منطقي") == 0) {
+    return strcmp(value, "صح") == 0 || strcmp(value, "خطأ") == 0;
+  }
+  if (strcmp(type, "حرفي") == 0) return utf8_value_length(value) == 1;
+  char *end = NULL;
+  errno = 0;
+  const double number = strtod(value, &end);
+  if (end == value || *end != '\0' || errno == ERANGE || !isfinite(number)) {
+    return 0;
+  }
+  if (strcmp(type, "صحيح") == 0) {
+    return strchr(value, '.') == NULL && strchr(value, 'e') == NULL &&
+        strchr(value, 'E') == NULL;
+  }
+  return strcmp(type, "حقيقي") == 0;
+}
+
+static void input_type_error(const char *name, const char *type) {
+  char message[256];
+  snprintf(message, sizeof(message),
+           "قيمة الإدخال للمتغير «%s» يجب أن تكون من النوع «%s»",
+           name ? name : "input", type ? type : "معروف");
+  fprintf(stderr, "%s\n", message);
+}
 
 static ExecValue exec_value_from_text(const char *text) {
   if (!text) return exec_number(0);
@@ -743,31 +819,33 @@ static ExecValue exec_value_from_text(const char *text) {
 
 static ExecValue exec_interactive_input(const char *name) {
   char line[4096];
-  printf("{\"requestType\":\"input\",\"name\":\"%s\"}\n", name);
-  fflush(stdout);
-  if (!fgets(line, sizeof(line), stdin)) {
-    g_input_error = 1;
-    return exec_number(0);
+  const char *type = input_type_for(name);
+  for (;;) {
+    printf("{\"requestType\":\"input\",\"name\":\"%s\",\"type\":\"%s\"}\n",
+           name, type ? type : "خيط_رمزي");
+    fflush(stdout);
+    if (!fgets(line, sizeof(line), stdin)) {
+      g_input_error = 1;
+      return exec_number(0);
+    }
+    const char *value = strstr(line, "\"value\"");
+    value = value ? strchr(value + strlen("\"value\""), ':') : NULL;
+    if (!value) {
+      g_input_error = 1;
+      return exec_number(0);
+    }
+    while (*++value == ' ' || *value == '\t' || *value == '\n' || *value == '\r') {}
+    if (*value == '"') value++;
+    char parsed[1024];
+    size_t length = 0;
+    while (*value && *value != '"' && *value != '\n' && *value != '\r' &&
+           length + 1 < sizeof(parsed)) {
+      parsed[length++] = *value++;
+    }
+    parsed[length] = '\0';
+    if (input_matches_type(parsed, type)) return exec_value_from_text(parsed);
+    input_type_error(name, type);
   }
-  const char *value = strstr(line, "\"value\"");
-  if (!value) {
-    g_input_error = 1;
-    return exec_number(0);
-  }
-  value = strchr(value + strlen("\"value\""), ':');
-  if (!value) {
-    g_input_error = 1;
-    return exec_number(0);
-  }
-  while (*++value == ' ' || *value == '\t' || *value == '\n' || *value == '\r') {}
-  if (*value == '"') value++;
-  char parsed[1024];
-  size_t length = 0;
-  while (*value && *value != '"' && *value != '\n' && *value != '\r' && length + 1 < sizeof(parsed)) {
-    parsed[length++] = *value++;
-  }
-  parsed[length] = '\0';
-  return exec_value_from_text(parsed);
 }
 
 static ExecValue exec_input_value(const char *name) {
@@ -789,12 +867,26 @@ static ExecValue exec_input_value(const char *name) {
     return exec_number(0);
   }
   while (*++p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') {}
-  if (*p != '"') return exec_number(strtod(p, NULL));
-  p++;
   char value[256];
-  size_t length = 0;
-  while (*p && *p != '"' && length + 1 < sizeof(value)) value[length++] = *p++;
-  value[length] = '\0';
+  if (*p != '"') {
+    size_t length = 0;
+    while (*p && *p != ',' && *p != '}' && length + 1 < sizeof(value)) {
+      value[length++] = *p++;
+    }
+    while (length > 0 && (value[length - 1] == ' ' || value[length - 1] == '\t')) length--;
+    value[length] = '\0';
+  } else {
+    p++;
+    size_t length = 0;
+    while (*p && *p != '"' && length + 1 < sizeof(value)) value[length++] = *p++;
+    value[length] = '\0';
+  }
+  const char *type = input_type_for(name);
+  if (!input_matches_type(value, type)) {
+    input_type_error(name, type);
+    g_input_error = 1;
+    return exec_number(0);
+  }
   return exec_value_from_text(value);
 }
 
@@ -877,10 +969,15 @@ static ExecValue eval_ast_value(const CAstNode *e, ExecVar *vars, size_t count) 
   return exec_number(0);
 }
 static long long eval_ast_expr(const CAstNode *e, ExecVar *vars, size_t count) { return (long long)exec_num(eval_ast_value(e, vars, count)); }
-static void set_exec_var(ExecVar *vars, size_t *count, const char *name, ExecValue value) {
-  for (size_t i=0;i<*count;i++) if (strcmp(vars[i].name,name)==0) { vars[i].value=value; return; }
+static void set_exec_var(ExecVar *vars, size_t *count, const char *name,
+                         const char *type, ExecValue value) {
+  for (size_t i=0;i<*count;i++) if (strcmp(vars[i].name,name)==0) {
+    vars[i].value=value;
+    if (type) vars[i].type=type;
+    return;
+  }
   if (*count<128) {
-    vars[*count]=(ExecVar){c_strdup(name),value};
+    vars[*count]=(ExecVar){c_strdup(name),type,value};
     (*count)++;
   }
 }
@@ -894,15 +991,15 @@ static void execute_print(ProtocolResponse *resp, const CAstNode *s, ExecVar *va
 static void execute_statement(ProtocolResponse *resp,const CAstNode *s,ExecVar *vars,size_t *count) {
   if(!s)return;
   if(s->kind==C_AST_PROGRAM) execute_statements(resp,&s->data.program.statements,vars,count);
-  else if(s->kind==C_AST_READ&&s->data.access.name) set_exec_var(vars,count,s->data.access.name,exec_input_value(s->data.access.name));
-  else if(s->kind==C_AST_ASSIGNMENT&&s->data.assignment.name) { char *key=exec_access_key(s->data.assignment.name,&s->data.assignment.selectors,vars,*count); set_exec_var(vars,count,key,eval_ast_value(s->data.assignment.expression,vars,*count)); free(key); }
+  else if(s->kind==C_AST_READ&&s->data.access.name) set_exec_var(vars,count,s->data.access.name,input_type_for(s->data.access.name),exec_input_value(s->data.access.name));
+  else if(s->kind==C_AST_ASSIGNMENT&&s->data.assignment.name) { char *key=exec_access_key(s->data.assignment.name,&s->data.assignment.selectors,vars,*count); set_exec_var(vars,count,key,input_type_for(s->data.assignment.name),eval_ast_value(s->data.assignment.expression,vars,*count)); free(key); }
   else if(s->kind==C_AST_PRINT) execute_print(resp,s,vars,*count);
-  else if(s->kind==C_AST_REPEAT){long long from=eval_ast_expr(s->data.repeat.from,vars,*count),to=eval_ast_expr(s->data.repeat.to,vars,*count),step=s->data.repeat.step?eval_ast_expr(s->data.repeat.step,vars,*count):1;if(!step)step=1;for(long long v=from;step>0?v<=to:v>=to;v+=step){set_exec_var(vars,count,s->data.repeat.variable,exec_number(v));execute_statements(resp,&s->data.repeat.body,vars,count);if((step>0&&v>to-step)||(step<0&&v<to-step))break;}}
+  else if(s->kind==C_AST_REPEAT){long long from=eval_ast_expr(s->data.repeat.from,vars,*count),to=eval_ast_expr(s->data.repeat.to,vars,*count),step=s->data.repeat.step?eval_ast_expr(s->data.repeat.step,vars,*count):1;if(!step)step=1;for(long long v=from;step>0?v<=to:v>=to;v+=step){set_exec_var(vars,count,s->data.repeat.variable,"صحيح",exec_number(v));execute_statements(resp,&s->data.repeat.body,vars,count);if((step>0&&v>to-step)||(step<0&&v<to-step))break;}}
   else if(s->kind==C_AST_WHILE){size_t guard=0;while(eval_ast_expr(s->data.loop.condition,vars,*count)&&guard++<100000)execute_statements(resp,&s->data.loop.body,vars,count);}
   else if(s->kind==C_AST_IF){const CAstNodeList *b=eval_ast_expr(s->data.conditional.condition,vars,*count)?&s->data.conditional.then_branch:&s->data.conditional.else_branch;execute_statements(resp,b,vars,count);}
 }
 static void execute_statements(ProtocolResponse *resp,const CAstNodeList *statements,ExecVar *vars,size_t *count){for(size_t i=0;i<statements->count && !g_input_error;i++)execute_statement(resp,statements->items[i],vars,count);}
-static void execute_ast_program(ProtocolResponse *resp,const CAstNode *root){if(!root||root->kind!=C_AST_PROGRAM)return;ExecVar vars[128];size_t count=0;for(size_t i=0;i<root->data.program.declarations.count;i++){CAstNode*d=root->data.program.declarations.items[i];if(d->kind==C_AST_CONSTANT_DECLARATION)set_exec_var(vars,&count,d->data.constant.name,eval_ast_value(d->data.constant.value,vars,count));else if(d->kind==C_AST_VARIABLE_DECLARATION)for(size_t n=0;n<d->data.variable.name_count;n++)set_exec_var(vars,&count,d->data.variable.names[n],exec_number(0));}execute_statements(resp,&root->data.program.statements,vars,&count);}
+static void execute_ast_program(ProtocolResponse *resp,const CAstNode *root){if(!root||root->kind!=C_AST_PROGRAM)return;ExecVar vars[128];size_t count=0;g_input_program=root;for(size_t i=0;i<root->data.program.declarations.count;i++){CAstNode*d=root->data.program.declarations.items[i];if(d->kind==C_AST_CONSTANT_DECLARATION)set_exec_var(vars,&count,d->data.constant.name,literal_type(d->data.constant.value),eval_ast_value(d->data.constant.value,vars,count));else if(d->kind==C_AST_VARIABLE_DECLARATION)for(size_t n=0;n<d->data.variable.name_count;n++)set_exec_var(vars,&count,d->data.variable.names[n],d->data.variable.type ? d->data.variable.type->name : NULL,exec_number(0));}execute_statements(resp,&root->data.program.statements,vars,&count);g_input_program=NULL;}
 
 typedef struct {
   const char *keyword;
@@ -1096,6 +1193,135 @@ static int request_interactive(const char *payload) {
   return strncmp(p, "true", 4) == 0;
 }
 
+static int file_exists(const char *path) {
+  FILE *file = fopen(path, "rb");
+  if (file == NULL) return 0;
+  fclose(file);
+  return 1;
+}
+
+static void ensure_directory(const char *path) {
+  char buffer[2048];
+  size_t length;
+  if (!path) return;
+  length = strlen(path);
+  if (length == 0 || length >= sizeof(buffer)) return;
+  memcpy(buffer, path, length + 1U);
+  for (size_t i = 1U; i < length; i++) {
+    if (buffer[i] == '/' || buffer[i] == '\\') {
+      char saved = buffer[i];
+      buffer[i] = '\0';
+#ifdef _WIN32
+      (void)_mkdir(buffer);
+#else
+      (void)mkdir(buffer, 0775);
+#endif
+      buffer[i] = saved;
+    }
+  }
+#ifdef _WIN32
+  (void)_mkdir(buffer);
+#else
+  (void)mkdir(buffer, 0775);
+#endif
+}
+
+static const char *tool_path(const char *tool) {
+#ifdef _WIN32
+  static char paths[2][260];
+  char *path = paths[tool[0] == 'n' ? 0 : 1];
+  const char *directories[] = {
+    "C:\\msys64\\ucrt64\\bin",
+    "C:\\msys64\\usr\\bin",
+    "C:\\msys64\\mingw64\\bin"
+  };
+  for (size_t i = 0U; i < sizeof(directories) / sizeof(directories[0]); i++) {
+    snprintf(path, sizeof(paths[0]), "%s\\%s.exe", directories[i], tool);
+    if (file_exists(path)) return path;
+  }
+#endif
+  return tool;
+}
+
+static int build_native_artifact(const char *artifact_dir,
+                                 const char *assembly_path,
+                                 char *artifact_path,
+                                 size_t artifact_path_size,
+                                 char *error,
+                                 size_t error_size) {
+  char object_path[2048];
+#ifndef _WIN32
+  char command[8192];
+#endif
+  const char *nasm = tool_path("nasm");
+  const char *gcc = tool_path("gcc");
+  if (!artifact_dir || !assembly_path || !artifact_path ||
+      !error || artifact_path_size == 0U || error_size == 0U) return 0;
+  snprintf(object_path, sizeof(object_path), "%s%carabicc.obj",
+           artifact_dir,
+#ifdef _WIN32
+           '\\'
+#else
+           '/'
+#endif
+  );
+  snprintf(artifact_path, artifact_path_size, "%s%carabicc%s",
+           artifact_dir,
+#ifdef _WIN32
+           '\\',
+           ".exe"
+#else
+           '/',
+           ""
+#endif
+  );
+  ensure_directory(artifact_dir);
+#ifdef _WIN32
+  {
+    const char *arguments[] = {
+      nasm, "-f", "win64", assembly_path, "-o", object_path, NULL
+    };
+    if (_spawnv(_P_WAIT, nasm, arguments) != 0) {
+      snprintf(error, error_size, "فشل تشغيل NASM لبناء الملف التنفيذي");
+      return 0;
+    }
+  }
+#else
+  snprintf(command, sizeof(command), "\"%s\" -f elf64 \"%s\" -o \"%s\"",
+           nasm, assembly_path, object_path);
+  if (system(command) != 0) {
+    snprintf(error, error_size, "فشل تشغيل NASM لبناء الملف التنفيذي: %s",
+             command);
+    return 0;
+  }
+#endif
+#ifdef _WIN32
+  {
+    const char *arguments[] = {
+      gcc, object_path, "-o", artifact_path, NULL
+    };
+    if (_spawnv(_P_WAIT, gcc, arguments) != 0) {
+      snprintf(error, error_size, "فشل تشغيل GCC لربط الملف التنفيذي");
+      return 0;
+    }
+  }
+#else
+  snprintf(command, sizeof(command), "\"%s\" -no-pie \"%s\" -o \"%s\"",
+           gcc, object_path, artifact_path);
+#endif
+#ifndef _WIN32
+  if (system(command) != 0) {
+    snprintf(error, error_size, "فشل تشغيل GCC لربط الملف التنفيذي");
+    return 0;
+  }
+#endif
+  if (!file_exists(artifact_path)) {
+    snprintf(error, error_size, "لم ينتج backend الملف التنفيذي المتوقع");
+    return 0;
+  }
+  return 1;
+}
+
 int c_run_protocol(const char *payload) {
   if (payload == NULL || payload[0] == '\0') {
     fputs("{\"protocolVersion\":\"" ARABICC_PROTOCOL_VERSION "\",\"success\":false,\"diagnostics\":[{\"severity\":\"error\",\"phase\":\"driver\",\"code\":\"P001\",\"message\":\"حزمة الطلب فارغة\",\"span\":null}],\"tokens\":[],\"syntaxTree\":null,\"symbolTable\":[],\"threeAddressCode\":[],\"assembly\":\"\",\"executionOutput\":[],\"artifacts\":[],\"intermediateRepresentation\":{}}\n", stdout);
@@ -1171,8 +1397,15 @@ int c_run_protocol(const char *payload) {
             (!assembly_ok || assembly.diagnostic_count > 0)) {
           resp.success = 0;
           for (size_t i = 0; i < assembly.diagnostic_count; i++) {
+            ProtocolSpan span = {
+              g_current_source_path[0] != '\0' ? g_current_source_path : NULL,
+              assembly.diagnostic_offsets[i],
+              assembly.diagnostic_lines[i],
+              assembly.diagnostic_columns[i],
+              assembly.diagnostic_lengths[i]
+            };
             protocol_add_diagnostic(&resp, SEVERITY_ERROR, "backend", "A001",
-                                    assembly.diagnostics[i], NULL);
+                                    assembly.diagnostics[i], &span);
           }
           if (assembly.diagnostic_count == 0) {
             protocol_add_diagnostic(&resp, SEVERITY_ERROR, "backend", "A001",
@@ -1227,16 +1460,49 @@ int c_run_protocol(const char *payload) {
       /* 7. Artifacts */
       char *artifact_dir = extract_string_value(payload, "\"artifactDirectory\"");
       if (artifact_dir && artifact_dir[0] != '\0') {
+        char *artifact_target = extract_string_value(payload, "\"target\"");
         char asm_path[1024];
-        snprintf(asm_path, sizeof(asm_path), "%s/arabicc.asm", artifact_dir);
+        snprintf(asm_path, sizeof(asm_path), "%s%carabicc.asm",
+                 artifact_dir,
+#ifdef _WIN32
+                 '\\'
+#else
+                 '/'
+#endif
+        );
         if (resp.assembly && resp.assembly[0] != '\0') {
+          ensure_directory(artifact_dir);
           FILE *af = fopen(asm_path, "w");
           if (af) {
             fputs(resp.assembly, af);
             fclose(af);
             protocol_add_artifact(&resp, asm_path);
+            if (artifact_target &&
+                strcmp(artifact_target, "dart-native") == 0) {
+              char native_path[2048];
+              char build_error[256];
+              if (build_native_artifact(
+                      artifact_dir,
+                      asm_path,
+                      native_path,
+                      sizeof(native_path),
+                      build_error,
+                      sizeof(build_error))) {
+                protocol_add_artifact(&resp, native_path);
+              } else {
+                resp.success = 0;
+                protocol_add_diagnostic(
+                    &resp,
+                    SEVERITY_ERROR,
+                    "backend",
+                    "A002",
+                    build_error,
+                    NULL);
+              }
+            }
           }
         }
+        free(artifact_target);
         free(artifact_dir);
       }
 
