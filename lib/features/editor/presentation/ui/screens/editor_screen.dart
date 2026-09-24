@@ -160,10 +160,9 @@ class _EditorShellState extends State<EditorShell> {
     analysisTimer = null;
     setState(() => _executionRunning = true);
     try {
-      await widget.controller.compile(
-        interactive: true,
-        onInputRequest: _requestInput,
-      );
+      await widget.controller.buildNative();
+      if (widget.controller.error != null) return;
+      await widget.controller.runNative(onInputRequest: _requestInput);
     } finally {
       if (mounted) setState(() => _executionRunning = false);
     }

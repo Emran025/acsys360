@@ -13,6 +13,7 @@ import '../../domain/usecases/format_arabic_source.dart';
 import '../../domain/usecases/workspace_actions.dart';
 import '../../../../core/services/workspace_path_service.dart';
 import '../../data/datasources/native_artifact_builder.dart';
+import '../../data/datasources/native_artifact_runner.dart';
 
 /// مصدر حالة المحرر: workspace والوثائق والنتائج، بينما تبقى الملفات والمترجم خلف عقود repositories.
 class EditorController extends ChangeNotifier {
@@ -28,6 +29,7 @@ class EditorController extends ChangeNotifier {
   final AssistRepository? assistant;
   final WorkspacePathService pathService;
   final NativeArtifactBuilder artifactBuilder;
+  final NativeArtifactRunner artifactRunner;
 
   Workspace workspace;
   List<String> files = const [];
@@ -62,6 +64,7 @@ class EditorController extends ChangeNotifier {
     this.assistant,
     this.pathService = const DefaultWorkspacePathService(),
     this.artifactBuilder = const NativeArtifactBuilder(),
+    this.artifactRunner = const NativeArtifactRunner(),
   }) : workspace = Workspace(rootPath: rootPath),
        openDocument = OpenDocument(repository),
        saveDocument = SaveDocument(repository),
@@ -512,6 +515,27 @@ class EditorController extends ChangeNotifier {
       if (version == _stateVersion) error = exception;
     }
     if (version == _stateVersion) notifyListeners();
+  }
+
+  Future<void> runNative({InputRequestHandler? onInputRequest}) async {
+    final artifact = compilation?.artifacts.firstWhere(
+      (path) => !path.endsWith('.asm') && !path.endsWith('.o'),
+      orElse: () => '',
+    );
+    if (artifact == null || artifact.isEmpty) {
+      throw StateError('لا يوجد executable ناتج. نفّذ البناء أولًا');
+    }
+    final output = await artifactRunner.run(
+      artifact,
+      onInputRequest: onInputRequest,
+    );
+    final payload = Map<String, dynamic>.from(compilation?.payload ?? const {})
+      ..['executionOutput'] = output;
+    compilation = CompilationResult(
+      success: compilation?.success ?? true,
+      payload: payload,
+    );
+    notifyListeners();
   }
 
   EditorDiagnostic? diagnosticAt(int offset) {

@@ -182,10 +182,12 @@ int c_generate_nasm_x86_64(const CAstNode *program,
               "global main\n"
               "extern printf\n"
               "extern scanf\n"
+              "extern fflush\n"
               "section .data\n"
               "fmt_int: db \"%%ld\", 10, 0\n"
               "fmt_str: db \"%%s\", 10, 0\n"
-              "fmt_read_int: db \"%%ld\", 0\n")) {
+              "fmt_read_int: db \"%%ld\", 0\n"
+              "fmt_input_request: db '{\"requestType\":\"input\",\"name\":\"input\"}', 10, 0\n")) {
     free(strings);
     c_assembly_result_free(result);
     return 0;
@@ -227,6 +229,29 @@ int c_generate_nasm_x86_64(const CAstNode *program,
     } else if (statement->kind == C_AST_READ) {
       const int slot = slot_for(semantic, statement->data.access.name);
       if (slot == 0 || !append(&result->text, &length, &capacity,
+                               "    lea "
+#ifdef _WIN32
+                               "rcx"
+#else
+                               "rdi"
+#endif
+                               ", [rel fmt_input_request]\n"
+                               "    xor eax, eax\n"
+                               "    call printf\n"
+                               "    xor "
+#ifdef _WIN32
+                               "ecx"
+#else
+                               "edi"
+#endif
+                               ", "
+#ifdef _WIN32
+                               "ecx"
+#else
+                               "edi"
+#endif
+                               "\n"
+                               "    call fflush\n"
                                "    lea "
 #ifdef _WIN32
                                "rdx"
