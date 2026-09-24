@@ -46,8 +46,9 @@ def main():
         executable,
         "برنامج قراءة؛ متغير س: صحيح؛ { اقرأ(س)؛ اطبع(س)؛ }.",
     )
-    assert read.returncode == 0, read.stderr
-    assert read_response["success"] is True
+    assert read.returncode != 0, read.stderr
+    assert read_response["success"] is False
+    assert any(item["code"] == "R001" for item in read_response["diagnostics"])
 
     read_request = {
         "protocolVersion": "0.5.0",

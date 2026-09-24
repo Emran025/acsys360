@@ -725,6 +725,7 @@ typedef struct {
 typedef struct { char *name; ExecValue value; } ExecVar;
 static const char *g_input_values_payload = NULL;
 static int g_interactive_execution = 0;
+static int g_input_error = 0;
 static ExecValue exec_number(double n);
 static ExecValue exec_bool(int b);
 static char *c_strdup(const char *src);
@@ -744,11 +745,20 @@ static ExecValue exec_interactive_input(const char *name) {
   char line[4096];
   printf("{\"requestType\":\"input\",\"name\":\"%s\"}\n", name);
   fflush(stdout);
-  if (!fgets(line, sizeof(line), stdin)) return exec_number(0);
+  if (!fgets(line, sizeof(line), stdin)) {
+    g_input_error = 1;
+    return exec_number(0);
+  }
   const char *value = strstr(line, "\"value\"");
-  if (!value) return exec_number(0);
+  if (!value) {
+    g_input_error = 1;
+    return exec_number(0);
+  }
   value = strchr(value + strlen("\"value\""), ':');
-  if (!value) return exec_number(0);
+  if (!value) {
+    g_input_error = 1;
+    return exec_number(0);
+  }
   while (*++value == ' ' || *value == '\t' || *value == '\n' || *value == '\r') {}
   if (*value == '"') value++;
   char parsed[1024];
@@ -762,13 +772,22 @@ static ExecValue exec_interactive_input(const char *name) {
 
 static ExecValue exec_input_value(const char *name) {
   if (g_interactive_execution) return exec_interactive_input(name);
-  if (!g_input_values_payload || !name) return exec_number(0);
+  if (!g_input_values_payload || !name) {
+    g_input_error = 1;
+    return exec_number(0);
+  }
   char key[256];
   snprintf(key, sizeof(key), "\"%s\"", name);
   const char *p = strstr(g_input_values_payload, key);
-  if (!p) return exec_number(0);
+  if (!p) {
+    g_input_error = 1;
+    return exec_number(0);
+  }
   p = strchr(p + strlen(key), ':');
-  if (!p) return exec_number(0);
+  if (!p) {
+    g_input_error = 1;
+    return exec_number(0);
+  }
   while (*++p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') {}
   if (*p != '"') return exec_number(strtod(p, NULL));
   p++;
@@ -882,7 +901,7 @@ static void execute_statement(ProtocolResponse *resp,const CAstNode *s,ExecVar *
   else if(s->kind==C_AST_WHILE){size_t guard=0;while(eval_ast_expr(s->data.loop.condition,vars,*count)&&guard++<100000)execute_statements(resp,&s->data.loop.body,vars,count);}
   else if(s->kind==C_AST_IF){const CAstNodeList *b=eval_ast_expr(s->data.conditional.condition,vars,*count)?&s->data.conditional.then_branch:&s->data.conditional.else_branch;execute_statements(resp,b,vars,count);}
 }
-static void execute_statements(ProtocolResponse *resp,const CAstNodeList *statements,ExecVar *vars,size_t *count){for(size_t i=0;i<statements->count;i++)execute_statement(resp,statements->items[i],vars,count);}
+static void execute_statements(ProtocolResponse *resp,const CAstNodeList *statements,ExecVar *vars,size_t *count){for(size_t i=0;i<statements->count && !g_input_error;i++)execute_statement(resp,statements->items[i],vars,count);}
 static void execute_ast_program(ProtocolResponse *resp,const CAstNode *root){if(!root||root->kind!=C_AST_PROGRAM)return;ExecVar vars[128];size_t count=0;for(size_t i=0;i<root->data.program.declarations.count;i++){CAstNode*d=root->data.program.declarations.items[i];if(d->kind==C_AST_CONSTANT_DECLARATION)set_exec_var(vars,&count,d->data.constant.name,eval_ast_value(d->data.constant.value,vars,count));else if(d->kind==C_AST_VARIABLE_DECLARATION)for(size_t n=0;n<d->data.variable.name_count;n++)set_exec_var(vars,&count,d->data.variable.names[n],exec_number(0));}execute_statements(resp,&root->data.program.statements,vars,&count);}
 
 typedef struct {
@@ -1174,9 +1193,17 @@ int c_run_protocol(const char *payload) {
       if (request_executes(payload)) {
         g_input_values_payload = strstr(payload, "\"inputValues\"");
         g_interactive_execution = request_interactive(payload);
+        g_input_error = 0;
         execute_ast_program(&resp, g_root_ast);
+        if (g_input_error) {
+          resp.success = 0;
+          protocol_add_diagnostic(
+              &resp, SEVERITY_ERROR, "runtime", "R001",
+              "توقف التنفيذ لأن قناة الإدخال لم تُرجع قيمة صالحة", NULL);
+        }
         g_interactive_execution = 0;
         g_input_values_payload = NULL;
+        g_input_error = 0;
       }
 
       /* 7. Artifacts */
