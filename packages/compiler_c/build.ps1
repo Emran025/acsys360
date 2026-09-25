@@ -94,23 +94,24 @@ $gccDir = Split-Path -Parent $gcc
 $env:PATH = "$gccDir;$bisonDir;$env:PATH"
 
 if (!(Test-Path "build")) { New-Item -ItemType Directory "build" | Out-Null }
+if (!(Test-Path "build/generated")) { New-Item -ItemType Directory "build/generated" | Out-Null }
 
 if (Test-Path "src/parser.y") {
     Write-Host "[1/3] Running Bison ($bison)..."
-    & $bison -d -Wno-other -Wno-conflicts-sr -o "src/parser.tab.c" "src/parser.y"
+    & $bison -d -Wno-other -Wno-conflicts-sr -o "build/generated/parser.tab.c" "src/parser.y"
 }
 
 if (Test-Path "src/lexer.l") {
     Write-Host "[2/3] Running Flex ($flex)..."
-    & $flex -o "src/lexer.yy.c" "src/lexer.l"
+    & $flex -o "build/generated/lexer.yy.c" "src/lexer.l"
 }
 
 Write-Host "[3/3] Compiling C source files with $gcc..."
-$sources = @("src/main.c", "src/protocol.c", "src/ast.c", "src/semantic.c", "src/tac.c", "src/asm_x86_64.c")
-if (Test-Path "src/parser.tab.c") { $sources += "src/parser.tab.c" }
-if (Test-Path "src/lexer.yy.c") { $sources += "src/lexer.yy.c" }
+$sources = @("src/main.c", "src/protocol.c", "src/backend/artifact_builder.c", "src/ast.c", "src/semantic.c", "src/tac.c", "src/asm_x86_64.c")
+if (Test-Path "build/generated/parser.tab.c") { $sources += "build/generated/parser.tab.c" }
+if (Test-Path "build/generated/lexer.yy.c") { $sources += "build/generated/lexer.yy.c" }
 
-& $gcc -O2 -Wall -Wextra -Iinclude -Isrc $sources -o "build/arabicc.exe"
+& $gcc -O2 -Wall -Wextra -Iinclude -Isrc -Ibuild/generated $sources -o "build/arabicc.exe"
 if ($LASTEXITCODE -eq 0) {
     Write-Host "[OK] Build succeeded: build/arabicc.exe" -ForegroundColor Green
     $projectRoot = Split-Path -Parent $scriptDir

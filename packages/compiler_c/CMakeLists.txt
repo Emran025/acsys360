@@ -8,7 +8,10 @@ set(CMAKE_C_EXTENSIONS OFF)
 find_package(BISON REQUIRED)
 find_package(FLEX REQUIRED)
 
-bison_target(ArabicParser src/parser.y ${CMAKE_CURRENT_BINARY_DIR}/parser.tab.c
+set(ARABICC_GENERATED_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated)
+file(MAKE_DIRECTORY ${ARABICC_GENERATED_DIR})
+
+bison_target(ArabicParser src/parser.y ${ARABICC_GENERATED_DIR}/parser.tab.c
   COMPILE_FLAGS "-d -Wno-other -Wno-conflicts-sr")
 set(ARABICC_FLEX_FLAGS "")
 if(WIN32)
@@ -16,13 +19,14 @@ if(WIN32)
   # not available when the generated scanner is compiled with MSVC.
   set(ARABICC_FLEX_FLAGS "--wincompat")
 endif()
-flex_target(ArabicLexer src/lexer.l ${CMAKE_CURRENT_BINARY_DIR}/lexer.yy.c
+flex_target(ArabicLexer src/lexer.l ${ARABICC_GENERATED_DIR}/lexer.yy.c
   COMPILE_FLAGS "${ARABICC_FLEX_FLAGS}")
 add_flex_bison_dependency(ArabicLexer ArabicParser)
 
 add_executable(arabicc
   src/main.c
   src/protocol.c
+  src/backend/artifact_builder.c
   src/ast.c
   src/semantic.c
   src/tac.c
@@ -40,7 +44,7 @@ endif()
 target_include_directories(arabicc PRIVATE
   include
   src
-  ${CMAKE_CURRENT_BINARY_DIR}
+  ${ARABICC_GENERATED_DIR}
 )
 
 enable_testing()

@@ -12,7 +12,6 @@ import '../../domain/usecases/find_replace.dart';
 import '../../domain/usecases/editor_language_server.dart';
 import '../../domain/usecases/format_arabic_source.dart';
 import '../../domain/usecases/workspace_actions.dart';
-import '../../data/datasources/native_artifact_runner.dart';
 import '../../../../core/services/workspace_path_service.dart';
 
 /// مصدر حالة المحرر: workspace والوثائق والنتائج، بينما تبقى الملفات والمترجم خلف عقود repositories.
@@ -28,7 +27,8 @@ class EditorController extends ChangeNotifier {
   final CompilerRepository? compiler;
   final AssistRepository? assistant;
   final WorkspacePathService pathService;
-  final ProgramRunner artifactRunner;
+  /// Injected by the composition root; presentation depends only on the contract.
+  final ProgramRunner? artifactRunner;
 
   Workspace workspace;
   List<String> files = const [];
@@ -62,7 +62,7 @@ class EditorController extends ChangeNotifier {
     this.compiler,
     this.assistant,
     this.pathService = const DefaultWorkspacePathService(),
-    this.artifactRunner = const NativeArtifactRunner(),
+    this.artifactRunner,
   }) : workspace = Workspace(rootPath: rootPath),
        openDocument = OpenDocument(repository),
        saveDocument = SaveDocument(repository),
@@ -524,7 +524,11 @@ class EditorController extends ChangeNotifier {
     if (artifact == null || artifact.isEmpty) {
       throw StateError('لا يوجد executable ناتج. نفّذ البناء أولًا');
     }
-    final output = await artifactRunner.run(
+    final runner = artifactRunner;
+    if (runner == null) {
+      throw StateError('لم يتم إعداد مشغل البرنامج التنفيذي');
+    }
+    final output = await runner.run(
       artifact,
       onInputRequest: onInputRequest,
       onOutput: (line) {

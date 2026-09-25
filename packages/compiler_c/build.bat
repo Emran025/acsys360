@@ -30,23 +30,24 @@ where bison >nul 2>&1 || (echo [ERROR] bison not found! Please install Bison (vi
 where flex >nul 2>&1 || (echo [ERROR] flex not found! Please install Flex (via MSYS2 or winflexbison). & popd & exit /b 1)
 
 if not exist build mkdir build
+if not exist build\generated mkdir build\generated
 
 echo [1/3] Running Bison...
 if exist src\parser.y (
-    bison -d -Wno-other -Wno-conflicts-sr -o src\parser.tab.c src\parser.y
+    bison -d -Wno-other -Wno-conflicts-sr -o build\generated\parser.tab.c src\parser.y
 )
 
 echo [2/3] Running Flex...
 if exist src\lexer.l (
-    flex -o src\lexer.yy.c src\lexer.l
+    flex -o build\generated\lexer.yy.c src\lexer.l
 )
 
 echo [3/3] Compiling C source files...
-set SOURCES=src\main.c src\protocol.c src\ast.c src\semantic.c src\tac.c src\asm_x86_64.c
-if exist src\parser.tab.c set SOURCES=!SOURCES! src\parser.tab.c
-if exist src\lexer.yy.c set SOURCES=!SOURCES! src\lexer.yy.c
+set SOURCES=src/main.c src/protocol.c src/backend/artifact_builder.c src/ast.c src/semantic.c src/tac.c src/asm_x86_64.c
+if exist build\generated\parser.tab.c set SOURCES=!SOURCES! build\generated\parser.tab.c
+if exist build\generated\lexer.yy.c set SOURCES=!SOURCES! build\generated\lexer.yy.c
 
-gcc -O2 -Wall -Wextra -Iinclude -Isrc !SOURCES! -o build\arabicc.exe
+gcc -O2 -Wall -Wextra -Iinclude -Isrc -Ibuild\generated !SOURCES! -o build\arabicc.exe
 if %ERRORLEVEL% equ 0 (
     echo [OK] Build succeeded: build\arabicc.exe
 
