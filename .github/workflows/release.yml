@@ -100,10 +100,10 @@ jobs:
           $exe = if (Test-Path packages/compiler_c/build/Release/arabicc.exe) { "packages/compiler_c/build/Release/arabicc.exe" } else { "packages/compiler_c/build/arabicc.exe" }
           Copy-Item $exe "$release/compiler/arabicc.exe"
           Copy-Item C:/msys64/ucrt64/bin/* "$release/toolchain/windows/bin/" -Recurse -Force
-          Copy-Item C:/msys64/ucrt64/include "$release/toolchain/windows/" -Recurse -Force
-          Copy-Item C:/msys64/ucrt64/lib "$release/toolchain/windows/" -Recurse -Force
-          Copy-Item C:/msys64/ucrt64/libexec "$release/toolchain/windows/" -Recurse -Force
-          Copy-Item C:/msys64/ucrt64/share "$release/toolchain/windows/" -Recurse -Force
+          foreach ($directory in @("include", "lib", "libexec", "share")) {
+            $source = "C:/msys64/ucrt64/$directory"
+            if (Test-Path $source) { Copy-Item $source "$release/toolchain/windows/" -Recurse -Force }
+          }
       - name: Bundle compiler and native tools (macOS)
         if: matrix.target == 'macos'
         shell: bash
