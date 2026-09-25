@@ -158,25 +158,34 @@ class ArabicCodeController extends TextEditingController {
   }
 
   Color? _tokenColor(SourceToken token, ColorScheme colors) {
-    if (token.kind == SourceTokenKind.comment) return colors.onSurfaceVariant;
+    if (token.kind == SourceTokenKind.comment) return AppTheme.syntaxComment;
     if (token.role != null) {
       return switch (token.role!) {
-        SourceTokenRole.constant => colors.secondary,
-        SourceTokenRole.type => colors.tertiary,
-        SourceTokenRole.procedure => AppTheme.brandOrange,
-        SourceTokenRole.parameter => colors.primary,
-        SourceTokenRole.variable => colors.onSurface,
+        SourceTokenRole.constant => AppTheme.syntaxNumber,
+        SourceTokenRole.type => AppTheme.syntaxType,
+        SourceTokenRole.procedure => AppTheme.syntaxDeclaration,
+        SourceTokenRole.parameter => AppTheme.syntaxModifier,
+        SourceTokenRole.variable => AppTheme.syntaxIdentifier,
+      };
+    }
+    if (token.group != null) {
+      return switch (token.group!) {
+        SourceTokenGroup.declaration => AppTheme.syntaxDeclaration,
+        SourceTokenGroup.controlFlow => AppTheme.syntaxControlFlow,
+        SourceTokenGroup.builtin => AppTheme.syntaxBuiltin,
+        SourceTokenGroup.type => AppTheme.syntaxType,
+        SourceTokenGroup.modifier => AppTheme.syntaxModifier,
       };
     }
     return switch (token.kind) {
-      SourceTokenKind.keyword => AppTheme.brandOrange,
-      SourceTokenKind.string || SourceTokenKind.character => colors.tertiary,
-      SourceTokenKind.integer || SourceTokenKind.real => colors.secondary,
-      SourceTokenKind.boolean => colors.primary,
-      SourceTokenKind.operator => colors.error,
-      SourceTokenKind.punctuation => colors.outline,
-      SourceTokenKind.identifier => colors.onSurfaceVariant,
-      SourceTokenKind.comment => colors.onSurfaceVariant,
+      SourceTokenKind.keyword => AppTheme.syntaxDeclaration,
+      SourceTokenKind.string || SourceTokenKind.character => AppTheme.syntaxString,
+      SourceTokenKind.integer || SourceTokenKind.real => AppTheme.syntaxNumber,
+      SourceTokenKind.boolean => AppTheme.syntaxBoolean,
+      SourceTokenKind.operator => AppTheme.syntaxOperator,
+      SourceTokenKind.punctuation => AppTheme.syntaxPunctuation,
+      SourceTokenKind.identifier => AppTheme.syntaxIdentifier,
+      SourceTokenKind.comment => AppTheme.syntaxComment,
     };
   }
 }

@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 
 import '../../../domain/entities/editor_diagnostic.dart';
+import '../../../domain/entities/source_token.dart';
+import '../../../domain/usecases/arabic_syntax_highlighter.dart';
 import '../../../../../../shared/themes/app_theme.dart';
 
 class CodeMinimap extends StatefulWidget {
@@ -232,6 +234,7 @@ List<_MinimapSection> _sections(List<String> lines) {
 
 class _MinimapPainter extends CustomPainter {
   static const lineHeight = 7.0;
+  static const _highlighter = ArabicSyntaxHighlighter();
   final List<String> lines;
   final List<_MinimapSection> sections;
   final List<EditorDiagnostic> diagnostics;
@@ -361,21 +364,28 @@ class _MinimapPainter extends CustomPainter {
   }
 
   Color _tokenColor(String token) {
-    if (token.startsWith('//')) return colors.onSurfaceVariant;
-    if (token.startsWith('"')) return colors.secondary;
-    if (RegExp(r'^\d').hasMatch(token)) return colors.error;
-    if (RegExp(
-      r'^(برنامج|ثابت|نوع|متغير|اجراء|إجراء|بالقيمة|بالمرجع|اطبع|اقرا|اقرأ|اذا|إذا|فان|والا|وإلا|كرر|طالما|استمر|اعد|أعد|من|الى|اضف|أضف|حتى|قائمة|سجل)$',
-    ).hasMatch(token)) {
-      return colors.primary;
+    final parsed = _highlighter.tokenize(token);
+    if (parsed.isEmpty) return AppTheme.syntaxIdentifier;
+    final sourceToken = parsed.first;
+    if (sourceToken.group != null) {
+      return switch (sourceToken.group!) {
+        SourceTokenGroup.declaration => AppTheme.syntaxDeclaration,
+        SourceTokenGroup.controlFlow => AppTheme.syntaxControlFlow,
+        SourceTokenGroup.builtin => AppTheme.syntaxBuiltin,
+        SourceTokenGroup.type => AppTheme.syntaxType,
+        SourceTokenGroup.modifier => AppTheme.syntaxModifier,
+      };
     }
-    if (RegExp(r'^(صحيح|حقيقي|منطقي|حرفي|خيط_رمزي)$').hasMatch(token)) {
-      return colors.tertiary;
-    }
-    if (RegExp(r'^[{}()\[\];،؛,.+*/=<>:-]$').hasMatch(token)) {
-      return colors.outline;
-    }
-    return colors.onSurfaceVariant;
+    return switch (sourceToken.kind) {
+      SourceTokenKind.comment => AppTheme.syntaxComment,
+      SourceTokenKind.string || SourceTokenKind.character => AppTheme.syntaxString,
+      SourceTokenKind.integer || SourceTokenKind.real => AppTheme.syntaxNumber,
+      SourceTokenKind.boolean => AppTheme.syntaxBoolean,
+      SourceTokenKind.operator => AppTheme.syntaxOperator,
+      SourceTokenKind.punctuation => AppTheme.syntaxPunctuation,
+      SourceTokenKind.keyword => AppTheme.syntaxDeclaration,
+      SourceTokenKind.identifier => AppTheme.syntaxIdentifier,
+    };
   }
 
   void _paintSection(

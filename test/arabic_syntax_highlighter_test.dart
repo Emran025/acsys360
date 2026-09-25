@@ -64,4 +64,31 @@ void main() {
       SourceTokenKind.identifier,
     );
   });
+
+  test('assigns semantic groups to reserved words', () {
+    final tokens = highlighter.tokenize(
+      'برنامج إذا اطبع صحيح بالقيمة',
+    );
+
+    expect(
+      tokens.firstWhere((token) => token.lexeme == 'برنامج').group,
+      SourceTokenGroup.declaration,
+    );
+    expect(
+      tokens.firstWhere((token) => token.lexeme == 'إذا').group,
+      SourceTokenGroup.controlFlow,
+    );
+    expect(
+      tokens.firstWhere((token) => token.lexeme == 'اطبع').group,
+      SourceTokenGroup.builtin,
+    );
+    expect(
+      tokens.firstWhere((token) => token.lexeme == 'صحيح').group,
+      SourceTokenGroup.type,
+    );
+    expect(
+      tokens.firstWhere((token) => token.lexeme == 'بالقيمة').group,
+      SourceTokenGroup.modifier,
+    );
+  });
 }

@@ -3,6 +3,18 @@ import 'package:flutter/material.dart';
 abstract final class AppTheme {
   static const brandOrange = Color(0xFFFF9500);
   static const brandBlack = Color(0xFF0B0B0B);
+  static const syntaxDeclaration = Color(0xFFFFC857);
+  static const syntaxControlFlow = Color(0xFFFF7AB2);
+  static const syntaxBuiltin = Color(0xFF63C5DA);
+  static const syntaxType = Color(0xFFB39DDB);
+  static const syntaxModifier = Color(0xFFF2A65A);
+  static const syntaxNumber = Color(0xFF9CDCFE);
+  static const syntaxString = Color(0xFFCE9178);
+  static const syntaxBoolean = Color(0xFF569CD6);
+  static const syntaxOperator = Color(0xFFD4D4D4);
+  static const syntaxPunctuation = Color(0xFF808080);
+  static const syntaxIdentifier = Color(0xFFD4D4D4);
+  static const syntaxComment = Color(0xFF6A9955);
   static const lightSurface = Color(0xFFF5F2ED);
   static const darkSurface = Color(0xFF141414);
   static const fontFamily = 'Cairo';

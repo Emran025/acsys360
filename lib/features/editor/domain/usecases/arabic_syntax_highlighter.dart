@@ -2,40 +2,40 @@ import '../entities/source_token.dart';
 
 /// يحول النصوص العربية إلى tokens مستقلة للعرض والتلوين دون الحاجة للمترجم مباشرة.
 class ArabicSyntaxHighlighter {
-  static const Set<String> _keywords = {
-    'برنامج',
-    'ثابت',
-    'نوع',
-    'متغير',
-    'اجراء',
-    'إجراء',
-    'بالقيمة',
-    'بالمرجع',
-    'اطبع',
-    'اقرا',
-    'اقرأ',
-    'اذا',
-    'إذا',
-    'فان',
-    'والا',
-    'وإلا',
-    'كرر',
-    'طالما',
-    'استمر',
-    'اعد',
-    'أعد',
-    'من',
-    'الى',
-    'اضف',
-    'أضف',
-    'حتى',
-    'صحيح',
-    'حقيقي',
-    'منطقي',
-    'حرفي',
-    'خيط_رمزي',
-    'قائمة',
-    'سجل',
+  static const Map<String, SourceTokenGroup> _keywordGroups = {
+    'برنامج': SourceTokenGroup.declaration,
+    'ثابت': SourceTokenGroup.declaration,
+    'نوع': SourceTokenGroup.declaration,
+    'متغير': SourceTokenGroup.declaration,
+    'اجراء': SourceTokenGroup.declaration,
+    'إجراء': SourceTokenGroup.declaration,
+    'اذا': SourceTokenGroup.controlFlow,
+    'إذا': SourceTokenGroup.controlFlow,
+    'فان': SourceTokenGroup.controlFlow,
+    'والا': SourceTokenGroup.controlFlow,
+    'وإلا': SourceTokenGroup.controlFlow,
+    'كرر': SourceTokenGroup.controlFlow,
+    'طالما': SourceTokenGroup.controlFlow,
+    'استمر': SourceTokenGroup.controlFlow,
+    'اعد': SourceTokenGroup.controlFlow,
+    'أعد': SourceTokenGroup.controlFlow,
+    'اطبع': SourceTokenGroup.builtin,
+    'اقرا': SourceTokenGroup.builtin,
+    'اقرأ': SourceTokenGroup.builtin,
+    'صحيح': SourceTokenGroup.type,
+    'حقيقي': SourceTokenGroup.type,
+    'منطقي': SourceTokenGroup.type,
+    'حرفي': SourceTokenGroup.type,
+    'خيط_رمزي': SourceTokenGroup.type,
+    'قائمة': SourceTokenGroup.type,
+    'سجل': SourceTokenGroup.type,
+    'بالقيمة': SourceTokenGroup.modifier,
+    'بالمرجع': SourceTokenGroup.modifier,
+    'من': SourceTokenGroup.modifier,
+    'الى': SourceTokenGroup.modifier,
+    'اضف': SourceTokenGroup.modifier,
+    'أضف': SourceTokenGroup.modifier,
+    'حتى': SourceTokenGroup.modifier,
   };
 
   static const Set<String> _booleans = {'صح', 'خطأ'};
@@ -192,10 +192,11 @@ class ArabicSyntaxHighlighter {
           index++;
         }
         final lexeme = source.substring(start, index);
+        final group = _keywordGroups[lexeme];
         final SourceTokenKind kind;
         if (_booleans.contains(lexeme)) {
           kind = SourceTokenKind.boolean;
-        } else if (_keywords.contains(lexeme)) {
+        } else if (group != null) {
           kind = SourceTokenKind.keyword;
         } else {
           kind = SourceTokenKind.identifier;
@@ -207,6 +208,7 @@ class ArabicSyntaxHighlighter {
             start: start,
             end: index,
             role: roles[lexeme],
+            group: group,
           ),
         );
         continue;
