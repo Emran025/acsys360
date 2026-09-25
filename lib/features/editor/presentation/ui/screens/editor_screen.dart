@@ -1,9 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 
 import 'package:compiler_contracts/compiler_contracts.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -12,7 +9,7 @@ import '../../../domain/entities/document.dart';
 import '../../../domain/entities/editor_diagnostic.dart';
 import '../../../domain/entities/source_token.dart';
 import '../../../domain/repositories/workspace_repository.dart';
-import '../../../domain/services/source_file_policy.dart';
+import '../../../domain/services/document_file_service.dart';
 import '../../../domain/usecases/toggle_line_comment.dart';
 import '../../controllers/editor_controller.dart';
 import '../widgets/arabic_code_controller.dart';
@@ -36,12 +33,14 @@ typedef EditorScreen = EditorShell;
 
 class EditorShell extends StatefulWidget {
   final EditorController controller;
+  final DocumentFileService fileService;
   final VoidCallback? onToggleTheme;
   final bool isDark;
 
   const EditorShell({
     super.key,
     required this.controller,
+    required this.fileService,
     this.onToggleTheme,
     this.isDark = false,
   });
@@ -241,12 +240,8 @@ class _EditorShellState extends State<EditorShell> {
   Map<String, SourceTokenRole> _semanticRoles(CompilationResult? result) {
     if (result == null) return const {};
     final roles = <String, SourceTokenRole>{};
-    for (final item in result.symbols) {
-      if (item is! Map) continue;
-      final name = item['name'];
-      final kind = item['kind'];
-      if (name is! String || kind is! String) continue;
-      roles[name] = switch (kind) {
+    for (final symbol in result.symbols) {
+      roles[symbol.name] = switch (symbol.kind) {
         'constant' => SourceTokenRole.constant,
         'type' => SourceTokenRole.type,
         'procedure' || 'function' => SourceTokenRole.procedure,
@@ -796,12 +791,7 @@ class _EditorShellState extends State<EditorShell> {
   }
 
   Future<void> _openFile() async {
-    final files = await FilePicker.pickFiles(
-      dialogTitle: 'فتح ملف عربي',
-      type: FileType.custom,
-      allowedExtensions: [SourceFilePolicy.extension.substring(1)],
-    );
-    final path = files.isEmpty ? null : files.first.path;
+    final path = await widget.fileService.pickSourceFile();
     if (path != null && mounted) await widget.controller.open(path);
   }
 
@@ -811,7 +801,7 @@ class _EditorShellState extends State<EditorShell> {
   }
 
   Future<void> _renamePath(String path) async {
-    final currentName = path.split(Platform.pathSeparator).last;
+    final currentName = widget.fileService.baseName(path);
     final newName = await showRenameDialog(context, currentName: currentName);
     if (newName != null && mounted) {
       await widget.controller.rename(path, newName);
@@ -821,24 +811,17 @@ class _EditorShellState extends State<EditorShell> {
   Future<void> _saveAs() async {
     final active = widget.controller.activeDocument;
     if (active == null) return;
-    final currentName = active.path.split(Platform.pathSeparator).last;
-    final selected = await FilePicker.saveFile(
-      dialogTitle: 'حفظ الملف باسم',
+    final currentName = widget.fileService.baseName(active.path);
+    final path = await widget.fileService.saveSourceFile(
       fileName: currentName,
-      bytes: Uint8List.fromList(utf8.encode(active.text)),
-      type: FileType.custom,
-      allowedExtensions: [SourceFilePolicy.extension.substring(1)],
+      text: active.text,
     );
-    final path = selected?.toFilePath();
     if (path == null || !mounted) return;
-    final normalized = const SourceFilePolicy().ensureExtension(path);
-    await widget.controller.saveAs(normalized);
+    await widget.controller.saveAs(path);
   }
 
   Future<void> _pickWorkspace() async {
-    final path = await FilePicker.getDirectoryPath(
-      dialogTitle: 'اختر مجلد المشروع',
-    );
+    final path = await widget.fileService.pickWorkspace();
     if (path != null && mounted) {
       await widget.controller.changeRoot(path);
     }

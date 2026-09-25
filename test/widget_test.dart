@@ -117,9 +117,7 @@ void main() {
     await controller.open('main.arb');
     controller.compilation = const CompilationResult(
       success: true,
-      payload: {
-        'executionOutput': ['الأول', 'الثاني'],
-      },
+      executionOutput: ['الأول', 'الثاني'],
     );
 
     await tester.pumpWidget(ArabicEditorApp(controller: controller));

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../features/editor/domain/services/document_file_service.dart';
 import '../features/editor/presentation/controllers/editor_controller.dart';
 import '../features/editor/presentation/ui/screens/editor_screen.dart';
 
@@ -21,6 +22,7 @@ class AppRouter {
   static Route<dynamic>? onGenerateRoute(
     RouteSettings settings, {
     required EditorController controller,
+    DocumentFileService fileService = const UnavailableDocumentFileService(),
     VoidCallback? onToggleTheme,
     bool isDark = false,
   }) {
@@ -31,6 +33,7 @@ class AppRouter {
           settings: settings,
           builder: (_) => EditorShell(
             controller: controller,
+            fileService: fileService,
             onToggleTheme: onToggleTheme,
             isDark: isDark,
           ),

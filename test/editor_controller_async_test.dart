@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:acsys360/features/editor/domain/entities/compilation_result.dart';
 import 'package:acsys360/features/editor/domain/entities/document.dart';
 import 'package:acsys360/features/editor/domain/entities/file_node.dart';
 import 'package:acsys360/features/editor/domain/repositories/workspace_repository.dart';
@@ -21,7 +22,7 @@ void main() {
 
       final compileFuture = controller.compile();
       controller.edit(const TextEdit(offset: 0, before: '', after: 'س'));
-      compiler.response.complete(_successResponse());
+      compiler.response.complete(_successResponse);
       await compileFuture;
 
       expect(controller.compilation, isNull);
@@ -80,16 +81,13 @@ void main() {
   );
 }
 
-Map<String, dynamic> _successResponse() => {
-  'success': true,
-  'diagnostics': const [],
-};
+const _successResponse = CompilationResult(success: true);
 
 class DeferredCompiler implements CompilerRepository {
-  final response = Completer<Map<String, dynamic>>();
+  final response = Completer<CompilationResult>();
 
   @override
-  Future<Map<String, dynamic>> compile({
+  Future<CompilationResult> compile({
     required String rootPath,
     required String sourcePath,
     required List<Document> documents,
@@ -107,7 +105,7 @@ class EmptyCompiler implements CompilerRepository {
   const EmptyCompiler();
 
   @override
-  Future<Map<String, dynamic>> compile({
+  Future<CompilationResult> compile({
     required String rootPath,
     required String sourcePath,
     required List<Document> documents,
@@ -118,7 +116,7 @@ class EmptyCompiler implements CompilerRepository {
     bool execute = true,
     bool interactive = false,
     InputRequestHandler? onInputRequest,
-  }) async => _successResponse();
+  }) async => _successResponse;
 }
 
 class DeferredAssistant implements AssistRepository {

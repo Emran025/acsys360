@@ -9,3 +9,14 @@ abstract interface class ProgramRunner {
     NativeOutputHandler? onOutput,
   });
 }
+
+class UnavailableProgramRunner implements ProgramRunner {
+  const UnavailableProgramRunner();
+
+  @override
+  Future<List<String>> run(
+    String executable, {
+    InputRequestHandler? onInputRequest,
+    NativeOutputHandler? onOutput,
+  }) => throw StateError('لم يتم إعداد مشغل البرنامج التنفيذي');
+}

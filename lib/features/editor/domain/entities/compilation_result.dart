@@ -1,25 +1,55 @@
+import 'package:compiler_contracts/compiler_contracts.dart';
+
 class CompilationResult {
   final bool success;
-  final Map<String, dynamic> payload;
+  final List<Diagnostic> diagnostics;
+  final List<ProtocolToken> tokens;
+  final Map<String, Object?>? syntaxTree;
+  final List<SymbolRecord> symbols;
+  final List<String> threeAddressCode;
+  final String assembly;
+  final List<String> executionOutput;
+  final List<String> artifacts;
+  final Map<String, Object?>? intermediateRepresentation;
 
-  const CompilationResult({required this.success, required this.payload});
+  const CompilationResult({
+    required this.success,
+    this.diagnostics = const [],
+    this.tokens = const [],
+    this.syntaxTree,
+    this.symbols = const [],
+    this.threeAddressCode = const [],
+    this.assembly = '',
+    this.executionOutput = const [],
+    this.artifacts = const [],
+    this.intermediateRepresentation,
+  });
 
-  List<dynamic> get diagnostics =>
-      payload['diagnostics'] as List<dynamic>? ?? const [];
-  List<dynamic> get tokens => payload['tokens'] as List<dynamic>? ?? const [];
-  List<dynamic> get threeAddressCode =>
-      payload['threeAddressCode'] as List<dynamic>? ?? const [];
-  String get assembly => payload['assembly'] as String? ?? '';
-  List<dynamic> get executionOutput =>
-      payload['executionOutput'] as List<dynamic>? ?? const [];
-  List<String> get artifacts =>
-      (payload['artifacts'] as List<dynamic>? ?? const [])
-          .whereType<String>()
-          .toList(growable: false);
-  List<dynamic> get symbols =>
-      payload['symbolTable'] as List<dynamic>? ?? const [];
-  Map<String, dynamic>? get syntaxTree =>
-      payload['syntaxTree'] as Map<String, dynamic>?;
-  Map<String, dynamic>? get intermediateRepresentation =>
-      payload['intermediateRepresentation'] as Map<String, dynamic>?;
+  factory CompilationResult.fromProtocol(CompilationResponse response) =>
+      CompilationResult(
+        success: response.success,
+        diagnostics: response.diagnostics,
+        tokens: response.tokens,
+        syntaxTree: response.syntaxTree,
+        symbols: response.symbols,
+        threeAddressCode: response.threeAddressCode,
+        assembly: response.assembly,
+        executionOutput: response.executionOutput,
+        artifacts: response.artifacts,
+        intermediateRepresentation: response.intermediateRepresentation,
+      );
+
+  CompilationResult copyWith({List<String>? executionOutput}) =>
+      CompilationResult(
+        success: success,
+        diagnostics: diagnostics,
+        tokens: tokens,
+        syntaxTree: syntaxTree,
+        symbols: symbols,
+        threeAddressCode: threeAddressCode,
+        assembly: assembly,
+        executionOutput: executionOutput ?? this.executionOutput,
+        artifacts: artifacts,
+        intermediateRepresentation: intermediateRepresentation,
+      );
 }

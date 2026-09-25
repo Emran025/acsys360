@@ -2,6 +2,7 @@ import 'package:compiler_contracts/compiler_contracts.dart';
 
 import '../entities/document.dart';
 import '../entities/file_node.dart';
+import '../entities/compilation_result.dart';
 
 class InputRequest {
   final String name;
@@ -25,7 +26,7 @@ abstract interface class WorkspaceRepository {
 }
 
 abstract interface class CompilerRepository {
-  Future<Map<String, dynamic>> compile({
+  Future<CompilationResult> compile({
     required String rootPath,
     required String sourcePath,
     required List<Document> documents,

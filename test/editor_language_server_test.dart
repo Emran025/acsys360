@@ -1,3 +1,4 @@
+import 'package:acsys360/features/editor/domain/entities/compilation_result.dart';
 import 'package:acsys360/features/editor/domain/entities/document.dart';
 import 'package:acsys360/features/editor/domain/repositories/workspace_repository.dart';
 import 'package:acsys360/features/editor/domain/usecases/editor_language_server.dart';
@@ -33,7 +34,7 @@ class DiagnosticCompiler implements CompilerRepository {
   const DiagnosticCompiler();
 
   @override
-  Future<Map<String, dynamic>> compile({
+  Future<CompilationResult> compile({
     required String rootPath,
     required String sourcePath,
     required List<Document> documents,
@@ -44,38 +45,38 @@ class DiagnosticCompiler implements CompilerRepository {
     bool execute = true,
     bool interactive = false,
     InputRequestHandler? onInputRequest,
-  }) async => {
-    'success': false,
-    'executionOutput': ['0'],
-    'diagnostics': [
-      {
-        'severity': 'error',
-        'phase': 'syntax',
-        'code': 'S001',
-        'message': 'خطأ في الملف النشط',
-        'span': {
-          'sourcePath': '/workspace/main.arb',
-          'offset': 0,
-          'line': 1,
-          'column': 1,
-          'length': 1,
-        },
-      },
-      {
-        'severity': 'error',
-        'phase': 'syntax',
-        'code': 'S002',
-        'message': 'خطأ في ملف آخر',
-        'span': {
-          'sourcePath': '/workspace/lib.arb',
-          'offset': 0,
-          'line': 1,
-          'column': 1,
-          'length': 1,
-        },
-      },
+  }) async => const CompilationResult(
+    success: false,
+    diagnostics: [
+      Diagnostic(
+        severity: DiagnosticSeverity.error,
+        phase: 'syntax',
+        code: 'S001',
+        message: 'خطأ في الملف النشط',
+        span: SourceSpan(
+          sourcePath: '/workspace/main.arb',
+          offset: 0,
+          line: 1,
+          column: 1,
+          length: 1,
+        ),
+      ),
+      Diagnostic(
+        severity: DiagnosticSeverity.error,
+        phase: 'syntax',
+        code: 'S002',
+        message: 'خطأ في ملف آخر',
+        span: SourceSpan(
+          sourcePath: '/workspace/lib.arb',
+          offset: 0,
+          line: 1,
+          column: 1,
+          length: 1,
+        ),
+      ),
     ],
-  };
+    executionOutput: ['0'],
+  );
 }
 
 class EmptyAssistRepository implements AssistRepository {

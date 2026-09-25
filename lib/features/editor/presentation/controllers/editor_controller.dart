@@ -27,8 +27,9 @@ class EditorController extends ChangeNotifier {
   final CompilerRepository? compiler;
   final AssistRepository? assistant;
   final WorkspacePathService pathService;
+
   /// Injected by the composition root; presentation depends only on the contract.
-  final ProgramRunner? artifactRunner;
+  final ProgramRunner artifactRunner;
 
   Workspace workspace;
   List<String> files = const [];
@@ -62,7 +63,7 @@ class EditorController extends ChangeNotifier {
     this.compiler,
     this.assistant,
     this.pathService = const DefaultWorkspacePathService(),
-    this.artifactRunner,
+    this.artifactRunner = const UnavailableProgramRunner(),
   }) : workspace = Workspace(rootPath: rootPath),
        openDocument = OpenDocument(repository),
        saveDocument = SaveDocument(repository),
@@ -524,30 +525,21 @@ class EditorController extends ChangeNotifier {
     if (artifact == null || artifact.isEmpty) {
       throw StateError('لا يوجد executable ناتج. نفّذ البناء أولًا');
     }
-    final runner = artifactRunner;
-    if (runner == null) {
-      throw StateError('لم يتم إعداد مشغل البرنامج التنفيذي');
-    }
-    final output = await runner.run(
+    final output = await artifactRunner.run(
       artifact,
       onInputRequest: onInputRequest,
       onOutput: (line) {
         final current = compilation;
         if (current == null) return;
         final executionOutput = [...current.executionOutput, line];
-        compilation = CompilationResult(
-          success: current.success,
-          payload: {...current.payload, 'executionOutput': executionOutput},
-        );
+        compilation = current.copyWith(executionOutput: executionOutput);
         notifyListeners();
         onOutput?.call(line);
       },
     );
-    final payload = Map<String, dynamic>.from(compilation?.payload ?? const {})
-      ..['executionOutput'] = output;
-    compilation = CompilationResult(
-      success: compilation?.success ?? true,
-      payload: payload,
+    final current = compilation;
+    compilation = (current ?? const CompilationResult(success: true)).copyWith(
+      executionOutput: output,
     );
     notifyListeners();
   }
@@ -633,12 +625,7 @@ class EditorController extends ChangeNotifier {
   }
 
   List<String> _knownSymbols() {
-    final table = compilation?.payload['symbolTable'];
-    if (table is! List) return const [];
-    return [
-      for (final item in table)
-        if (item is Map && item['name'] is String) item['name'] as String,
-    ];
+    return [for (final symbol in compilation?.symbols ?? const []) symbol.name];
   }
 
   void undo() {

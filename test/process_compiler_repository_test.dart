@@ -30,9 +30,9 @@ void main() {
         ],
       );
 
-      expect(response['protocolVersion'], '0.5.0');
-      expect(response['success'], isTrue);
-      expect(response['diagnostics'], isEmpty);
+      expect(response.success, isTrue);
+      expect(response.success, isTrue);
+      expect(response.diagnostics, isEmpty);
     },
   );
 
@@ -60,9 +60,9 @@ void main() {
         ],
       );
 
-      expect(response['protocolVersion'], '0.5.0');
-      expect(response['success'], isTrue);
-      expect(response['intermediateRepresentation'], isA<Map>());
+      expect(response.success, isTrue);
+      expect(response.success, isTrue);
+      expect(response.intermediateRepresentation, isA<Map>());
     },
   );
 
@@ -84,11 +84,11 @@ void main() {
         documents: const [Document(path: '/workspace/main.arb', text: 'س')],
       );
 
-      expect(response['success'], isFalse);
-      final diagnostic = (response['diagnostics'] as List).single as Map;
-      expect(diagnostic['phase'], 'process');
-      expect(diagnostic['code'], 'P005');
-      expect(diagnostic['message'], contains('حد الانتظار'));
+      expect(response.success, isFalse);
+      final diagnostic = response.diagnostics.single;
+      expect(diagnostic.phase, 'process');
+      expect(diagnostic.code, 'P005');
+      expect(diagnostic.message, contains('حد الانتظار'));
     },
   );
 }

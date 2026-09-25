@@ -51,19 +51,18 @@ class EditorLanguageServer {
       interactive: interactive,
       onInputRequest: onInputRequest,
     );
-    final analysisResponse = Map<String, dynamic>.from(response);
     // Analysis must never expose runtime output. This also protects the UI
     // when a bundled/legacy compiler still returns default values for اقرأ.
-    if (!execute) analysisResponse['executionOutput'] = const <String>[];
-    final compilation = CompilationResult(
-      success: analysisResponse['success'] == true,
-      payload: analysisResponse,
-    );
+    final compilation = !execute
+        ? response.copyWith(executionOutput: const [])
+        : response;
     final active = documents.firstWhere(
       (document) => document.path == sourcePath,
       orElse: () => Document(path: sourcePath, text: ''),
     );
-    final rawDiagnostics = response['diagnostics'];
+    final rawDiagnostics = [
+      for (final diagnostic in response.diagnostics) diagnostic.toJson(),
+    ];
     bool matchesPath(String? p1, String p2) {
       if (p1 == null || p1.isEmpty) return true;
       final n1 = p1.replaceAll('\\', '/').toLowerCase();
@@ -72,10 +71,7 @@ class EditorLanguageServer {
     }
 
     final diagnostics = diagnosticsService
-        .enrichDiagnostics(
-          rawDiagnostics is List ? rawDiagnostics : const [],
-          active.text,
-        )
+        .enrichDiagnostics(rawDiagnostics, active.text)
         .where((diagnostic) => matchesPath(diagnostic.sourcePath, sourcePath))
         .toList();
     return LanguageAnalysis(compilation: compilation, diagnostics: diagnostics);

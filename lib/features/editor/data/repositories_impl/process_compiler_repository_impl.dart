@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:compiler_contracts/compiler_contracts.dart';
 
 import '../../domain/entities/document.dart';
+import '../../domain/entities/compilation_result.dart';
 import '../../domain/repositories/workspace_repository.dart';
 
 typedef CompilerProcessStarter =
@@ -37,7 +38,7 @@ class ProcessCompilerRepository
   });
 
   @override
-  Future<Map<String, dynamic>> compile({
+  Future<CompilationResult> compile({
     required String rootPath,
     required String sourcePath,
     required List<Document> documents,
@@ -116,9 +117,20 @@ class ProcessCompilerRepository
       final response = CompilationResponse.fromJson(
         Map<String, dynamic>.from(decoded),
       );
-      final result = Map<String, dynamic>.from(response.toJson());
-      if (!execute) result['executionOutput'] = const <String>[];
-      return result;
+      final typedResponse = !execute
+          ? CompilationResponse(
+              success: response.success,
+              diagnostics: response.diagnostics,
+              tokens: response.tokens,
+              syntaxTree: response.syntaxTree,
+              symbols: response.symbols,
+              threeAddressCode: response.threeAddressCode,
+              assembly: response.assembly,
+              artifacts: response.artifacts,
+              intermediateRepresentation: response.intermediateRepresentation,
+            )
+          : response;
+      return CompilationResult.fromProtocol(typedResponse);
     } on TimeoutException {
       return _processFailure(
         'تجاوز المترجم حد الانتظار (${processTimeout.inSeconds} ثانية)',
@@ -307,26 +319,18 @@ class ProcessCompilerRepository
     ];
   }
 
-  Map<String, dynamic> _processFailure(String message, int exitCode) => {
-    'protocolVersion': protocolVersion,
-    'success': false,
-    'diagnostics': [
-      {
-        'severity': 'error',
-        'phase': 'process',
-        'code': exitCode == -1 ? 'P004' : 'P005',
-        'message': message.isEmpty ? 'فشل تشغيل المترجم' : message,
-        'span': null,
-      },
-    ],
-    'tokens': const [],
-    'syntaxTree': null,
-    'symbolTable': const [],
-    'threeAddressCode': const [],
-    'assembly': '',
-    'executionOutput': const [],
-    'artifacts': const [],
-  };
+  CompilationResult _processFailure(String message, int exitCode) =>
+      CompilationResult(
+        success: false,
+        diagnostics: [
+          Diagnostic(
+            severity: DiagnosticSeverity.error,
+            phase: 'process',
+            code: exitCode == -1 ? 'P004' : 'P005',
+            message: message.isEmpty ? 'فشل تشغيل المترجم' : message,
+          ),
+        ],
+      );
 }
 
 class _ProcessResult {

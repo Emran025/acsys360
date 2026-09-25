@@ -130,7 +130,8 @@ class _DiagnosticsPanelWidgetState extends State<DiagnosticsPanelWidget> {
     4 => _selectable(
       prettyJson(
         result.diagnostics
-            .where((item) => item is Map && item['phase'] == 'semantic')
+            .where((item) => item.phase == 'semantic')
+            .map((item) => item.toJson())
             .toList(),
       ),
     ),
@@ -232,12 +233,7 @@ class _DiagnosticsPanelWidgetState extends State<DiagnosticsPanelWidget> {
     }
     return _selectable(
       result.diagnostics
-          .map((diagnostic) {
-            if (diagnostic is Map) {
-              return '${diagnostic['phase'] ?? 'compiler'}: ${diagnostic['message'] ?? diagnostic}';
-            }
-            return '$diagnostic';
-          })
+          .map((diagnostic) => '${diagnostic.phase}: ${diagnostic.message}')
           .join('\n'),
     );
   }
