@@ -5,6 +5,19 @@ import '../repositories_impl/process_compiler_repository_impl.dart';
 ProcessCompilerRepository createCompilerRepository() {
   final compilerName = Platform.isWindows ? 'arabicc.exe' : 'arabicc';
   final executableDirectory = File(Platform.resolvedExecutable).parent.path;
+  final toolchainDirectory = join([
+    executableDirectory,
+    'toolchain',
+    Platform.isWindows ? 'windows' : (Platform.isMacOS ? 'macos' : 'linux'),
+    'bin',
+  ]);
+  final toolchainEnvironment = {
+    'ACSYS360_TOOLCHAIN_DIR': toolchainDirectory,
+    'PATH': [
+      toolchainDirectory,
+      Platform.environment['PATH'] ?? '',
+    ].join(Platform.isWindows ? ';' : ':'),
+  };
   final roots = <String>[];
 
   void addRoot(String path) {
@@ -69,6 +82,7 @@ ProcessCompilerRepository createCompilerRepository() {
         executable: candidate,
         arguments: const ['--protocol'],
         processWorkingDirectory: roots.first,
+        environment: toolchainEnvironment,
       );
     }
   }
@@ -77,5 +91,6 @@ ProcessCompilerRepository createCompilerRepository() {
     executable: compilerName,
     arguments: const ['--protocol'],
     processWorkingDirectory: roots.first,
+    environment: toolchainEnvironment,
   );
 }

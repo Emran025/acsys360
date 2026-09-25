@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build:
-    name: Build ${{ matrix.platform }}
+    name: Build ${{ matrix.platform }} installer
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -40,21 +40,31 @@ jobs:
       - run: flutter analyze
       - run: flutter test
 
-      # ── Linux desktop build ──────────────────────────────────────────────
       - if: matrix.target == 'linux'
-        name: Install Linux desktop dependencies
+        name: Install Linux build and package dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev flex bison
-      - if: matrix.target != 'linux'
-        name: Install Flutter desktop prerequisites (non-Linux)
-        shell: bash
-        run: echo "No extra prerequisites needed for ${{ matrix.target }}"
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev flex bison nasm gcc dpkg-dev rpm
+      - if: matrix.target == 'windows'
+        name: Install Flex & Bison
+        shell: pwsh
+        run: choco install winflexbison3 innosetup --yes --no-progress
+      - if: matrix.target == 'windows'
+        name: Install bundled Windows toolchain
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-nasm
+      - if: matrix.target == 'macos'
+        name: Install macOS build tools
+        run: brew install flex bison
 
       - run: flutter config --enable-${{ matrix.target }}-desktop
       - run: flutter build ${{ matrix.target }} --release
 
-      # ── Build C compiler (Unix) ──────────────────────────────────────────
       - name: Build C compiler (Unix)
         if: matrix.target != 'windows'
         shell: bash
@@ -62,13 +72,6 @@ jobs:
           cd packages/compiler_c
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
           cmake --build build --parallel
-
-      # ── Build C compiler (Windows) ───────────────────────────────────────
-      - name: Install Flex & Bison (Windows)
-        if: matrix.target == 'windows'
-        shell: pwsh
-        run: choco install winflexbison3 --yes --no-progress
-
       - name: Build C compiler (Windows)
         if: matrix.target == 'windows'
         shell: pwsh
@@ -77,77 +80,100 @@ jobs:
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
           cmake --build build --parallel --config Release
 
-      # ── Bundle compiler into app (Linux) ────────────────────────────────
-      - name: Bundle compiler on Linux
+      - name: Bundle compiler and native tools (Linux)
         if: matrix.target == 'linux'
         shell: bash
         run: |
-          mkdir -p build/linux/x64/release/bundle/compiler
-          cp packages/compiler_c/build/arabicc build/linux/x64/release/bundle/compiler/arabicc
-          chmod +x build/linux/x64/release/bundle/compiler/arabicc
-
-      # ── Bundle compiler into app (Windows) ──────────────────────────────
-      - name: Bundle compiler on Windows
+          bundle=build/linux/x64/release/bundle
+          mkdir -p "$bundle/compiler"
+          cp packages/compiler_c/build/arabicc "$bundle/compiler/arabicc"
+          chmod +x "$bundle/compiler/arabicc"
+      - name: Bundle compiler and native tools (Windows)
         if: matrix.target == 'windows'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force build/windows/x64/runner/Release/compiler | Out-Null
-          $exe = if (Test-Path packages/compiler_c/build/Release/arabicc.exe) {
-            "packages/compiler_c/build/Release/arabicc.exe"
-          } else {
-            "packages/compiler_c/build/arabicc.exe"
-          }
-          Copy-Item $exe build/windows/x64/runner/Release/compiler/arabicc.exe
-
-      # ── Bundle compiler into app (macOS) ────────────────────────────────
-      - name: Install Flex & Bison (macOS)
-        if: matrix.target == 'macos'
-        shell: bash
-        run: brew install flex bison
-
-      - name: Bundle compiler on macOS
+          $release = "build/windows/x64/runner/Release"
+          New-Item -ItemType Directory -Force "$release/compiler", "$release/toolchain/windows/bin" | Out-Null
+          $exe = if (Test-Path packages/compiler_c/build/Release/arabicc.exe) { "packages/compiler_c/build/Release/arabicc.exe" } else { "packages/compiler_c/build/arabicc.exe" }
+          Copy-Item $exe "$release/compiler/arabicc.exe"
+          Copy-Item C:/msys64/ucrt64/bin/* "$release/toolchain/windows/bin/" -Recurse -Force
+          Copy-Item C:/msys64/ucrt64/include "$release/toolchain/windows/" -Recurse -Force
+          Copy-Item C:/msys64/ucrt64/lib "$release/toolchain/windows/" -Recurse -Force
+          Copy-Item C:/msys64/ucrt64/libexec "$release/toolchain/windows/" -Recurse -Force
+          Copy-Item C:/msys64/ucrt64/share "$release/toolchain/windows/" -Recurse -Force
+      - name: Bundle compiler and native tools (macOS)
         if: matrix.target == 'macos'
         shell: bash
         run: |
-          dest="build/macos/Build/Products/Release/acsys360.app/Contents/MacOS/compiler"
-          mkdir -p "$dest"
-          cp packages/compiler_c/build/arabicc "$dest/arabicc"
-          chmod +x "$dest/arabicc"
+          app=build/macos/Build/Products/Release/acsys360.app
+          dest="$app/Contents/MacOS"
+          mkdir -p "$dest/compiler"
+          cp packages/compiler_c/build/arabicc "$dest/compiler/arabicc"
+          chmod +x "$dest/compiler/arabicc"
 
-      # ── Smoke test bundled compiler ──────────────────────────────────────
       - name: Smoke test bundled compiler (Unix)
         if: matrix.target != 'windows'
         shell: bash
         run: |
-          if [ "${{ matrix.target }}" = "linux" ]; then
-            compiler_path="build/linux/x64/release/bundle/compiler/arabicc"
-          else
-            compiler_path="build/macos/Build/Products/Release/acsys360.app/Contents/MacOS/compiler/arabicc"
-          fi
-          dart run tool/verify_compiler_bundle.dart --executable "$compiler_path"
-
+          if [ "${{ matrix.target }}" = linux ]; then path=build/linux/x64/release/bundle/compiler/arabicc; else path=build/macos/Build/Products/Release/acsys360.app/Contents/MacOS/compiler/arabicc; fi
+          dart run tool/verify_compiler_bundle.dart --executable "$path"
       - name: Smoke test bundled compiler (Windows)
         if: matrix.target == 'windows'
         shell: pwsh
         run: dart run tool/verify_compiler_bundle.dart --executable build/windows/x64/runner/Release/compiler/arabicc.exe
 
-      # ── Package artifacts ────────────────────────────────────────────────
-      - name: Package Linux
+      - name: Build Linux DEB and RPM installers
         if: matrix.target == 'linux'
-        run: tar -czf acsys360-linux-${{ github.ref_name }}.tar.gz -C build/linux/x64/release bundle
-      - name: Package Windows
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          if [[ "$version" == "$GITHUB_REF_NAME" ]]; then version="$(sed -n 's/^version: \([0-9.]*\).*/\1/p' pubspec.yaml)"; fi
+          root="$RUNNER_TEMP/acsys360-package"
+          mkdir -p "$root/DEBIAN" "$root/opt/acsys360" "$root/usr/share/applications" "$root/usr/share/icons/hicolor/512x512/apps"
+          cp -a build/linux/x64/release/bundle/. "$root/opt/acsys360/"
+          install -m 0644 linux/runner/resources/acsys360.desktop "$root/usr/share/applications/acsys360.desktop"
+          install -m 0644 linux/runner/resources/arabic360.png "$root/usr/share/icons/hicolor/512x512/apps/acsys360.png"
+          sed -i 's|^Exec=.*|Exec=/opt/acsys360/acsys360|; s|^Icon=.*|Icon=acsys360|' "$root/usr/share/applications/acsys360.desktop"
+          cat > "$root/DEBIAN/control" <<EOF
+          Package: acsys360
+          Version: ${version}
+          Section: devel
+          Priority: optional
+          Architecture: amd64
+          Maintainer: acsys360 maintainers
+          Depends: libgtk-3-0, liblzma5, gcc, nasm
+          Description: Arabic-first desktop programming environment
+           Includes the acsys360 desktop application and Arabic compiler.
+          EOF
+          mkdir -p dist
+          dpkg-deb --build --root-owner-group "$root" "dist/acsys360-linux-${version}-amd64.deb"
+          mkdir -p "$RUNNER_TEMP/rpmbuild"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+          rpmbuild -bb --define "_topdir $RUNNER_TEMP/rpmbuild" --define "_buildrootdir $root" --define "app_version $version" tool/packaging/acsys360.spec
+          find "$RUNNER_TEMP/rpmbuild/RPMS" -type f -name '*.rpm' -exec cp {} dist/ \;
+      - name: Build Windows setup installer
         if: matrix.target == 'windows'
         shell: pwsh
-        run: Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath acsys360-windows-${{ github.ref_name }}.zip
-      - name: Package macOS
+        run: |
+          $version = if ($env:GITHUB_REF_NAME -match '^v(\d+\.\d+\.\d+)') { $Matches[1] } else { (Select-String '^version: ([0-9.]+)' pubspec.yaml).Matches.Groups[1].Value }
+          New-Item -ItemType Directory -Force dist | Out-Null
+          & "C:/Program Files (x86)/Inno Setup 6/ISCC.exe" /DAppVersion=$version /DSourceDir="build/windows/x64/runner/Release" /DOutputDir=dist tool/packaging/acsys360-windows.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
+      - name: Build macOS package installer
         if: matrix.target == 'macos'
-        run: ditto -c -k --sequesterRsrc --keepParent build/macos/Build/Products/Release/acsys360.app acsys360-macos-${{ github.ref_name }}.zip
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          if [[ "$version" == "$GITHUB_REF_NAME" ]]; then version="$(sed -n 's/^version: \([0-9.]*\).*/\1/p' pubspec.yaml)"; fi
+          mkdir -p dist
+          pkgbuild --root build/macos/Build/Products/Release --install-location /Applications --identifier com.acsys360.desktop --version "$version" "dist/acsys360-macos-${version}.pkg"
+
       - uses: actions/upload-artifact@v4
         with:
-          name: acsys360-${{ matrix.platform }}
-          path: |
-            *.tar.gz
-            *.zip
+          name: acsys360-${{ matrix.platform }}-installer
+          path: dist/*
+          if-no-files-found: error
 
   publish:
     needs: build

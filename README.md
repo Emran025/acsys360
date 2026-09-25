@@ -73,7 +73,7 @@ dart run tool/verify_compiler_bundle.dart --executable packages/compiler_c/build
 
 ## بناء نسخة Windows نهائية محليًا
 
-يمكن بناء نسخة Windows كاملة من جذر المشروع باستخدام PowerShell. يتطلب السكربت Flutter وDart وCMake وVisual Studio مع أدوات C، إضافة إلى Flex وBison؛ ويمكن تثبيت الأخيرين عبر Chocolatey:
+يمكن بناء نسخة Windows كاملة من جذر المشروع باستخدام PowerShell. يتطلب السكربت Flutter وDart وCMake وVisual Studio مع أدوات C وInno Setup 6، إضافة إلى Flex وBison. كما يتطلب MSYS2 UCRT64 المثبّت فيه GCC وNASM لتضمينهما في المُثبّت النهائي. يمكن تثبيت Flex وBison عبر Chocolatey:
 
 ```powershell
 choco install winflexbison3 --yes
@@ -85,10 +85,10 @@ choco install winflexbison3 --yes
 powershell -ExecutionPolicy Bypass -File .\tool\build_windows_release.ps1
 ```
 
-ينفذ السكربت `flutter pub get` و`dart format` و`flutter analyze` و`flutter test`، ثم يبني `arabicc.exe` عبر CMake، ويبني المحرر بـ `flutter build windows --release`، ويضمّن المترجم داخل `compiler\arabicc.exe`. بعد ذلك يشغّل smoke test للبروتوكول ويكتب الحزمة القابلة للتوزيع هنا:
+ينفذ السكربت `flutter pub get` و`dart format` و`flutter analyze` و`flutter test`، ثم يبني `arabicc.exe` عبر CMake، ويبني المحرر بـ `flutter build windows --release`، ويضمّن المترجم ومجلد MSYS2 UCRT64 داخل التطبيق. بعد ذلك يشغّل smoke test للبروتوكول وينشئ مُثبّت Windows تنفيذيًا:
 
 ```text
-dist\acsys360-windows-local.zip
+dist\acsys360-windows-<version>-setup-x64.exe
 ```
 
 لإعادة البناء من الصفر:
@@ -102,6 +102,8 @@ powershell -ExecutionPolicy Bypass -File .\tool\build_windows_release.ps1 -Clean
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\tool\build_windows_release.ps1 -SkipChecks
 ```
+
+إذا أردت مجلد ملفات البناء دون إنشاء مُثبّت، استخدم `-SkipInstaller`؛ لا ينشئ مسار الإصدار المنشور ملفات ZIP أو TAR.
 
 ## بناء compiler محليًا مع نسخة Windows Debug
 

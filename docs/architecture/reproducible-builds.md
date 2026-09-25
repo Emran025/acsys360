@@ -13,17 +13,23 @@
 | Pull Request | checkout، Flutter `3.44.5`، pub get، format check، analyze، tests |
 | Push إلى `main` | نفس الفحوصات وبناء Linux artifact للتحقق باستخدام Flutter `3.44.5` |
 | تغيير `.devcontainer` على `main` | بناء صورة التطوير ونشرها إلى `ghcr.io/<owner>/<repo>/dev` مع SHA و`latest` |
-| Tag من الشكل `vX.Y.Z` | بناء Linux/Windows/macOS على runners أصلية باستخدام Flutter `3.44.5`، ترجمة `arabicc` إلى executable للمنصة، نسخه داخل bundle، ضغط artifacts، إنشاء GitHub Release وإرفاقها |
+| Tag من الشكل `vX.Y.Z` | بناء Linux/Windows/macOS على runners أصلية باستخدام Flutter `3.44.5`، ترجمة `arabicc` إلى executable للمنصة، تجهيز ملفات التثبيت الأصلية، وإنشاء GitHub Release وإرفاقها |
 | فحص البيئة المحلية | تشغيل `bash tool/environment_doctor.sh --strict` على جهاز التطوير؛ ويمكن إضافة `--doctor` لطباعة `flutter doctor -v` |
-| تحقق compiler المضمّن | يبني Release workflow `packages/compiler_c` عبر CMake وFlex وBison، ثم يثبت executable `arabicc` أو `arabicc.exe` داخل `compiler/` في حزمة المنصة قبل الضغط |
+| تحقق compiler المضمّن | يبني Release workflow `packages/compiler_c` عبر CMake وFlex وBison، ثم يثبت executable `arabicc` أو `arabicc.exe` داخل `compiler/` في ملفات تثبيت المنصة قبل التوزيع |
 
 ## الصلاحيات والأمان
 
 يستخدم نشر GHCR `GITHUB_TOKEN` مع `packages: write`، ويستخدم نشر Release `contents: write`. لا توجد مفاتيح سرية في الملفات. يجب إبقاء package visibility خاصة إن كان المستودع خاصًا، وحماية main ومنع الدفع المباشر.
 
+## حزم التثبيت
+
+لا تنشر إصدارات التطبيق ZIP أو TAR كملفات التسليم الأساسية. ينتج Windows مثبّت Inno Setup بصيغة EXE، وينتج Linux حزمتي DEB وRPM، وينتج macOS حزمة تثبيت PKG. تضع الحزم تطبيق Flutter والمترجم العربي داخل مسارات التطبيق. يتضمن مثبّت Windows شجرة MSYS2 UCRT64 مع NASM وGCC وملفات التشغيل والرؤوس والمكتبات والتراخيص؛ ويبحث التطبيق داخل `toolchain/windows/bin` قبل مسارات النظام. حزم Linux تصرّح باعتمادها على `gcc` و`nasm`، بينما لا تضمّن PKG الخاصة بـ macOS toolchain كاملًا بعد، لذا لا يُدّعى أن native artifact يعمل على macOS حاليًا.
+
+تُبنى الحزم على runners أصلية لكل منصة. يتطلب Windows محليًا Flutter وCMake وFlex/Bison وMSYS2 UCRT64 المزوّد بـ GCC وNASM وInno Setup 6؛ يمكن استخدام `-SkipInstaller` لبناء مجلد التطبيق فقط. ملفات PKG على macOS وDEB/RPM على Linux تُنشأ في سير عمل الإصدار.
+
 ## معنى الترجمة التلقائية
 
-تعني الترجمة التلقائية أن GitHub يبني تطبيق Flutter ويشغّل فحوصاته عند PR وtag، كما يبني executable C مستقلًا لكل منصة. حزمة Windows ليست ملفًا منفردًا؛ ZIP الإصدار يحتوي `acsys360.exe` وملفات Flutter المصاحبة ومجلد `compiler/arabicc.exe`. لذلك يعمل الإصدار دون Flex أو Bison أو مصدر المستودع. يبقى مسار التطوير مخصصًا للتشغيل من checkout فقط.
+تعني الترجمة التلقائية أن GitHub يبني تطبيق Flutter ويشغّل فحوصاته عند PR وtag، كما يبني executable C مستقلًا لكل منصة. يتضمن Windows `acsys360.exe` وملفات Flutter و`compiler/arabicc.exe` ومجلد `toolchain/windows` في مُثبّت واحد؛ لا يحتاج المستخدم إلى تثبيت MSYS2 أو Flex/Bison. يبقى مسار التطوير مخصصًا للتشغيل من checkout فقط.
 
 ## قيود يجب مراقبتها
 

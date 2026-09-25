@@ -73,8 +73,9 @@ void main() {
       final repository = ProcessCompilerRepository(
         executable: 'arabicc',
         processTimeout: const Duration(milliseconds: 1),
-        startProcess: (executable, arguments, {workingDirectory}) =>
-            pending.future,
+        startProcess:
+            (executable, arguments, {workingDirectory, environment}) =>
+                pending.future,
       );
 
       final response = await repository.compile(

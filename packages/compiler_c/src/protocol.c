@@ -34,7 +34,11 @@ static void buf_init(Buffer *b) {
 }
 
 static int path_is_within_root(const char *root_path, const char *candidate_path) {
+#ifdef _WIN32
   char root[2048];
+#else
+  char root[4096];
+#endif
   char candidate[2048];
   size_t root_length;
   if (!root_path || !candidate_path || root_path[0] == '\0' ||
@@ -61,7 +65,7 @@ static int path_is_within_root(const char *root_path, const char *candidate_path
   }
   if (_strnicmp(root, candidate, root_length) != 0) return 0;
 #else
-  if (realpath(root_path, root, sizeof(root)) == NULL) return 0;
+  if (realpath(root_path, root) == NULL) return 0;
   if (candidate_path[0] == '/') {
     if (strlen(candidate_path) >= sizeof(candidate)) return 0;
     strcpy(candidate, candidate_path);
@@ -1218,9 +1222,16 @@ static void ensure_directory(const char *path) {
 }
 
 static const char *tool_path(const char *tool) {
+  const char *bundled_dir = getenv("ACSYS360_TOOLCHAIN_DIR");
 #ifdef _WIN32
+  static char bundled_paths[2][1024];
   static char paths[2][260];
-  char *path = paths[tool[0] == 'n' ? 0 : 1];
+  const size_t index = tool[0] == 'n' ? 0U : 1U;
+  char *path = paths[index];
+  if (bundled_dir && bundled_dir[0] != '\0') {
+    snprintf(bundled_paths[index], sizeof(bundled_paths[index]), "%s\\%s.exe", bundled_dir, tool);
+    if (file_exists(bundled_paths[index])) return bundled_paths[index];
+  }
   const char *directories[] = {
     "C:\\msys64\\ucrt64\\bin",
     "C:\\msys64\\usr\\bin",
@@ -1231,7 +1242,14 @@ static const char *tool_path(const char *tool) {
     if (file_exists(path)) return path;
   }
 #else
-  static char path[512];
+  static char bundled_paths[2][1024];
+  static char paths[2][512];
+  const size_t index = tool[0] == 'n' ? 0U : 1U;
+  char *path = paths[index];
+  if (bundled_dir && bundled_dir[0] != '\0') {
+    snprintf(bundled_paths[index], sizeof(bundled_paths[index]), "%s/%s", bundled_dir, tool);
+    if (access(bundled_paths[index], X_OK) == 0) return bundled_paths[index];
+  }
   const char *directories[] = {
     "/usr/local/bin",
     "/usr/bin",
