@@ -158,34 +158,34 @@ class ArabicCodeController extends TextEditingController {
   }
 
   Color? _tokenColor(SourceToken token, ColorScheme colors) {
-    if (token.kind == SourceTokenKind.comment) return AppTheme.syntaxComment;
+    if (token.kind == SourceTokenKind.comment) return AppTheme.syntaxComment(colors);
     if (token.role != null) {
       return switch (token.role!) {
-        SourceTokenRole.constant => AppTheme.syntaxNumber,
-        SourceTokenRole.type => AppTheme.syntaxType,
-        SourceTokenRole.procedure => AppTheme.syntaxDeclaration,
-        SourceTokenRole.parameter => AppTheme.syntaxModifier,
-        SourceTokenRole.variable => AppTheme.syntaxIdentifier,
+        SourceTokenRole.constant => AppTheme.syntaxNumber(colors),
+        SourceTokenRole.type => AppTheme.syntaxType(colors),
+        SourceTokenRole.procedure => AppTheme.syntaxDeclaration(colors),
+        SourceTokenRole.parameter => AppTheme.syntaxModifier(colors),
+        SourceTokenRole.variable => AppTheme.syntaxIdentifier(colors),
       };
     }
     if (token.group != null) {
       return switch (token.group!) {
-        SourceTokenGroup.declaration => AppTheme.syntaxDeclaration,
-        SourceTokenGroup.controlFlow => AppTheme.syntaxControlFlow,
-        SourceTokenGroup.builtin => AppTheme.syntaxBuiltin,
-        SourceTokenGroup.type => AppTheme.syntaxType,
-        SourceTokenGroup.modifier => AppTheme.syntaxModifier,
+        SourceTokenGroup.declaration => AppTheme.syntaxDeclaration(colors),
+        SourceTokenGroup.controlFlow => AppTheme.syntaxControlFlow(colors),
+        SourceTokenGroup.builtin => AppTheme.syntaxBuiltin(colors),
+        SourceTokenGroup.type => AppTheme.syntaxType(colors),
+        SourceTokenGroup.modifier => AppTheme.syntaxModifier(colors),
       };
     }
     return switch (token.kind) {
-      SourceTokenKind.keyword => AppTheme.syntaxDeclaration,
-      SourceTokenKind.string || SourceTokenKind.character => AppTheme.syntaxString,
-      SourceTokenKind.integer || SourceTokenKind.real => AppTheme.syntaxNumber,
-      SourceTokenKind.boolean => AppTheme.syntaxBoolean,
-      SourceTokenKind.operator => AppTheme.syntaxOperator,
-      SourceTokenKind.punctuation => AppTheme.syntaxPunctuation,
-      SourceTokenKind.identifier => AppTheme.syntaxIdentifier,
-      SourceTokenKind.comment => AppTheme.syntaxComment,
+      SourceTokenKind.keyword => AppTheme.syntaxDeclaration(colors),
+      SourceTokenKind.string || SourceTokenKind.character => AppTheme.syntaxString(colors),
+      SourceTokenKind.integer || SourceTokenKind.real => AppTheme.syntaxNumber(colors),
+      SourceTokenKind.boolean => AppTheme.syntaxBoolean(colors),
+      SourceTokenKind.operator => AppTheme.syntaxOperator(colors),
+      SourceTokenKind.punctuation => AppTheme.syntaxPunctuation(colors),
+      SourceTokenKind.identifier => AppTheme.syntaxIdentifier(colors),
+      SourceTokenKind.comment => AppTheme.syntaxComment(colors),
     };
   }
 }

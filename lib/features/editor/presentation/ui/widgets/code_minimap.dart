@@ -365,26 +365,26 @@ class _MinimapPainter extends CustomPainter {
 
   Color _tokenColor(String token) {
     final parsed = _highlighter.tokenize(token);
-    if (parsed.isEmpty) return AppTheme.syntaxIdentifier;
+    if (parsed.isEmpty) return AppTheme.syntaxIdentifier(colors);
     final sourceToken = parsed.first;
     if (sourceToken.group != null) {
       return switch (sourceToken.group!) {
-        SourceTokenGroup.declaration => AppTheme.syntaxDeclaration,
-        SourceTokenGroup.controlFlow => AppTheme.syntaxControlFlow,
-        SourceTokenGroup.builtin => AppTheme.syntaxBuiltin,
-        SourceTokenGroup.type => AppTheme.syntaxType,
-        SourceTokenGroup.modifier => AppTheme.syntaxModifier,
+        SourceTokenGroup.declaration => AppTheme.syntaxDeclaration(colors),
+        SourceTokenGroup.controlFlow => AppTheme.syntaxControlFlow(colors),
+        SourceTokenGroup.builtin => AppTheme.syntaxBuiltin(colors),
+        SourceTokenGroup.type => AppTheme.syntaxType(colors),
+        SourceTokenGroup.modifier => AppTheme.syntaxModifier(colors),
       };
     }
     return switch (sourceToken.kind) {
-      SourceTokenKind.comment => AppTheme.syntaxComment,
-      SourceTokenKind.string || SourceTokenKind.character => AppTheme.syntaxString,
-      SourceTokenKind.integer || SourceTokenKind.real => AppTheme.syntaxNumber,
-      SourceTokenKind.boolean => AppTheme.syntaxBoolean,
-      SourceTokenKind.operator => AppTheme.syntaxOperator,
-      SourceTokenKind.punctuation => AppTheme.syntaxPunctuation,
-      SourceTokenKind.keyword => AppTheme.syntaxDeclaration,
-      SourceTokenKind.identifier => AppTheme.syntaxIdentifier,
+      SourceTokenKind.comment => AppTheme.syntaxComment(colors),
+      SourceTokenKind.string || SourceTokenKind.character => AppTheme.syntaxString(colors),
+      SourceTokenKind.integer || SourceTokenKind.real => AppTheme.syntaxNumber(colors),
+      SourceTokenKind.boolean => AppTheme.syntaxBoolean(colors),
+      SourceTokenKind.operator => AppTheme.syntaxOperator(colors),
+      SourceTokenKind.punctuation => AppTheme.syntaxPunctuation(colors),
+      SourceTokenKind.keyword => AppTheme.syntaxDeclaration(colors),
+      SourceTokenKind.identifier => AppTheme.syntaxIdentifier(colors),
     };
   }
 
