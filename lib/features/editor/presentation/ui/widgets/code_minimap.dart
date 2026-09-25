@@ -221,7 +221,7 @@ List<_MinimapSection> _sections(List<String> lines) {
       continue;
     }
     final match = RegExp(
-      r'^(برنامج|اجراء|نوع|ثابت|متغير)\b(.*)',
+      r'^(برنامج|اجراء|إجراء|نوع|ثابت|متغير)\b(.*)',
     ).firstMatch(trimmed);
     if (match == null) continue;
     final label = '${match.group(1)}${match.group(2)?.trim() ?? ''}'.trim();
@@ -365,11 +365,11 @@ class _MinimapPainter extends CustomPainter {
     if (token.startsWith('"')) return colors.secondary;
     if (RegExp(r'^\d').hasMatch(token)) return colors.error;
     if (RegExp(
-      r'^(برنامج|اجراء|نوع|ثابت|متغير|اذا|والا|طالما|كرر|اعد)$',
+      r'^(برنامج|ثابت|نوع|متغير|اجراء|إجراء|بالقيمة|بالمرجع|اطبع|اقرا|اقرأ|اذا|إذا|فان|والا|وإلا|كرر|طالما|استمر|اعد|أعد|من|الى|اضف|أضف|حتى|قائمة|سجل)$',
     ).hasMatch(token)) {
       return colors.primary;
     }
-    if (RegExp(r'^(صحيح|حقيقي|منطقي|حرفي|خيط)$').hasMatch(token)) {
+    if (RegExp(r'^(صحيح|حقيقي|منطقي|حرفي|خيط_رمزي)$').hasMatch(token)) {
       return colors.tertiary;
     }
     if (RegExp(r'^[{}()\[\];،؛,.+*/=<>:-]$').hasMatch(token)) {

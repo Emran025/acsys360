@@ -40,4 +40,28 @@ void main() {
     expect(symbol.role, SourceTokenRole.constant);
     expect(source.substring(symbol.start, symbol.end), 'س');
   });
+
+  test('recognizes the compiler lexer spellings and rejects invented aliases', () {
+    const source = 'إجراء اقرأ إذا وإلا أعد أضف خيط_رمزي خيط';
+    final tokens = highlighter.tokenize(source);
+
+    for (final word in <String>[
+      'إجراء',
+      'اقرأ',
+      'إذا',
+      'وإلا',
+      'أعد',
+      'أضف',
+      'خيط_رمزي',
+    ]) {
+      expect(
+        tokens.firstWhere((token) => token.lexeme == word).kind,
+        SourceTokenKind.keyword,
+      );
+    }
+    expect(
+      tokens.firstWhere((token) => token.lexeme == 'خيط').kind,
+      SourceTokenKind.identifier,
+    );
+  });
 }
