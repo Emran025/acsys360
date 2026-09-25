@@ -1,5 +1,5 @@
-import '../lib/domain/entities/document.dart';
-import '../lib/domain/entities/workspace.dart';
+import '../lib/features/editor/domain/entities/document.dart';
+import '../lib/features/editor/domain/entities/workspace.dart';
 
 void main() {
   final original = Document(path: 'main.arb', text: 'abc');
