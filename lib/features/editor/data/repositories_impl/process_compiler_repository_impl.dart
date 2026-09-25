@@ -224,6 +224,7 @@ class ProcessCompilerRepository
             in process.stdout
                 .transform(utf8.decoder)
                 .transform(const LineSplitter())) {
+          if (line.trim().isEmpty) continue;
           final decoded = jsonDecode(line);
           if (decoded is Map && decoded['requestType'] == 'input') {
             final name = decoded['name'];
@@ -257,8 +258,20 @@ class ProcessCompilerRepository
         inputRequests: inputRequests,
       );
     } on TimeoutException {
-      process.kill();
+      await _abortInteractive(process);
       rethrow;
+    } on Object {
+      await _abortInteractive(process);
+      rethrow;
+    }
+  }
+
+  Future<void> _abortInteractive(Process process) async {
+    process.kill();
+    try {
+      await process.stdin.close();
+    } on Object {
+      // The process may have already closed its input stream while failing.
     }
   }
 

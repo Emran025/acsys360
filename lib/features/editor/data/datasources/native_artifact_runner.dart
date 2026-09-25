@@ -8,6 +8,7 @@ import '../../domain/repositories/program_runner.dart';
 class NativeArtifactRunner implements ProgramRunner {
   const NativeArtifactRunner();
 
+  @override
   Future<List<String>> run(
     String executable, {
     InputRequestHandler? onInputRequest,
