@@ -59,6 +59,7 @@ const char *toolchain_path(const char *tool) {
     snprintf(bundled_paths[index], sizeof(bundled_paths[index]), "%s\\%s.exe", bundled_dir, tool);
     if (toolchain_file_exists(bundled_paths[index])) return bundled_paths[index];
   }
+  if (toolchain_only && strcmp(toolchain_only, "1") == 0) return NULL;
   const char *directories[] = {
     "C:\\msys64\\ucrt64\\bin",
     "C:\\msys64\\usr\\bin",

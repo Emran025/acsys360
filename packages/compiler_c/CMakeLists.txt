@@ -12,7 +12,7 @@ set(ARABICC_GENERATED_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated)
 file(MAKE_DIRECTORY ${ARABICC_GENERATED_DIR})
 
 bison_target(ArabicParser src/parser.y ${ARABICC_GENERATED_DIR}/parser.tab.c
-  COMPILE_FLAGS "-d -Wno-other -Wno-conflicts-sr")
+  COMPILE_FLAGS "-d -Wno-other -Wno-conflicts-sr -Wno-conflicts-rr")
 set(ARABICC_FLEX_FLAGS "")
 if(WIN32)
   # win_flex otherwise emits an unconditional <unistd.h> include, which is

@@ -98,7 +98,7 @@ if (!(Test-Path "build/generated")) { New-Item -ItemType Directory "build/genera
 
 if (Test-Path "src/parser.y") {
     Write-Host "[1/3] Running Bison ($bison)..."
-    & $bison -d -Wno-other -Wno-conflicts-sr -o "build/generated/parser.tab.c" "src/parser.y"
+    & $bison -d -Wno-other -Wno-conflicts-sr -Wno-conflicts-rr -o "build/generated/parser.tab.c" "src/parser.y"
 }
 
 if (Test-Path "src/lexer.l") {
