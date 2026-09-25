@@ -49,6 +49,7 @@ void toolchain_ensure_directory(const char *path) {
 
 const char *toolchain_path(const char *tool) {
   const char *bundled_dir = getenv("ACSYS360_TOOLCHAIN_DIR");
+  const char *toolchain_only = getenv("ACSYS360_TOOLCHAIN_ONLY");
 #ifdef _WIN32
   static char bundled_paths[2][1024];
   static char paths[2][260];
@@ -76,6 +77,7 @@ const char *toolchain_path(const char *tool) {
     snprintf(bundled_paths[index], sizeof(bundled_paths[index]), "%s/%s", bundled_dir, tool);
     if (access(bundled_paths[index], X_OK) == 0) return bundled_paths[index];
   }
+  if (toolchain_only && strcmp(toolchain_only, "1") == 0) return NULL;
   const char *directories[] = {
     "/usr/local/bin",
     "/usr/bin",

@@ -64,6 +64,13 @@ add_executable(arabicc_tac_golden_test
 )
 target_include_directories(arabicc_tac_golden_test PRIVATE include)
 add_test(NAME arabicc_tac_golden COMMAND arabicc_tac_golden_test)
+add_executable(arabicc_artifact_security_test
+  tests/artifact_security_test.c
+  src/backend/artifact_builder.c
+  src/backend/toolchain.c
+)
+target_include_directories(arabicc_artifact_security_test PRIVATE include)
+add_test(NAME arabicc_artifact_security COMMAND arabicc_artifact_security_test)
 find_program(DART_EXECUTABLE dart)
 if(DART_EXECUTABLE)
   add_test(NAME arabicc_protocol_smoke

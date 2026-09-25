@@ -33,9 +33,12 @@ Map<String, dynamic> requestFor(
 
 Future<(int, Map<String, dynamic>, String)> run(
   String executable,
-  Map<String, dynamic> request,
-) async {
-  final process = await Process.start(executable, ['--protocol']);
+  Map<String, dynamic> request, {
+  Map<String, String>? environment,
+}) async {
+  final process = await Process.start(executable, [
+    '--protocol',
+  ], environment: environment);
   process.stdin.writeln(jsonEncode(request));
   await process.stdin.close();
   final stdout = (await process.stdout.transform(utf8.decoder).join()).trim();
@@ -215,7 +218,8 @@ Future<void> main(List<String> args) async {
         'برنامج artifact؛ { اطبع(7)؛ }.',
         target: 'dart-native',
         rootPath: artifactDirectory.path,
-        artifactDirectory: '${artifactDirectory.path}${Platform.pathSeparator}.arabic360${Platform.pathSeparator}build',
+        artifactDirectory:
+            '${artifactDirectory.path}${Platform.pathSeparator}.arabic360${Platform.pathSeparator}build',
       ),
     );
     check(
@@ -270,6 +274,43 @@ Future<void> main(List<String> args) async {
     ((syntax.$2['diagnostics'] as List).first as Map)['phase'] == 'syntax',
     'wrong syntax diagnostic phase',
   );
+
+  final missingToolDirectory = await Directory.systemTemp.createTemp(
+    'arabicc-protocol-missing-tool-',
+  );
+  try {
+    final environment = Map<String, String>.from(Platform.environment)
+      ..['ACSYS360_TOOLCHAIN_DIR'] = missingToolDirectory.path
+      ..['ACSYS360_TOOLCHAIN_ONLY'] = '1';
+    final missingTool = await run(
+      executable,
+      requestFor(
+        'برنامج مفقودة؛ { اطبع(8)؛ }.',
+        target: 'dart-native',
+        rootPath: missingToolDirectory.path,
+        artifactDirectory:
+            '${missingToolDirectory.path}${Platform.pathSeparator}build',
+      ),
+      environment: environment,
+    );
+    check(
+      missingTool.$1 != 0 && missingTool.$2['success'] == false,
+      'missing tool should fail gracefully',
+    );
+    final diagnostics = missingTool.$2['diagnostics'];
+    check(
+      diagnostics is List &&
+          diagnostics.any(
+            (item) =>
+                item is Map &&
+                item['code'] == 'A002' &&
+                (item['message'] as String).contains('NASM'),
+          ),
+      'missing tool diagnostic is missing',
+    );
+  } finally {
+    await missingToolDirectory.delete(recursive: true);
+  }
 }
 
 bool listEquals(Object? actual, List<Object?> expected) =>

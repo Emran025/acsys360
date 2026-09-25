@@ -81,4 +81,42 @@ void main() {
     expect(await File('${root.path}/renamed.arb').exists(), isTrue);
     expect(await file.exists(), isFalse);
   });
+
+  test('rejects path traversal in file and directory names', () async {
+    final root = await Directory.systemTemp.createTemp('acsys360-traversal-');
+    addTearDown(() => root.delete(recursive: true));
+    final repository = LocalWorkspaceRepository();
+
+    expect(
+      () => repository.create(root.path, '../outside'),
+      throwsArgumentError,
+    );
+    expect(
+      () => repository.createDirectory(root.path, '..\\outside'),
+      throwsArgumentError,
+    );
+    expect(await File('${root.parent.path}/outside.arb').exists(), isFalse);
+  });
+
+  test(
+    'does not follow symlinks while listing or moving workspace entries',
+    () async {
+      if (Platform.isWindows) return;
+      final root = await Directory.systemTemp.createTemp('acsys360-symlink-');
+      addTearDown(() => root.delete(recursive: true));
+      final outside = await Directory.systemTemp.createTemp(
+        'acsys360-symlink-target-',
+      );
+      addTearDown(() => outside.delete(recursive: true));
+      await File('${outside.path}/secret.arb').writeAsString('secret');
+      final link = Link('${root.path}/linked');
+      await link.create(outside.path);
+
+      final repository = LocalWorkspaceRepository();
+      final tree = await repository.listTree(root.path);
+      expect(tree.where((node) => node.name == 'linked'), isEmpty);
+      expect(() => repository.move(link.path, root.path), throwsStateError);
+      expect(() => repository.rename(link.path, 'renamed'), throwsStateError);
+    },
+  );
 }

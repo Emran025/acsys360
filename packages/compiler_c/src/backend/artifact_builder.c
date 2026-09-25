@@ -63,6 +63,12 @@ int artifact_path_is_within_root(const char *root_path, const char *candidate_pa
     strcat(candidate, "/");
     strcat(candidate, candidate_path);
   }
+  {
+    char resolved_candidate[4096];
+    if (realpath(candidate, resolved_candidate) != NULL) {
+      strcpy(candidate, resolved_candidate);
+    }
+  }
   root_length = strlen(root);
   while (root_length > 1U && root[root_length - 1U] == '/') root[--root_length] = '\0';
   for (size_t i = 0U; candidate[i] != '\0'; i++) {
