@@ -37,7 +37,7 @@ jobs:
       - name: Install build tools (Flex, Bison)
         run: |
           sudo apt-get update
-          sudo apt-get install -y flex bison
+          sudo apt-get install -y flex bison gcc nasm
       - name: Build C compiler
         working-directory: packages/compiler_c
         run: |

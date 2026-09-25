@@ -5,6 +5,8 @@ import '../repositories_impl/process_compiler_repository_impl.dart';
 ProcessCompilerRepository createCompilerRepository() {
   final compilerName = Platform.isWindows ? 'arabicc.exe' : 'arabicc';
   final executableDirectory = File(Platform.resolvedExecutable).parent.path;
+  String join(List<String> parts) => parts.join(Platform.pathSeparator);
+
   final toolchainDirectory = join([
     executableDirectory,
     'toolchain',
@@ -39,8 +41,6 @@ ProcessCompilerRepository createCompilerRepository() {
     if (parent.path == current.path) break;
     current = parent;
   }
-
-  String join(List<String> parts) => parts.join(Platform.pathSeparator);
 
   // Search all source-tree compiler locations before any bundled Release copy.
   // A stale bundled executable must never shadow the freshly built compiler.
