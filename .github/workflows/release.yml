@@ -159,9 +159,11 @@ jobs:
         shell: pwsh
         run: |
           $version = if ($env:GITHUB_REF_NAME -match '^v(\d+\.\d+\.\d+)') { $Matches[1] } else { (Select-String '^version: ([0-9.]+)' pubspec.yaml).Matches.Groups[1].Value }
-          New-Item -ItemType Directory -Force dist | Out-Null
-          & "C:/Program Files (x86)/Inno Setup 6/ISCC.exe" /DAppVersion=$version /DSourceDir="build/windows/x64/runner/Release" /DOutputDir=dist tool/packaging/acsys360-windows.iss
+          $sourceDir = (Resolve-Path "build/windows/x64/runner/Release").Path
+          $outputDir = (New-Item -ItemType Directory -Force dist).FullName
+          & "C:/Program Files (x86)/Inno Setup 6/ISCC.exe" "/DAppVersion=$version" "/DSourceDir=$sourceDir" "/DOutputDir=$outputDir" tool/packaging/acsys360-windows.iss
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
+          if (-not (Test-Path (Join-Path $outputDir "acsys360-windows-$version-setup-x64.exe"))) { throw "Windows setup installer was not created in $outputDir" }
       - name: Build macOS package installer
         if: matrix.target == 'macos'
         shell: bash
