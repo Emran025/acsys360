@@ -353,6 +353,23 @@ static void collect_text_literal(const CAstNode *node,
                            capacity);
     }
   }
+  else if (node->kind == C_AST_IF)
+  {
+    collect_text_literal(node->data.conditional.condition, values, count,
+                         capacity);
+    for (size_t i = 0; i < node->data.conditional.then_branch.count; i++)
+      collect_text_literal(node->data.conditional.then_branch.items[i], values,
+                           count, capacity);
+    for (size_t i = 0; i < node->data.conditional.else_branch.count; i++)
+      collect_text_literal(node->data.conditional.else_branch.items[i], values,
+                           count, capacity);
+  }
+  else if (node->kind == C_AST_PROGRAM)
+  {
+    for (size_t i = 0; i < node->data.program.statements.count; i++)
+      collect_text_literal(node->data.program.statements.items[i], values,
+                           count, capacity);
+  }
 }
 
 static int real_literal_index(const char **values, size_t count,
@@ -517,6 +534,25 @@ static int emit_expression(const CAstNode *node, const CSemanticResult *semantic
       return append(text, length, capacity,
                     "    cqo\n    idiv rcx\n");
     }
+    const char *set_instruction = NULL;
+    if (strcmp(node->data.binary.operator, "==") == 0)
+      set_instruction = "sete";
+    else if (strcmp(node->data.binary.operator, "!=") == 0)
+      set_instruction = "setne";
+    else if (strcmp(node->data.binary.operator, "<") == 0)
+      set_instruction = "setl";
+    else if (strcmp(node->data.binary.operator, "<=") == 0)
+      set_instruction = "setle";
+    else if (strcmp(node->data.binary.operator, ">") == 0)
+      set_instruction = "setg";
+    else if (strcmp(node->data.binary.operator, ">=") == 0)
+      set_instruction = "setge";
+    if (set_instruction != NULL)
+    {
+      return append(text, length, capacity,
+                    "    cmp rax, rcx\n    %s al\n    movzx rax, al\n",
+                    set_instruction);
+    }
   }
   return 0;
 }
@@ -607,6 +643,99 @@ static int emit_nasm_bytes(char **text, size_t *length, size_t *capacity,
       return 0;
   }
   return append(text, length, capacity, "%s0\n", value[0] ? ", " : "");
+}
+
+static int emit_native_statements(const CAstNodeList *statements,
+                                  const CSemanticResult *semantic,
+                                  char **text, size_t *length, size_t *capacity,
+                                  size_t *label_index)
+{
+  for (size_t i = 0; i < statements->count; i++)
+  {
+    const CAstNode *statement = statements->items[i];
+    if (statement->kind == C_AST_IF)
+    {
+      const size_t label = (*label_index)++;
+      if (!emit_expression(statement->data.conditional.condition, semantic,
+                           text, length, capacity) ||
+          !append(text, length, capacity,
+                  "    cmp rax, 0\n    je if_else%zu\n", label) ||
+          !emit_native_statements(&statement->data.conditional.then_branch,
+                                  semantic, text, length, capacity, label_index) ||
+          !append(text, length, capacity,
+                  "    jmp if_done%zu\nif_else%zu:\n", label, label) ||
+          !emit_native_statements(&statement->data.conditional.else_branch,
+                                  semantic, text, length, capacity, label_index) ||
+          !append(text, length, capacity, "if_done%zu:\n", label))
+        return 0;
+      continue;
+    }
+    if (statement->kind == C_AST_PROGRAM)
+    {
+      if (!emit_native_statements(&statement->data.program.statements, semantic,
+                                  text, length, capacity, label_index))
+        return 0;
+      continue;
+    }
+    if (statement->kind == C_AST_ASSIGNMENT)
+    {
+      const int slot = slot_for(semantic, statement->data.assignment.name);
+      if (slot == 0 ||
+          !emit_expression(statement->data.assignment.expression, semantic,
+                           text, length, capacity) ||
+          !append(text, length, capacity, "    mov [rbp-%d], rax\n", slot))
+        return 0;
+      continue;
+    }
+    if (statement->kind != C_AST_PRINT)
+      return 0;
+    for (size_t vi = 0; vi < statement->data.print.values.count; vi++)
+    {
+      const CAstNode *value = statement->data.print.values.items[vi];
+      if (value == NULL)
+        continue;
+      const char *value_register =
+#ifdef _WIN32
+          "rdx";
+      const char *format_register = "rcx";
+#else
+          "rsi";
+      const char *format_register = "rdi";
+#endif
+      if (expression_is_boolean(value, semantic))
+      {
+        const size_t label = (*label_index)++;
+        if (!emit_expression(value, semantic, text, length, capacity) ||
+            !append(text, length, capacity,
+                    "    cmp rax, 0\n    jne if_bool_true%zu\n"
+                    "    lea %s, [rel fmt_bool_false]\n"
+                    "    xor eax, eax\n    call printf\n"
+                    "    jmp if_bool_done%zu\n"
+                    "if_bool_true%zu:\n    lea %s, [rel fmt_bool_true]\n"
+                    "    xor eax, eax\n    call printf\n"
+                    "if_bool_done%zu:\n",
+                    label, format_register, label, label, format_register,
+                    label))
+          return 0;
+      }
+      else
+      {
+        const char *format = expression_is_text(value, semantic) ? "fmt_str" : "fmt_int";
+        const int emitted = expression_is_text(value, semantic)
+                                ? emit_text_expression(value, semantic, text,
+                                                       length, capacity)
+                                : emit_expression(value, semantic, text, length,
+                                                  capacity);
+        if (!emitted ||
+            !append(text, length, capacity,
+                    "    mov %s, rax\n    lea %s, [rel %s]\n"
+                    "    xor eax, eax\n    call printf\n",
+                    value_register, format_register, format))
+          return 0;
+      }
+    }
+  }
+  return 1;
 }
 
 int c_generate_nasm_x86_64(const CAstNode *program,
@@ -768,9 +897,40 @@ int c_generate_nasm_x86_64(const CAstNode *program,
   /* Statements */
   size_t read_index = 0U;
   size_t boolean_print_index = 0U;
+  size_t if_label_index = 0U;
   for (size_t index = 0U; index < program->data.program.statements.count; index++)
   {
     const CAstNode *statement = program->data.program.statements.items[index];
+    if (statement->kind == C_AST_IF)
+    {
+      const size_t label = if_label_index++;
+      if (!emit_expression(statement->data.conditional.condition, semantic,
+                           &result->text, &length, &capacity) ||
+          !append(&result->text, &length, &capacity,
+                  "    cmp rax, 0\n    je if_else%zu\n", label) ||
+          !emit_native_statements(&statement->data.conditional.then_branch,
+                                  semantic, &result->text, &length, &capacity,
+                                  &if_label_index))
+      {
+        (void)diagnostic_at(result, statement,
+                            "تعذر تحويل الفرع الشرطي إلى NASM");
+        free(strings);
+        return 1;
+      }
+      if (!append(&result->text, &length, &capacity,
+                  "    jmp if_done%zu\nif_else%zu:\n", label, label) ||
+          !emit_native_statements(&statement->data.conditional.else_branch,
+                                  semantic, &result->text, &length, &capacity,
+                                  &if_label_index) ||
+          !append(&result->text, &length, &capacity, "if_done%zu:\n", label))
+      {
+        (void)diagnostic_at(result, statement,
+                            "تعذر تحويل الفرع الشرطي إلى NASM");
+        free(strings);
+        return 1;
+      }
+      continue;
+    }
     if (statement->kind == C_AST_ASSIGNMENT)
     {
       const char *target_type = type_for(semantic, statement->data.assignment.name);
