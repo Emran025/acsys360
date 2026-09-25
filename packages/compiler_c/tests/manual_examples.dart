@@ -5,7 +5,11 @@ void check(bool condition, String message) {
   if (!condition) throw StateError(message);
 }
 
-Future<Map<String, dynamic>> compileSource(String executable, File path) async {
+Future<Map<String, dynamic>> compileSource(
+  String executable,
+  File path, {
+  Map<String, String> inputValues = const {},
+}) async {
   final source = await path.readAsString();
   final request = {
     'protocolVersion': '0.5.0',
@@ -14,6 +18,7 @@ Future<Map<String, dynamic>> compileSource(String executable, File path) async {
     'sourceTexts': {path.path: source},
     'mode': 'project',
     'entryPath': path.path,
+    if (inputValues.isNotEmpty) 'inputValues': inputValues,
   };
   final process = await Process.start(executable, ['--protocol']);
   process.stdin.writeln(jsonEncode(request));
@@ -27,9 +32,9 @@ Future<Map<String, dynamic>> compileSource(String executable, File path) async {
 
 Future<void> main(List<String> args) async {
   check(args.length == 1, 'usage: dart manual_examples.dart <arabicc>');
-  final directory = File(Platform.script.toFilePath()).parent.parent.parent.parent
-      .uri
-      .resolve('examples/manual/');
+  final directory = File(
+    Platform.script.toFilePath(),
+  ).parent.parent.parent.parent.uri.resolve('examples/manual/');
   final positive = [
     '01_basics.arb',
     '02_composite_types.arb',
@@ -43,14 +48,37 @@ Future<void> main(List<String> args) async {
   final negative = ['08_syntax_error.arb', '09_semantic_error.arb'];
   for (final name in positive) {
     final path = File(directory.resolve(name).toFilePath());
-    final response = await compileSource(args.single, path);
-    check(response['success'] == true,
-        '${path.path}: ${response['diagnostics']}');
+    final response = await compileSource(
+      args.single,
+      path,
+      inputValues: name == '04_io.arb'
+          ? const {
+              'الاسم': 'علي',
+              'العدد': '7',
+              'المعدل': '2.5',
+              'موافق': 'صح',
+              'الحرف': 'م',
+            }
+          : const {},
+    );
+    check(
+      response['success'] == true,
+      '${path.path}: ${response['diagnostics']}',
+    );
+    if (name == '04_io.arb') {
+      check(
+        response['executionOutput'] is List &&
+            (response['executionOutput'] as List).contains('علي'),
+        '${path.path}: input output is missing',
+      );
+    }
   }
   for (final name in negative) {
     final path = File(directory.resolve(name).toFilePath());
     final response = await compileSource(args.single, path);
     check(response['success'] == false, '${path.path}: expected failure');
   }
-  print('manual examples passed: ${positive.length} positive, ${negative.length} negative');
+  print(
+    'manual examples passed: ${positive.length} positive, ${negative.length} negative',
+  );
 }

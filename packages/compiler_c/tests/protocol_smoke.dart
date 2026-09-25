@@ -8,8 +8,11 @@ void check(bool condition, String message) {
   if (!condition) fail(message);
 }
 
-Map<String, dynamic> requestFor(String source,
-    {String? target, bool execute = true}) {
+Map<String, dynamic> requestFor(
+  String source, {
+  String? target,
+  bool execute = true,
+}) {
   final request = <String, dynamic>{
     'protocolVersion': '0.5.0',
     'rootPath': '.',
@@ -24,7 +27,9 @@ Map<String, dynamic> requestFor(String source,
 }
 
 Future<(int, Map<String, dynamic>, String)> run(
-    String executable, Map<String, dynamic> request) async {
+  String executable,
+  Map<String, dynamic> request,
+) async {
   final process = await Process.start(executable, ['--protocol']);
   process.stdin.writeln(jsonEncode(request));
   await process.stdin.close();
@@ -40,7 +45,9 @@ class LineReader {
   final List<Completer<String>> _waiters = [];
 
   LineReader(Stream<List<int>> stream) {
-    stream.transform(utf8.decoder).transform(const LineSplitter()).listen((line) {
+    stream.transform(utf8.decoder).transform(const LineSplitter()).listen((
+      line,
+    ) {
       if (_waiters.isNotEmpty) {
         _waiters.removeAt(0).complete(line);
       } else {
@@ -61,120 +68,208 @@ Future<void> main(List<String> args) async {
   check(args.length == 1, 'usage: dart protocol_smoke.dart <arabicc>');
   final executable = args.single;
 
-  final valid = await run(executable, requestFor(
-    'برنامج اختبار؛ متغير س: صحيح؛ { س = 42؛ اطبع(س)؛ }.',
-  ));
+  final valid = await run(
+    executable,
+    requestFor('برنامج اختبار؛ متغير س: صحيح؛ { س = 42؛ اطبع(س)؛ }.'),
+  );
   check(valid.$1 == 0, valid.$3);
   check(valid.$2['success'] == true, 'valid program should compile');
   check((valid.$2['tokens'] as List).isNotEmpty, 'tokens are missing');
-  check((valid.$2['syntaxTree'] as Map)['kind'] == 'program',
-      'syntax tree kind is wrong');
-  check((valid.$2['symbolTable'] as List).first['name'] == 'س',
-      'symbol table is wrong');
+  check(
+    (valid.$2['syntaxTree'] as Map)['kind'] == 'program',
+    'syntax tree kind is wrong',
+  );
+  check(
+    (valid.$2['symbolTable'] as List).first['name'] == 'س',
+    'symbol table is wrong',
+  );
 
-  final power = await run(executable, requestFor(
-    'برنامج قوة؛ { اطبع(2 ^ 3)؛ اطبع(9 ^ 0.5)؛ }.',
-  ));
+  final power = await run(
+    executable,
+    requestFor('برنامج قوة؛ { اطبع(2 ^ 3)؛ اطبع(9 ^ 0.5)؛ }.'),
+  );
   check(power.$1 == 0, power.$3);
-  check(listEquals(power.$2['executionOutput'], ['8', '3']),
-      'power output changed');
+  check(
+    listEquals(power.$2['executionOutput'], ['8', '3']),
+    'power output changed',
+  );
 
-  final read = await run(executable, requestFor(
-    'برنامج قراءة؛ متغير س: صحيح؛ { اقرأ(س)؛ اطبع(س)؛ }.',
-  ));
+  final read = await run(
+    executable,
+    requestFor('برنامج قراءة؛ متغير س: صحيح؛ { اقرأ(س)؛ اطبع(س)؛ }.'),
+  );
   check(read.$1 != 0, 'read without input should fail');
   check(read.$2['success'] == false, 'read diagnostics missing');
-  check((read.$2['diagnostics'] as List)
-      .any((item) => (item as Map)['code'] == 'R001'), 'R001 is missing');
+  check(
+    (read.$2['diagnostics'] as List).any(
+      (item) => (item as Map)['code'] == 'R001',
+    ),
+    'R001 is missing',
+  );
 
-  final readRequest = requestFor(
-    'برنامج قراءة؛ متغير س: صحيح؛ { اقرأ(س)؛ اطبع(س)؛ }.',
-  )
-    ..['mode'] = 'active'
-    ..['inputValues'] = {'س': '42'};
+  final readRequest =
+      requestFor('برنامج قراءة؛ متغير س: صحيح؛ { اقرأ(س)؛ اطبع(س)؛ }.')
+        ..['mode'] = 'active'
+        ..['inputValues'] = {'س': '42'};
   final readWithInput = await run(executable, readRequest);
   check(readWithInput.$1 == 0, readWithInput.$3);
-  check(listEquals(readWithInput.$2['executionOutput'], ['42']),
-      'input output changed');
+  check(
+    listEquals(readWithInput.$2['executionOutput'], ['42']),
+    'input output changed',
+  );
 
   final analysisRequest = Map<String, dynamic>.from(readRequest)
     ..['execute'] = false;
   final analysis = await run(executable, analysisRequest);
   check(analysis.$1 == 0, analysis.$3);
-  check(listEquals(analysis.$2['executionOutput'], []),
-      'analysis must not execute');
+  check(
+    listEquals(analysis.$2['executionOutput'], []),
+    'analysis must not execute',
+  );
 
-  final interactiveRequest = requestFor(
-    'برنامج قراءة؛ متغير س: صحيح؛ متغير ص: صحيح؛ '
-        '{ اقرأ(س)؛ اقرأ(ص)؛ اطبع(س)؛ اطبع(ص)؛ }.',
-  )
-    ..['mode'] = 'active'
-    ..['inputValues'] = <String, String>{}
-    ..['interactive'] = true;
+  final interactiveRequest =
+      requestFor(
+          'برنامج قراءة؛ متغير س: صحيح؛ متغير ص: صحيح؛ '
+          '{ اقرأ(س)؛ اقرأ(ص)؛ اطبع(س)؛ اطبع(ص)؛ }.',
+        )
+        ..['mode'] = 'active'
+        ..['inputValues'] = <String, String>{}
+        ..['interactive'] = true;
   final session = await Process.start(executable, ['--protocol']);
   final output = LineReader(session.stdout);
   session.stdin.writeln(jsonEncode(interactiveRequest));
   await session.stdin.flush();
   final first = jsonDecode(await output.next()) as Map;
-  check(mapEquals(first, {'requestType': 'input', 'name': 'س', 'type': 'صحيح'}),
-      'first interactive request changed');
+  check(
+    mapEquals(first, {'requestType': 'input', 'name': 'س', 'type': 'صحيح'}),
+    'first interactive request changed',
+  );
   session.stdin.writeln(jsonEncode({'value': '11'}));
   await session.stdin.flush();
   final second = jsonDecode(await output.next()) as Map;
-  check(mapEquals(second, {'requestType': 'input', 'name': 'ص', 'type': 'صحيح'}),
-      'second interactive request changed');
+  check(
+    mapEquals(second, {'requestType': 'input', 'name': 'ص', 'type': 'صحيح'}),
+    'second interactive request changed',
+  );
   session.stdin.writeln(jsonEncode({'value': '22'}));
   await session.stdin.flush();
   final finalResponse = jsonDecode(await output.next()) as Map;
-  check(listEquals(finalResponse['executionOutput'], ['11', '22']),
-      'interactive output changed');
+  check(
+    listEquals(finalResponse['executionOutput'], ['11', '22']),
+    'interactive output changed',
+  );
   await session.stdin.close();
   check(await session.exitCode == 0, 'interactive process failed');
 
-  final mismatch = await run(executable, requestFor(
-    'برنامج أنواع؛ متغير رقم: صحيح؛ متغير نص: خيط_رمزي؛ { رقم = نص؛ }.',
-  ));
-  check(mismatch.$1 != 0 && mismatch.$2['success'] == false,
-      'type mismatch should fail');
-  check((mismatch.$2['diagnostics'] as List).any((item) =>
-      (item as Map)['phase'] == 'semantic' &&
-      (item['message'] as String).contains('عدم توافق نوع الإسناد')),
-      'type mismatch diagnostic is missing');
+  final mismatch = await run(
+    executable,
+    requestFor(
+      'برنامج أنواع؛ متغير رقم: صحيح؛ متغير نص: خيط_رمزي؛ { رقم = نص؛ }.',
+    ),
+  );
+  check(
+    mismatch.$1 != 0 && mismatch.$2['success'] == false,
+    'type mismatch should fail',
+  );
+  check(
+    (mismatch.$2['diagnostics'] as List).any(
+      (item) =>
+          (item as Map)['phase'] == 'semantic' &&
+          (item['message'] as String).contains('عدم توافق نوع الإسناد'),
+    ),
+    'type mismatch diagnostic is missing',
+  );
 
-  final native = await run(executable, requestFor(
-    'برنامج أصلي؛\nمتغير سعر: حقيقي؛\n{ سعر = 2.5؛ }.\n',
-    target: 'dart-native',
-  ));
-  check(native.$1 == 0 && native.$2['success'] == true,
-      'native program should compile');
-  check((native.$2['assembly'] as String).contains('movsd'),
-      'native assembly lost movsd');
-  check((native.$2['assembly'] as String).contains('fmt_real'),
-      'native assembly lost fmt_real');
+  final native = await run(
+    executable,
+    requestFor(
+      'برنامج أصلي؛\nمتغير سعر: حقيقي؛\n{ سعر = 2.5؛ }.\n',
+      target: 'dart-native',
+    ),
+  );
+  check(
+    native.$1 == 0 && native.$2['success'] == true,
+    'native program should compile',
+  );
+  check(
+    (native.$2['assembly'] as String).contains('movsd'),
+    'native assembly lost movsd',
+  );
+  check(
+    (native.$2['assembly'] as String).contains('fmt_real'),
+    'native assembly lost fmt_real',
+  );
 
-  final invalid = await run(executable, requestFor(
-    'برنامج اختبار؛ متغير س: صحيح؛ { اطبع(مفقود)؛ }.',
-  ));
-  check(invalid.$1 != 0 && invalid.$2['success'] == false,
-      'invalid identifier should fail');
+  final artifactDirectory = await Directory.systemTemp.createTemp(
+    'arabicc-protocol-artifact-',
+  );
+  try {
+    final artifact = await run(
+      executable,
+      requestFor('برنامج artifact؛ { اطبع(7)؛ }.', target: 'dart-native')
+        ..['artifactDirectory'] = artifactDirectory.path,
+    );
+    check(
+      artifact.$1 == 0 && artifact.$2['success'] == true,
+      'artifact build should succeed',
+    );
+    final artifacts = artifact.$2['artifacts'];
+    check(
+      artifacts is List && artifacts.length >= 2,
+      'artifact paths are missing',
+    );
+    for (final path in artifacts) {
+      check(
+        path is String && await File(path).exists(),
+        'artifact file was not written: $path',
+      );
+    }
+    final artifactExecutable = (artifacts as List).last as String;
+    final execution = await Process.run(artifactExecutable, const []);
+    check(
+      execution.exitCode == 0,
+      'generated artifact failed: ${execution.stderr}',
+    );
+  } finally {
+    await artifactDirectory.delete(recursive: true);
+  }
+
+  final invalid = await run(
+    executable,
+    requestFor('برنامج اختبار؛ متغير س: صحيح؛ { اطبع(مفقود)؛ }.'),
+  );
+  check(
+    invalid.$1 != 0 && invalid.$2['success'] == false,
+    'invalid identifier should fail',
+  );
   final diagnostic = (invalid.$2['diagnostics'] as List).first as Map;
   check(diagnostic['phase'] == 'semantic', 'wrong diagnostic phase');
-  check((diagnostic['span'] as Map)['sourcePath'] == 'main.arb',
-      'wrong diagnostic source');
+  check(
+    (diagnostic['span'] as Map)['sourcePath'] == 'main.arb',
+    'wrong diagnostic source',
+  );
 
-  final syntax = await run(executable, requestFor(
-    'برنامج اختبار؛ متغير س: صحيح؛ { س = ؛ }.',
-  ));
-  check(syntax.$1 != 0 && syntax.$2['success'] == false,
-      'syntax error should fail');
-  check(((syntax.$2['diagnostics'] as List).first as Map)['phase'] == 'syntax',
-      'wrong syntax diagnostic phase');
+  final syntax = await run(
+    executable,
+    requestFor('برنامج اختبار؛ متغير س: صحيح؛ { س = ؛ }.'),
+  );
+  check(
+    syntax.$1 != 0 && syntax.$2['success'] == false,
+    'syntax error should fail',
+  );
+  check(
+    ((syntax.$2['diagnostics'] as List).first as Map)['phase'] == 'syntax',
+    'wrong syntax diagnostic phase',
+  );
 }
 
 bool listEquals(Object? actual, List<Object?> expected) =>
-    actual is List && actual.length == expected.length &&
-    List.generate(actual.length, (i) => actual[i] == expected[i])
-        .every((value) => value);
+    actual is List &&
+    actual.length == expected.length &&
+    List.generate(
+      actual.length,
+      (i) => actual[i] == expected[i],
+    ).every((value) => value);
 
 bool mapEquals(Map actual, Map expected) =>
     actual.length == expected.length &&

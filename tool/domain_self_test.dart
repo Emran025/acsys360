@@ -16,10 +16,9 @@ void main() {
   assert(branched.redo().text == branched.text);
 
   final second = const Document(path: 'second.arb', text: 'second');
-  final workspace = Workspace(rootPath: '.')
-      .open(original)
-      .replaceActive(edited)
-      .open(second);
+  final workspace = Workspace(
+    rootPath: '.',
+  ).open(original).replaceActive(edited).open(second);
   assert(workspace.activeDocument?.path == 'second.arb');
   assert(workspace.select(0).activeDocument?.text == 'aXYZc');
   assert(workspace.closeActive().activeDocument?.path == 'main.arb');

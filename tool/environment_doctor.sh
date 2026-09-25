@@ -49,7 +49,7 @@ printf 'Expected Flutter: %s\n\n' "$EXPECTED_FLUTTER_VERSION"
 
 printf '%-12s %-45s %s\n' 'Tool' 'Path' 'Version'
 printf '%-12s %-45s %s\n' '----' '----' '-------'
-for tool in flutter dart git gh docker podman cmake ninja clang python3 node pnpm; do
+for tool in flutter dart git gh docker podman cmake ninja clang node pnpm; do
   printf '%-12s %-45s %s\n' "$tool" "$(command_path "$tool")" "$(version_line "$tool")"
 done
 
