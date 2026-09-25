@@ -26,10 +26,17 @@ add_flex_bison_dependency(ArabicLexer ArabicParser)
 add_executable(arabicc
   src/main.c
   src/protocol.c
+  src/protocol/protocol_json.c
+  src/protocol/protocol_request.c
+  src/protocol/protocol_response.c
+  src/driver/compiler_driver.c
+  src/ir/typed_ir.c
+  src/runtime/interpreter.c
   src/backend/artifact_builder.c
+  src/backend/toolchain.c
   src/ast.c
   src/semantic.c
-  src/tac.c
+  src/ir/tac.c
   src/asm_x86_64.c
   ${BISON_ArabicParser_OUTPUTS}
   ${FLEX_ArabicLexer_OUTPUTS}
@@ -52,7 +59,7 @@ add_test(NAME arabicc_version COMMAND arabicc --version)
 add_test(NAME arabicc_help COMMAND arabicc --help)
 add_executable(arabicc_tac_golden_test
   tests/tac_golden_test.c
-  src/tac.c
+  src/ir/tac.c
   src/ast.c
 )
 target_include_directories(arabicc_tac_golden_test PRIVATE include)

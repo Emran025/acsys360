@@ -1,4 +1,9 @@
+#ifndef _WIN32
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include "artifact_builder.h"
+#include "toolchain.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,6 +18,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <limits.h>
+extern char *realpath(const char *path, char *resolved_path);
 #endif
 
 int artifact_path_is_within_root(const char *root_path, const char *candidate_path) {
@@ -70,99 +76,6 @@ int artifact_path_is_within_root(const char *root_path, const char *candidate_pa
          candidate[root_length] == '/';
 }
 
-static int file_exists(const char *path) {
-  FILE *file = fopen(path, "rb");
-  if (file == NULL) return 0;
-  fclose(file);
-  return 1;
-}
-
-void artifact_ensure_directory(const char *path) {
-  char buffer[2048];
-  size_t length;
-  if (!path) return;
-  length = strlen(path);
-  if (length == 0 || length >= sizeof(buffer)) return;
-  memcpy(buffer, path, length + 1U);
-  for (size_t i = 1U; i < length; i++) {
-    if (buffer[i] == '/' || buffer[i] == '\\') {
-      char saved = buffer[i];
-      buffer[i] = '\0';
-#ifdef _WIN32
-      (void)_mkdir(buffer);
-#else
-      (void)mkdir(buffer, 0775);
-#endif
-      buffer[i] = saved;
-    }
-  }
-#ifdef _WIN32
-  (void)_mkdir(buffer);
-#else
-  (void)mkdir(buffer, 0775);
-#endif
-}
-
-static const char *tool_path(const char *tool) {
-  const char *bundled_dir = getenv("ACSYS360_TOOLCHAIN_DIR");
-#ifdef _WIN32
-  static char bundled_paths[2][1024];
-  static char paths[2][260];
-  const size_t index = tool[0] == 'n' ? 0U : 1U;
-  char *path = paths[index];
-  if (bundled_dir && bundled_dir[0] != '\0') {
-    snprintf(bundled_paths[index], sizeof(bundled_paths[index]), "%s\\%s.exe", bundled_dir, tool);
-    if (file_exists(bundled_paths[index])) return bundled_paths[index];
-  }
-  const char *directories[] = {
-    "C:\\msys64\\ucrt64\\bin",
-    "C:\\msys64\\usr\\bin",
-    "C:\\msys64\\mingw64\\bin"
-  };
-  for (size_t i = 0U; i < sizeof(directories) / sizeof(directories[0]); i++) {
-    snprintf(path, sizeof(paths[0]), "%s\\%s.exe", directories[i], tool);
-    if (file_exists(path)) return path;
-  }
-#else
-  static char bundled_paths[2][1024];
-  static char paths[2][512];
-  const size_t index = tool[0] == 'n' ? 0U : 1U;
-  char *path = paths[index];
-  if (bundled_dir && bundled_dir[0] != '\0') {
-    snprintf(bundled_paths[index], sizeof(bundled_paths[index]), "%s/%s", bundled_dir, tool);
-    if (access(bundled_paths[index], X_OK) == 0) return bundled_paths[index];
-  }
-  const char *directories[] = {
-    "/usr/local/bin",
-    "/usr/bin",
-    "/bin",
-    "/opt/homebrew/bin"
-  };
-  for (size_t i = 0U; i < sizeof(directories) / sizeof(directories[0]); i++) {
-    snprintf(path, sizeof(paths[index]), "%s/%s", directories[i], tool);
-    if (access(path, X_OK) == 0) return path;
-  }
-#endif
-  return NULL;
-}
-
-#ifndef _WIN32
-static int run_process(const char *executable, char *const arguments[]) {
-  pid_t child = fork();
-  if (child < 0) return -1;
-  if (child == 0) {
-    /* tool_path() resolves an absolute executable; do not search PATH again. */
-    execv(executable, arguments);
-    _exit(127);
-  }
-  int status;
-  do {
-    if (waitpid(child, &status, 0) < 0) return -1;
-  } while (!WIFEXITED(status) && !WIFSIGNALED(status));
-  return WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
-}
-#endif
-
 int artifact_build_native(const char *artifact_dir,
                                  const char *assembly_path,
                                  char *artifact_path,
@@ -170,8 +83,8 @@ int artifact_build_native(const char *artifact_dir,
                                  char *error,
                                  size_t error_size) {
   char object_path[2048];
-  const char *nasm = tool_path("nasm");
-  const char *gcc = tool_path("gcc");
+  const char *nasm = toolchain_path("nasm");
+  const char *gcc = toolchain_path("gcc");
   if (!artifact_dir || !assembly_path || !artifact_path ||
       !error || artifact_path_size == 0U || error_size == 0U) return 0;
   if (!nasm || !gcc) {
@@ -198,7 +111,7 @@ int artifact_build_native(const char *artifact_dir,
            ""
 #endif
   );
-  artifact_ensure_directory(artifact_dir);
+  toolchain_ensure_directory(artifact_dir);
 #ifdef _WIN32
   {
     const char *arguments[] = {
@@ -215,7 +128,7 @@ int artifact_build_native(const char *artifact_dir,
       (char *)nasm, "-f", "elf64", (char *)assembly_path,
       "-o", object_path, NULL
     };
-    if (run_process(nasm, arguments) != 0) {
+    if (toolchain_run_process(nasm, arguments) != 0) {
       snprintf(error, error_size, "فشل تشغيل NASM لبناء الملف التنفيذي");
       return 0;
     }
@@ -240,13 +153,13 @@ int artifact_build_native(const char *artifact_dir,
     char *arguments[] = {
       (char *)gcc, "-no-pie", object_path, "-o", artifact_path, NULL
     };
-    if (run_process(gcc, arguments) != 0) {
+    if (toolchain_run_process(gcc, arguments) != 0) {
       snprintf(error, error_size, "فشل تشغيل GCC لربط الملف التنفيذي");
       return 0;
     }
   }
 #endif
-  if (!file_exists(artifact_path)) {
+  if (!toolchain_file_exists(artifact_path)) {
     snprintf(error, error_size, "لم ينتج backend الملف التنفيذي المتوقع");
     return 0;
   }

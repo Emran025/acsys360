@@ -107,7 +107,7 @@ if (Test-Path "src/lexer.l") {
 }
 
 Write-Host "[3/3] Compiling C source files with $gcc..."
-$sources = @("src/main.c", "src/protocol.c", "src/backend/artifact_builder.c", "src/ast.c", "src/semantic.c", "src/tac.c", "src/asm_x86_64.c")
+$sources = @("src/main.c", "src/protocol.c", "src/protocol/protocol_json.c", "src/protocol/protocol_request.c", "src/protocol/protocol_response.c", "src/driver/compiler_driver.c", "src/ir/typed_ir.c", "src/runtime/interpreter.c", "src/backend/artifact_builder.c", "src/backend/toolchain.c", "src/ast.c", "src/semantic.c", "src/ir/tac.c", "src/asm_x86_64.c")
 if (Test-Path "build/generated/parser.tab.c") { $sources += "build/generated/parser.tab.c" }
 if (Test-Path "build/generated/lexer.yy.c") { $sources += "build/generated/lexer.yy.c" }
 
