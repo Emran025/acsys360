@@ -94,27 +94,76 @@ class _DiagnosticsPanelWidgetState extends State<DiagnosticsPanelWidget> {
             textDirection: TextDirection.rtl,
             children: [
               for (var index = 0; index < _stages.length; index++)
-                TextButton(
-                  onPressed: () => setState(() => _stage = index),
-                  style: TextButton.styleFrom(
-                    foregroundColor: index == _stage
-                        ? Theme.of(context).colorScheme.primary
-                        : null,
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    minimumSize: const Size(0, 28),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: const RoundedRectangleBorder(
-                      borderRadius: BorderRadius.zero,
-                    ),
-                  ),
-                  child: Text(_stages[index]),
-                ),
+                _stageTab(context, index: index, label: _stages[index]),
             ],
           ),
         ),
         const Divider(height: 1),
         Expanded(child: _stageBody(result)),
       ],
+    );
+  }
+
+  Widget _stageTab(
+    BuildContext context, {
+    required int index,
+    required String label,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+    final active = index == _stage;
+    return Semantics(
+      button: true,
+      selected: active,
+      label: label,
+      child: Padding(
+        padding: const EdgeInsetsDirectional.only(end: 2),
+        child: Material(
+          color: active
+              ? colors.primaryContainer.withValues(alpha: .42)
+              : Colors.transparent,
+          child: InkWell(
+            onTap: () => setState(() => _stage = index),
+            hoverColor: colors.primary.withValues(alpha: .08),
+            splashColor: colors.primary.withValues(alpha: .14),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 120),
+              curve: Curves.easeOut,
+              constraints: const BoxConstraints(minHeight: 34),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    color: active ? colors.primary : Colors.transparent,
+                    width: active ? 3 : 0,
+                  ),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (active)
+                    Padding(
+                      padding: const EdgeInsetsDirectional.only(end: 5),
+                      child: Icon(
+                        Icons.arrow_drop_down_rounded,
+                        size: 16,
+                        color: colors.primary,
+                      ),
+                    ),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: active ? colors.primary : colors.onSurfaceVariant,
+                      fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 

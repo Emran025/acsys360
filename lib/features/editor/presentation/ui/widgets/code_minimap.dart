@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 
 import '../../../domain/entities/editor_diagnostic.dart';
 import '../../../../../../shared/themes/app_theme.dart';
@@ -24,6 +25,10 @@ class CodeMinimap extends StatefulWidget {
 }
 
 class _CodeMinimapState extends State<CodeMinimap> {
+  bool _draggingViewport = false;
+  double _dragStartGlobalY = 0;
+  double _dragStartScrollOffset = 0;
+
   @override
   void initState() {
     super.initState();
@@ -65,50 +70,130 @@ class _CodeMinimapState extends State<CodeMinimap> {
       container: true,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTapDown: (details) => _jumpTo(details.localPosition.dy, lines.length),
-        onVerticalDragStart: (details) =>
-            _jumpTo(details.localPosition.dy, lines.length),
-        onVerticalDragUpdate: (details) =>
-            _jumpTo(details.localPosition.dy, lines.length),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: colors.surfaceContainerHighest.withValues(alpha: .34),
-            border: Border(right: BorderSide(color: colors.outlineVariant)),
-          ),
-          child: CustomPaint(
-            key: const ValueKey('minimap-code-painter'),
-            painter: _MinimapPainter(
-              lines: lines,
-              sections: sections,
-              diagnostics: widget.diagnostics,
-              fontScale: widget.fontScale,
-              selection: widget.controller.selection,
-              scrollPosition: widget.scrollController.hasClients
-                  ? widget.scrollController.position
-                  : null,
-              colors: colors,
+        onTapDown: (details) {
+          if (!_viewportRect(lines.length).contains(details.localPosition)) {
+            _jumpTo(details.localPosition.dy, lines.length);
+          }
+        },
+        onVerticalDragStart: (details) {
+          final viewport = _viewportRect(lines.length);
+          _draggingViewport = viewport.contains(details.localPosition);
+          _dragStartGlobalY = details.globalPosition.dy;
+          _dragStartScrollOffset = widget.scrollController.hasClients
+              ? widget.scrollController.offset
+              : 0;
+          if (!_draggingViewport) {
+            _jumpTo(details.localPosition.dy, lines.length);
+          }
+        },
+        onVerticalDragUpdate: (details) {
+          if (_draggingViewport) {
+            _dragViewport(details.globalPosition.dy - _dragStartGlobalY);
+          } else {
+            _jumpTo(details.localPosition.dy, lines.length);
+          }
+        },
+        onVerticalDragEnd: (_) => _draggingViewport = false,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: Listener(
+            onPointerSignal: (event) {
+              if (event is PointerScrollEvent) {
+                _scrollBy(event.scrollDelta.dy);
+              }
+            },
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.surfaceContainerHighest.withValues(alpha: .34),
+                border: Border(right: BorderSide(color: colors.outlineVariant)),
+              ),
+              child: CustomPaint(
+                key: const ValueKey('minimap-code-painter'),
+                painter: _MinimapPainter(
+                  lines: lines,
+                  sections: sections,
+                  diagnostics: widget.diagnostics,
+                  fontScale: widget.fontScale,
+                  selection: widget.controller.selection,
+                  scrollPosition: widget.scrollController.hasClients
+                      ? widget.scrollController.position
+                      : null,
+                  colors: colors,
+                ),
+                size: Size.zero,
+              ),
             ),
-            size: Size.zero,
           ),
         ),
       ),
     );
   }
 
+  Rect _viewportRect(int lineCount) {
+    final size = context.size;
+    if (size == null || size.height <= 0) return Rect.zero;
+    final position = widget.scrollController.hasClients
+        ? widget.scrollController.position
+        : null;
+    if (position == null || !position.hasContentDimensions) return Rect.zero;
+    final contentHeight = math.min(
+      size.height,
+      lineCount * _MinimapPainter.lineHeight,
+    );
+    final viewportHeight =
+        (position.viewportDimension / contentHeight * contentHeight)
+            .clamp(8.0, contentHeight)
+            .toDouble();
+    final available = math.max(0.0, contentHeight - viewportHeight).toDouble();
+    final top = position.maxScrollExtent == 0
+        ? 0.0
+        : position.pixels / position.maxScrollExtent * available;
+    return Rect.fromLTWH(0, top, size.width, viewportHeight);
+  }
+
   void _jumpTo(double y, int lineCount) {
     if (!widget.scrollController.hasClients || lineCount < 1) return;
     final height = context.size?.height ?? 0;
     if (height <= 0) return;
-    final line = ((y / height) * lineCount)
-        .floor()
-        .clamp(0, lineCount - 1)
-        .toInt();
     final position = widget.scrollController.position;
-    final target =
-        (line * _MinimapPainter.lineHeight - position.viewportDimension * .35)
-            .clamp(0.0, position.maxScrollExtent)
-            .toDouble();
+    final contentHeight = math.min(
+      height,
+      lineCount * _MinimapPainter.lineHeight,
+    );
+    final target = (y / height * contentHeight - position.viewportDimension / 2)
+        .clamp(0.0, position.maxScrollExtent)
+        .toDouble();
+    if ((target - position.pixels).abs() > 0.5) {
+      widget.scrollController.jumpTo(target);
+    }
+  }
+
+  void _dragViewport(double deltaY) {
+    if (!widget.scrollController.hasClients) return;
+    final size = context.size;
+    if (size == null || size.height <= 0) return;
+    final viewport = _viewportRect(widget.controller.text.split('\n').length);
+    final available = math.max(1.0, size.height - viewport.height);
+    final delta =
+        deltaY / available * widget.scrollController.position.maxScrollExtent;
+    final target = (_dragStartScrollOffset + delta)
+        .clamp(0.0, widget.scrollController.position.maxScrollExtent)
+        .toDouble();
     widget.scrollController.jumpTo(target);
+  }
+
+  void _scrollBy(double delta) {
+    if (!widget.scrollController.hasClients ||
+        !widget.scrollController.position.hasContentDimensions) {
+      return;
+    }
+    final position = widget.scrollController.position;
+    final target = (position.pixels + delta)
+        .clamp(0.0, position.maxScrollExtent)
+        .toDouble();
+    if ((target - position.pixels).abs() > 0.5) {
+      widget.scrollController.jumpTo(target);
+    }
   }
 }
 
@@ -116,11 +201,6 @@ class _MinimapSection {
   final int line;
   final String label;
   const _MinimapSection({required this.line, required this.label});
-}
-
-class _MiniToken {
-  final String text;
-  const _MiniToken(this.text);
 }
 
 List<_MinimapSection> _sections(List<String> lines) {
@@ -151,7 +231,7 @@ List<_MinimapSection> _sections(List<String> lines) {
 }
 
 class _MinimapPainter extends CustomPainter {
-  static const lineHeight = 24.0;
+  static const lineHeight = 7.0;
   final List<String> lines;
   final List<_MinimapSection> sections;
   final List<EditorDiagnostic> diagnostics;
@@ -173,18 +253,13 @@ class _MinimapPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final lineCount = math.max(lines.length, 1).toInt();
-    final lineScale = size.height / lineCount;
+    final lineScale = lineHeight;
     final currentLine = _lineAtOffset(selection.extentOffset);
     final viewport = _viewport(size, lineCount);
 
     final currentPaint = Paint()..color = colors.primary.withValues(alpha: .12);
     canvas.drawRect(
-      Rect.fromLTWH(
-        0,
-        currentLine * lineScale,
-        size.width,
-        math.max(2.0, lineScale).toDouble(),
-      ),
+      Rect.fromLTWH(0, currentLine * lineScale, size.width, lineScale),
       currentPaint,
     );
 
@@ -225,43 +300,64 @@ class _MinimapPainter extends CustomPainter {
 
   void _paintLine(Canvas canvas, Size size, int index, double lineScale) {
     final sourceLine = lines[index];
-    final text = sourceLine.trimRight();
-    if (text.isEmpty) return;
+    if (sourceLine.trim().isEmpty) return;
 
-    final indent = sourceLine.length - sourceLine.trimLeft().length;
-    final tokens = _miniTokens(text);
-    final gap = math.min(1.0, lineScale * .12).toDouble();
-    final indentWidth = math.min(size.width * .18, indent * 1.2).toDouble();
-    final widths = tokens
-        .map((token) => math.max(3.0, token.text.length * .95 * fontScale))
-        .toList();
-    final rawWidth =
-        widths.fold<double>(indentWidth, (sum, width) => sum + width) +
-        math.max(0, tokens.length - 1) * gap;
-    final available = math.max(6.0, size.width - 8).toDouble();
-    final compression = rawWidth > available ? available / rawWidth : 1.0;
-    final barHeight = math.max(1.5, math.min(4.0, lineScale * .42)).toDouble();
-    final y = index * lineScale + math.max(0.0, (lineScale - barHeight) / 2);
-    var x = size.width - 4;
+    final fontSize = math.min(5.5, lineScale * .8).toDouble();
+    final painter = TextPainter(
+      text: _lineSpan(sourceLine, fontSize),
+      textDirection: TextDirection.rtl,
+      textAlign: TextAlign.right,
+      maxLines: 1,
+      ellipsis: '…',
+    )..layout(maxWidth: math.max(8.0, size.width - 8));
 
-    // The first logical token is anchored at the right, matching Arabic lines.
-    for (var tokenIndex = 0; tokenIndex < tokens.length; tokenIndex++) {
-      final width = widths[tokenIndex] * compression;
-      x -= width;
-      canvas.drawRect(
-        Rect.fromLTWH(x, y, width, barHeight),
-        Paint()
-          ..color = _tokenColor(tokens[tokenIndex].text).withValues(alpha: .86),
-      );
-      x -= gap * compression;
-    }
+    final y =
+        index * lineScale + math.max(0.0, (lineScale - painter.height) / 2);
+    painter.paint(canvas, Offset(size.width - 4 - painter.width, y));
   }
 
-  List<_MiniToken> _miniTokens(String text) {
+  TextSpan _lineSpan(String sourceLine, double fontSize) {
     final matches = RegExp(
       r'//.*|"(?:\\.|[^"\\])*"|\d+(?:\.\d+)?|[A-Za-zء-ي_][A-Za-z0-9ء-ي_]*|[^\s]',
-    ).allMatches(text);
-    return [for (final match in matches) _MiniToken(match.group(0) ?? '')];
+    ).allMatches(sourceLine);
+    final children = <InlineSpan>[];
+    var cursor = 0;
+    for (final match in matches) {
+      if (match.start > cursor) {
+        children.add(
+          TextSpan(
+            text: sourceLine.substring(cursor, match.start),
+            style: _miniTextStyle(fontSize, colors.onSurfaceVariant),
+          ),
+        );
+      }
+      final token = match.group(0) ?? '';
+      children.add(
+        TextSpan(
+          text: token,
+          style: _miniTextStyle(fontSize, _tokenColor(token)),
+        ),
+      );
+      cursor = match.end;
+    }
+    if (cursor < sourceLine.length) {
+      children.add(
+        TextSpan(
+          text: sourceLine.substring(cursor),
+          style: _miniTextStyle(fontSize, colors.onSurfaceVariant),
+        ),
+      );
+    }
+    return TextSpan(children: children);
+  }
+
+  TextStyle _miniTextStyle(double fontSize, Color color) {
+    return TextStyle(
+      fontFamily: AppTheme.fontFamily,
+      fontSize: fontSize,
+      height: 1,
+      color: color.withValues(alpha: .9),
+    );
   }
 
   Color _tokenColor(String token) {
@@ -312,13 +408,13 @@ class _MinimapPainter extends CustomPainter {
     final position = scrollPosition;
     if (position == null || !position.hasContentDimensions) return null;
     final contentHeight = math
-        .max(size.height, lineCount * lineHeight)
+        .min(size.height, lineCount * lineHeight)
         .toDouble();
     final viewportHeight =
-        (position.viewportDimension / contentHeight * size.height)
-            .clamp(8.0, size.height)
+        (position.viewportDimension / contentHeight * contentHeight)
+            .clamp(8.0, contentHeight)
             .toDouble();
-    final available = math.max(0.0, size.height - viewportHeight).toDouble();
+    final available = math.max(0.0, contentHeight - viewportHeight).toDouble();
     final top = position.maxScrollExtent == 0
         ? 0.0
         : position.pixels / position.maxScrollExtent * available;
