@@ -71,6 +71,10 @@ if(DART_EXECUTABLE)
     COMMAND ${DART_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/composite_types.dart
             $<TARGET_FILE:arabicc>)
+  add_test(NAME arabicc_stability
+    COMMAND ${DART_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/stability.dart
+            $<TARGET_FILE:arabicc>)
 else()
   message(STATUS "Dart not found: skipping compiler Dart integration tests")
 endif()
