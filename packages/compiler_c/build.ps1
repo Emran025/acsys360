@@ -106,7 +106,7 @@ if (Test-Path "src/lexer.l") {
 }
 
 Write-Host "[3/3] Compiling C source files with $gcc..."
-$sources = @("src/main.c", "src/protocol.c", "src/ast.c", "src/semantic.c", "src/asm_x86_64.c")
+$sources = @("src/main.c", "src/protocol.c", "src/ast.c", "src/semantic.c", "src/tac.c", "src/asm_x86_64.c")
 if (Test-Path "src/parser.tab.c") { $sources += "src/parser.tab.c" }
 if (Test-Path "src/lexer.yy.c") { $sources += "src/lexer.yy.c" }
 

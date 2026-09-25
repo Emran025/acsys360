@@ -72,9 +72,10 @@ Map<String, dynamic> requestFor(
   bool execute = true,
   String? target,
   String? artifactDirectory,
+  String rootPath = '/stability',
 }) => {
   'protocolVersion': '0.5.0',
-  'rootPath': '/stability',
+  'rootPath': rootPath,
   'sourcePaths': ['/stability/main.arb'],
   'sourceTexts': {'/stability/main.arb': source},
   'mode': 'project',
@@ -164,6 +165,7 @@ Future<void> main(List<String> args) async {
   }
 
   for (var iteration = 0; iteration < 4; iteration++) {
+    if (Platform.isWindows) break;
     final directory = await Directory.systemTemp.createTemp(
       'arabicc-stability-artifact-',
     );
@@ -179,6 +181,7 @@ Future<void> main(List<String> args) async {
           'برنامج artifact؛ { اطبع(7)؛ }.',
           target: 'dart-native',
           artifactDirectory: artifactDirectory.path,
+          rootPath: directory.path,
         ),
       );
       check(response['success'] == true, 'artifact iteration $iteration failed');

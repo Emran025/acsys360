@@ -12,10 +12,12 @@ Map<String, dynamic> requestFor(
   String source, {
   String? target,
   bool execute = true,
+  String rootPath = '.',
+  String? artifactDirectory,
 }) {
   final request = <String, dynamic>{
     'protocolVersion': '0.5.0',
-    'rootPath': '.',
+    'rootPath': rootPath,
     'sourcePaths': ['main.arb'],
     'sourceTexts': {'main.arb': source},
     'mode': 'project',
@@ -23,6 +25,9 @@ Map<String, dynamic> requestFor(
     'execute': execute,
   };
   if (target != null) request['target'] = target;
+  if (artifactDirectory != null) {
+    request['artifactDirectory'] = artifactDirectory;
+  }
   return request;
 }
 
@@ -206,8 +211,12 @@ Future<void> main(List<String> args) async {
   try {
     final artifact = await run(
       executable,
-      requestFor('برنامج artifact؛ { اطبع(7)؛ }.', target: 'dart-native')
-        ..['artifactDirectory'] = artifactDirectory.path,
+      requestFor(
+        'برنامج artifact؛ { اطبع(7)؛ }.',
+        target: 'dart-native',
+        rootPath: artifactDirectory.path,
+        artifactDirectory: '${artifactDirectory.path}${Platform.pathSeparator}.arabic360${Platform.pathSeparator}build',
+      ),
     );
     check(
       artifact.$1 == 0 && artifact.$2['success'] == true,

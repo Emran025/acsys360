@@ -33,6 +33,57 @@ static void buf_init(Buffer *b) {
   if (b->data) b->data[0] = '\0';
 }
 
+static int path_is_within_root(const char *root_path, const char *candidate_path) {
+  char root[2048];
+  char candidate[2048];
+  size_t root_length;
+  if (!root_path || !candidate_path || root_path[0] == '\0' ||
+      candidate_path[0] == '\0') return 0;
+#ifdef _WIN32
+  if (!_fullpath(root, root_path, sizeof(root)) ||
+      !_fullpath(candidate, candidate_path, sizeof(candidate))) return 0;
+  for (char *p = root; *p; p++) {
+    if (*p == '/') *p = '\\';
+  }
+  for (char *p = candidate; *p; p++) {
+    if (*p == '/') *p = '\\';
+  }
+  root_length = strlen(root);
+  if (root_length > 0U &&
+      (root[root_length - 1U] == '\\' || root[root_length - 1U] == '/')) {
+    root[root_length - 1U] = '\0';
+    root_length--;
+  }
+  for (size_t i = 0U; i < strlen(candidate); i++) {
+    if (candidate[i] == '.' && candidate[i + 1U] == '.' &&
+        (i == 0U || candidate[i - 1U] == '\\') &&
+        (candidate[i + 2U] == '\0' || candidate[i + 2U] == '\\')) return 0;
+  }
+  if (_strnicmp(root, candidate, root_length) != 0) return 0;
+#else
+  if (realpath(root_path, root, sizeof(root)) == NULL) return 0;
+  if (candidate_path[0] == '/') {
+    if (strlen(candidate_path) >= sizeof(candidate)) return 0;
+    strcpy(candidate, candidate_path);
+  } else {
+    if (getcwd(candidate, sizeof(candidate)) == NULL) return 0;
+    if (strlen(candidate) + 1U + strlen(candidate_path) >= sizeof(candidate)) return 0;
+    strcat(candidate, "/");
+    strcat(candidate, candidate_path);
+  }
+  root_length = strlen(root);
+  while (root_length > 1U && root[root_length - 1U] == '/') root[--root_length] = '\0';
+  for (size_t i = 0U; candidate[i] != '\0'; i++) {
+    if (candidate[i] == '.' && candidate[i + 1U] == '.' &&
+        (i == 0U || candidate[i - 1U] == '/') &&
+        (candidate[i + 2U] == '\0' || candidate[i + 2U] == '/')) return 0;
+  }
+  if (strncmp(root, candidate, root_length) != 0) return 0;
+#endif
+  return candidate[root_length] == '\0' || candidate[root_length] == '\\' ||
+         candidate[root_length] == '/';
+}
+
 static void buf_append(Buffer *b, const char *str) {
   if (!str) return;
   size_t len = strlen(str);
@@ -1179,8 +1230,20 @@ static const char *tool_path(const char *tool) {
     snprintf(path, sizeof(paths[0]), "%s\\%s.exe", directories[i], tool);
     if (file_exists(path)) return path;
   }
+#else
+  static char path[512];
+  const char *directories[] = {
+    "/usr/local/bin",
+    "/usr/bin",
+    "/bin",
+    "/opt/homebrew/bin"
+  };
+  for (size_t i = 0U; i < sizeof(directories) / sizeof(directories[0]); i++) {
+    snprintf(path, sizeof(path), "%s/%s", directories[i], tool);
+    if (access(path, X_OK) == 0) return path;
+  }
 #endif
-  return tool;
+  return NULL;
 }
 
 #ifndef _WIN32
@@ -1210,6 +1273,10 @@ static int build_native_artifact(const char *artifact_dir,
   const char *gcc = tool_path("gcc");
   if (!artifact_dir || !assembly_path || !artifact_path ||
       !error || artifact_path_size == 0U || error_size == 0U) return 0;
+  if (!nasm || !gcc) {
+    snprintf(error, error_size, "تعذر العثور على أدوات NASM وGCC في مسارات موثوقة");
+    return 0;
+  }
   snprintf(object_path, sizeof(object_path), "%s%carabicc.obj",
            artifact_dir,
 #ifdef _WIN32
@@ -1308,6 +1375,7 @@ int c_run_protocol(const char *payload) {
     g_current_source_path = g_source_path_storage;
     free(entry_path);
   }
+  char *root_path = extract_string_value(payload, "\"rootPath\"");
 
   char *source = extract_source_code(payload);
   if (source && source[0] != '\0') {
@@ -1435,7 +1503,9 @@ int c_run_protocol(const char *payload) {
       if (artifact_dir && artifact_dir[0] != '\0') {
         char *artifact_target = extract_string_value(payload, "\"target\"");
         char asm_path[1024];
-        snprintf(asm_path, sizeof(asm_path), "%s%carabicc.asm",
+        const int artifact_path_allowed =
+            root_path && path_is_within_root(root_path, artifact_dir);
+        const int asm_length = snprintf(asm_path, sizeof(asm_path), "%s%carabicc.asm",
                  artifact_dir,
 #ifdef _WIN32
                  '\\'
@@ -1443,7 +1513,17 @@ int c_run_protocol(const char *payload) {
                  '/'
 #endif
         );
-        if (resp.assembly && resp.assembly[0] != '\0') {
+        if (!artifact_path_allowed) {
+          resp.success = 0;
+          protocol_add_diagnostic(
+              &resp, SEVERITY_ERROR, "backend", "A003",
+              "مسار artifact يجب أن يكون داخل مجلد المشروع", NULL);
+        } else if (asm_length < 0 || (size_t)asm_length >= sizeof(asm_path)) {
+          resp.success = 0;
+          protocol_add_diagnostic(
+              &resp, SEVERITY_ERROR, "backend", "A004",
+              "مسار artifact طويل جدًا", NULL);
+        } else if (resp.assembly && resp.assembly[0] != '\0') {
           ensure_directory(artifact_dir);
           FILE *af = fopen(asm_path, "w");
           if (af) {
@@ -1473,6 +1553,11 @@ int c_run_protocol(const char *payload) {
                     NULL);
               }
             }
+          } else {
+            resp.success = 0;
+            protocol_add_diagnostic(
+                &resp, SEVERITY_ERROR, "backend", "A005",
+                "تعذر إنشاء ملف Assembly الناتج", NULL);
           }
         }
         free(artifact_target);
@@ -1493,6 +1578,7 @@ int c_run_protocol(const char *payload) {
     protocol_add_diagnostic(&resp, SEVERITY_ERROR, "driver", "P003",
                             "لم يحتوي الطلب على مصدر قابل للترجمة", NULL);
   }
+  free(root_path);
 
   char *json_out = protocol_serialize_response(&resp);
   if (json_out) {
