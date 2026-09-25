@@ -167,16 +167,22 @@ Future<void> main(List<String> args) async {
     final directory = await Directory.systemTemp.createTemp(
       'arabicc-stability-artifact-',
     );
+    final marker = File('${directory.path}/shell-injection-marker');
+    final artifactDirectory = Directory(
+      '${directory.path}/artifact-\$(touch ${marker.path})',
+    );
     try {
+      await artifactDirectory.create(recursive: true);
       final response = await compile(
         executable,
         requestFor(
           'برنامج artifact؛ { اطبع(7)؛ }.',
           target: 'dart-native',
-          artifactDirectory: directory.path,
+          artifactDirectory: artifactDirectory.path,
         ),
       );
       check(response['success'] == true, 'artifact iteration $iteration failed');
+      check(!await marker.exists(), 'artifact path executed shell syntax');
       final artifacts = response['artifacts'];
       check(artifacts is List && artifacts.length >= 2, 'artifacts are missing');
       for (final artifact in artifacts) {

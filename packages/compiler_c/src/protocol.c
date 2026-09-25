@@ -15,6 +15,7 @@
 #else
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #endif
 
@@ -1182,6 +1183,22 @@ static const char *tool_path(const char *tool) {
   return tool;
 }
 
+#ifndef _WIN32
+static int run_process(const char *executable, char *const arguments[]) {
+  pid_t child = fork();
+  if (child < 0) return -1;
+  if (child == 0) {
+    execvp(executable, arguments);
+    _exit(127);
+  }
+  int status;
+  do {
+    if (waitpid(child, &status, 0) < 0) return -1;
+  } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+  return WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
+}
+#endif
+
 static int build_native_artifact(const char *artifact_dir,
                                  const char *assembly_path,
                                  char *artifact_path,
@@ -1189,9 +1206,6 @@ static int build_native_artifact(const char *artifact_dir,
                                  char *error,
                                  size_t error_size) {
   char object_path[2048];
-#ifndef _WIN32
-  char command[8192];
-#endif
   const char *nasm = tool_path("nasm");
   const char *gcc = tool_path("gcc");
   if (!artifact_dir || !assembly_path || !artifact_path ||
@@ -1228,12 +1242,15 @@ static int build_native_artifact(const char *artifact_dir,
     }
   }
 #else
-  snprintf(command, sizeof(command), "\"%s\" -f elf64 \"%s\" -o \"%s\"",
-           nasm, assembly_path, object_path);
-  if (system(command) != 0) {
-    snprintf(error, error_size, "فشل تشغيل NASM لبناء الملف التنفيذي: %s",
-             command);
-    return 0;
+  {
+    char *arguments[] = {
+      (char *)nasm, "-f", "elf64", (char *)assembly_path,
+      "-o", object_path, NULL
+    };
+    if (run_process(nasm, arguments) != 0) {
+      snprintf(error, error_size, "فشل تشغيل NASM لبناء الملف التنفيذي");
+      return 0;
+    }
   }
 #endif
 #ifdef _WIN32
@@ -1249,14 +1266,16 @@ static int build_native_artifact(const char *artifact_dir,
       return 0;
     }
   }
-#else
-  snprintf(command, sizeof(command), "\"%s\" -no-pie \"%s\" -o \"%s\"",
-           gcc, object_path, artifact_path);
 #endif
 #ifndef _WIN32
-  if (system(command) != 0) {
-    snprintf(error, error_size, "فشل تشغيل GCC لربط الملف التنفيذي");
-    return 0;
+  {
+    char *arguments[] = {
+      (char *)gcc, "-no-pie", object_path, "-o", artifact_path, NULL
+    };
+    if (run_process(gcc, arguments) != 0) {
+      snprintf(error, error_size, "فشل تشغيل GCC لربط الملف التنفيذي");
+      return 0;
+    }
   }
 #endif
   if (!file_exists(artifact_path)) {
