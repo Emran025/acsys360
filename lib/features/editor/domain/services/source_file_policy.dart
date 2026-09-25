@@ -5,5 +5,6 @@ class SourceFilePolicy {
 
   bool accepts(String path) => path.toLowerCase().endsWith(extension);
 
-  String ensureExtension(String path) => accepts(path) ? path : '$path$extension';
+  String ensureExtension(String path) =>
+      accepts(path) ? path : '$path$extension';
 }

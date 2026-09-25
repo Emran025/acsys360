@@ -26,9 +26,7 @@ class EditorTopBar extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Expanded(
-              child: const _CompactIdentity(),
-            ),
+            Expanded(child: const _CompactIdentity()),
             Tooltip(
               message: isDark ? 'الوضع الفاتح' : 'الوضع الداكن',
               child: IconButton(

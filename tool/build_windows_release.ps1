@@ -2,7 +2,7 @@
 param(
     [switch]$Clean,
     [switch]$SkipChecks,
-    [switch]$SkipZip,
+    [switch]$SkipInstaller,
     [string]$OutputDirectory = "dist"
 )
 
@@ -14,8 +14,9 @@ $CompilerRoot = Join-Path $ProjectRoot "packages\compiler_c"
 $CompilerBuild = Join-Path $CompilerRoot "build"
 $FlutterRelease = Join-Path $ProjectRoot "build\windows\x64\runner\Release"
 $BundleCompiler = Join-Path $FlutterRelease "compiler\arabicc.exe"
+$ToolchainRoot = "C:\msys64\ucrt64"
 $OutputRoot = Join-Path $ProjectRoot $OutputDirectory
-$ZipPath = Join-Path $OutputRoot "acsys360-windows-local.zip"
+$InstallerScript = Join-Path $ProjectRoot "tool\packaging\acsys360-windows.iss"
 
 function Fail([string]$Message) {
     Write-Host "[ERROR] $Message" -ForegroundColor Red
@@ -111,17 +112,42 @@ try {
     New-Item -ItemType Directory -Path $CompilerDestination -Force | Out-Null
     Copy-Item $CompilerExe $BundleCompiler -Force
 
+    $ToolchainBin = Join-Path $ToolchainRoot "bin"
+    foreach ($Tool in @("gcc.exe", "nasm.exe")) {
+        if (-not (Test-Path (Join-Path $ToolchainBin $Tool))) {
+            Fail "Bundled release tool missing: $(Join-Path $ToolchainBin $Tool). Install GCC and NASM in MSYS2 UCRT64."
+        }
+    }
+    $BundledToolchain = Join-Path $FlutterRelease "toolchain\windows"
+    if (Test-Path $BundledToolchain) { Remove-Item $BundledToolchain -Recurse -Force }
+    New-Item -ItemType Directory -Path $BundledToolchain -Force | Out-Null
+    foreach ($Directory in @("bin", "include", "lib", "libexec", "share")) {
+        $Source = Join-Path $ToolchainRoot $Directory
+        if (Test-Path $Source) { Copy-Item $Source $BundledToolchain -Recurse -Force }
+    }
+
     Invoke-Step "Run bundled compiler smoke test" {
         & dart run tool/verify_compiler_bundle.dart --executable $BundleCompiler
     }
 
-    if (-not $SkipZip) {
+    if (-not $SkipInstaller) {
+        $Iscc = Get-Command "ISCC.exe" -ErrorAction SilentlyContinue
+        $IsccPath = if ($Iscc) { $Iscc.Source } else { $null }
+        if (-not $IsccPath) {
+            $DefaultIscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+            if (Test-Path $DefaultIscc) { $IsccPath = $DefaultIscc }
+        }
+        if (-not $IsccPath) {
+            Fail "Inno Setup 6 (ISCC.exe) was not found. Install Inno Setup or use -SkipInstaller to build without packaging."
+        }
         New-Item -ItemType Directory -Path $OutputRoot -Force | Out-Null
-        if (Test-Path $ZipPath) { Remove-Item $ZipPath -Force }
-        Write-Host "`n==> Create distributable ZIP" -ForegroundColor Cyan
-        Compress-Archive -Path (Join-Path $FlutterRelease "*") -DestinationPath $ZipPath -CompressionLevel Optimal
-        if (-not (Test-Path $ZipPath)) { Fail "ZIP creation failed: $ZipPath" }
-        Write-Host "[OK] ZIP: $ZipPath" -ForegroundColor Green
+        $Version = (Select-String -Path (Join-Path $ProjectRoot "pubspec.yaml") -Pattern '^version: ([0-9.]+)' ).Matches.Groups[1].Value
+        Write-Host "`n==> Create Windows setup installer" -ForegroundColor Cyan
+        & $IsccPath "/DAppVersion=$Version" "/DSourceDir=$FlutterRelease" "/DOutputDir=$OutputRoot" $InstallerScript
+        if ($LASTEXITCODE -ne 0) { Fail "Inno Setup failed with exit code $LASTEXITCODE." }
+        $Installer = Join-Path $OutputRoot "acsys360-windows-$Version-setup-x64.exe"
+        if (-not (Test-Path $Installer)) { Fail "Installer was not created: $Installer" }
+        Write-Host "[OK] Installer: $Installer" -ForegroundColor Green
     }
 
     Write-Host "`n[OK] Windows release build completed successfully." -ForegroundColor Green

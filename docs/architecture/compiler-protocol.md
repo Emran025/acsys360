@@ -56,7 +56,7 @@
 
 في بيئة التطوير يُبنى `packages/compiler_c` عبر CMake، ثم يُشغّل `build/arabicc --protocol` على Linux/macOS أو `build/Release/arabicc.exe --protocol` على Windows. أما Release workflow فيبني executable C على runner الأصلي لكل منصة، ثم ينسخه إلى مجلد `compiler` بجوار executable المحرر داخل كل bundle. عند تشغيل النسخة المصدرة يبحث المحرر عن `compiler/arabicc` أو `compiler/arabicc.exe` ويشغل الملف نفسه مع `--protocol`، ويستخدم `--assist` لطلبات الإكمال والمساعدة. إذا لم يجد الملف المضمّن يعود لمسار التطوير فقط.
 
-لا يعني ذلك أن Windows output ملف EXE منفردًا؛ Flutter Desktop يحتاج executable وDLL و`data` وملفات runtime. الناتج القابل للنقل هو ZIP يحتوي `acsys360.exe` ومجلده الكامل، إضافة إلى `compiler/arabicc.exe`، وبذلك لا يحتاج المستخدم إلى تثبيت Dart SDK أو Flex أو Bison أو توفير مصدر المستودع.
+لا يعني ذلك أن Windows output ملف EXE منفردًا؛ Flutter Desktop يحتاج executable وDLL و`data` وملفات runtime. لذلك يوزّع إصدار Windows عبر مُثبّت Inno Setup بصيغة EXE يحتوي مجلد التطبيق الكامل و`compiler/arabicc.exe` وأدوات البناء المرفقة، وبذلك لا يحتاج المستخدم إلى تثبيت Dart SDK أو Flex أو Bison أو توفير مصدر المستودع.
 
 ## ما لم ينفذ بعد
 

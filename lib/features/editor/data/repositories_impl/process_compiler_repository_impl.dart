@@ -12,6 +12,7 @@ typedef CompilerProcessStarter =
       String executable,
       List<String> arguments, {
       String? workingDirectory,
+      Map<String, String>? environment,
     });
 
 /// حد البنية التحتية بين محرر Flutter والمترجم التنفيذي عبر JSON فقط.
@@ -21,6 +22,7 @@ class ProcessCompilerRepository
   final List<String> arguments;
   final CompilationMode mode;
   final String? processWorkingDirectory;
+  final Map<String, String>? environment;
   final CompilerProcessStarter startProcess;
   final Duration processTimeout;
 
@@ -29,6 +31,7 @@ class ProcessCompilerRepository
     this.arguments = const ['--protocol'],
     this.mode = CompilationMode.project,
     this.processWorkingDirectory,
+    this.environment,
     this.startProcess = Process.start,
     this.processTimeout = const Duration(seconds: 30),
   });
@@ -83,6 +86,7 @@ class ProcessCompilerRepository
         executable,
         arguments,
         workingDirectory: processWorkingDirectory ?? rootPath,
+        environment: environment,
       ).timeout(processTimeout);
       process.stdin.write('${jsonEncode(request.toJson())}\n');
       await process.stdin.flush();
@@ -175,6 +179,7 @@ class ProcessCompilerRepository
         executable,
         _assistArguments,
         workingDirectory: processWorkingDirectory ?? rootPath,
+        environment: environment,
       ).timeout(processTimeout);
       process.stdin.writeln(jsonEncode(request.toJson()));
       await process.stdin.close();
