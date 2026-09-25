@@ -30,9 +30,12 @@ Future<Map<String, dynamic>> compileSource(String executable, String source) asy
 Future<void> main(List<String> args) async {
   check(args.length == 1, 'usage: dart semicolon_rule.dart <arabicc>');
   final valid = await compileSource(args.single, 'برنامج اختبار؛ { اطبع(1)؛ }.');
+  final elseIf = await compileSource(args.single,
+      'برنامج شروط؛ متغير س: صحيح؛ { س = 8؛ إذا(س < 0) فان اطبع("سالب")؛ وإلا إذا(س > 5) فان اطبع("كبير")؛ وإلا اطبع("صغير")؛ }.');
   final invalid = await compileSource(args.single, 'برنامج اختبار؛ { اطبع(1) }.');
 
   check(valid['success'] == true, 'valid semicolon program should compile');
+  check(elseIf['success'] == true, 'else-if chain should compile');
   check(invalid['success'] == false, 'missing semicolon should fail');
   check((invalid['diagnostics'] as List).isNotEmpty,
       'missing semicolon should produce a diagnostic');
