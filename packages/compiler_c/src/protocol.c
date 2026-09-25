@@ -1,4 +1,5 @@
 #include "protocol.h"
+#include "tac.h"
 #include "ast.h"
 #include "semantic.h"
 #include "asm_x86_64.h"
@@ -630,69 +631,6 @@ static char *ast_to_json(const CAstNode *root) {
   buf_init(&b);
   serialize_ast_node(&b, root);
   return b.data;
-}
-
-/* 3AC Generation for the 3AC Tab */
-static int g_tac_temp_counter = 0;
-
-static char *emit_tac_expr(ProtocolResponse *resp, const CAstNode *expr) {
-  if (!expr) return c_strdup("0");
-  if (expr->kind == C_AST_LITERAL) {
-    return c_strdup(expr->data.literal.value ? expr->data.literal.value : "0");
-  }
-  if (expr->kind == C_AST_VARIABLE_REFERENCE) {
-    return c_strdup(expr->data.reference.name ? expr->data.reference.name : "");
-  }
-  if (expr->kind == C_AST_BINARY) {
-    char *left = emit_tac_expr(resp, expr->data.binary.left);
-    char *right = emit_tac_expr(resp, expr->data.binary.right);
-    char temp[32];
-    snprintf(temp, sizeof(temp), "t%d", g_tac_temp_counter++);
-    char buf[256];
-    snprintf(buf, sizeof(buf), "%s = %s %s %s", temp, left, expr->data.binary.operator ? expr->data.binary.operator : "+", right);
-    protocol_add_tac(resp, buf);
-    free(left);
-    free(right);
-    return c_strdup(temp);
-  }
-  return c_strdup("0");
-}
-
-static void generate_tac(ProtocolResponse *resp, const CAstNode *root) {
-  if (!root || root->kind != C_AST_PROGRAM) return;
-  g_tac_temp_counter = 0;
-  for (size_t i = 0; i < root->data.program.declarations.count; i++) {
-    const CAstNode *d = root->data.program.declarations.items[i];
-    if (d && d->kind == C_AST_VARIABLE_DECLARATION) {
-      for (size_t j = 0; j < d->data.variable.name_count; j++) {
-        char buf[128];
-        snprintf(buf, sizeof(buf), "ALLOC %s, %s",
-                 d->data.variable.names[j],
-                 d->data.variable.type && d->data.variable.type->name ? d->data.variable.type->name : "صحيح");
-        protocol_add_tac(resp, buf);
-      }
-    }
-  }
-  for (size_t i = 0; i < root->data.program.statements.count; i++) {
-    const CAstNode *s = root->data.program.statements.items[i];
-    if (!s) continue;
-    if (s->kind == C_AST_ASSIGNMENT && s->data.assignment.name) {
-      char *val = emit_tac_expr(resp, s->data.assignment.expression);
-      char buf[256];
-      snprintf(buf, sizeof(buf), "%s = %s", s->data.assignment.name, val);
-      protocol_add_tac(resp, buf);
-      free(val);
-    } else if (s->kind == C_AST_PRINT) {
-      for (size_t j = 0; j < s->data.print.values.count; j++) {
-        char *val = emit_tac_expr(resp, s->data.print.values.items[j]);
-        char buf[256];
-        snprintf(buf, sizeof(buf), "PARAM %s", val);
-        protocol_add_tac(resp, buf);
-        protocol_add_tac(resp, "CALL print, 1");
-        free(val);
-      }
-    }
-  }
 }
 
 /* Typed IR Generation for the Typed IR Tab */
@@ -1443,7 +1381,17 @@ int c_run_protocol(const char *payload) {
       c_semantic_result_free(&semantic);
 
       /* 5. Three Address Code (3AC) */
-      generate_tac(&resp, g_root_ast);
+      CTacResult tac = {0};
+      if (c_generate_tac(g_root_ast, &tac)) {
+        for (size_t i = 0U; i < tac.count; i++) {
+          char *text = c_tac_instruction_to_text(&tac.items[i]);
+          if (text) {
+            protocol_add_tac(&resp, text);
+            free(text);
+          }
+        }
+      }
+      c_tac_result_free(&tac);
 
       /* 6. Execution output. Analysis requests must not run read() with a
          missing value: that used to make an unprovided input look like 0. */

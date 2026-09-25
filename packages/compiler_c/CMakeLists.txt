@@ -25,6 +25,7 @@ add_executable(arabicc
   src/protocol.c
   src/ast.c
   src/semantic.c
+  src/tac.c
   src/asm_x86_64.c
   ${BISON_ArabicParser_OUTPUTS}
   ${FLEX_ArabicLexer_OUTPUTS}
@@ -45,20 +46,31 @@ target_include_directories(arabicc PRIVATE
 enable_testing()
 add_test(NAME arabicc_version COMMAND arabicc --version)
 add_test(NAME arabicc_help COMMAND arabicc --help)
-find_program(DART_EXECUTABLE dart REQUIRED)
-add_test(NAME arabicc_protocol_smoke
-  COMMAND ${DART_EXECUTABLE}
-          ${CMAKE_CURRENT_SOURCE_DIR}/tests/protocol_smoke.dart
-          $<TARGET_FILE:arabicc>)
-add_test(NAME arabicc_manual_examples
-  COMMAND ${DART_EXECUTABLE}
-          ${CMAKE_CURRENT_SOURCE_DIR}/tests/manual_examples.dart
-          $<TARGET_FILE:arabicc>)
-add_test(NAME arabicc_semicolon_rule
-  COMMAND ${DART_EXECUTABLE}
-          ${CMAKE_CURRENT_SOURCE_DIR}/tests/semicolon_rule.dart
-          $<TARGET_FILE:arabicc>)
-add_test(NAME arabicc_composite_types
-  COMMAND ${DART_EXECUTABLE}
-          ${CMAKE_CURRENT_SOURCE_DIR}/tests/composite_types.dart
-          $<TARGET_FILE:arabicc>)
+add_executable(arabicc_tac_golden_test
+  tests/tac_golden_test.c
+  src/tac.c
+  src/ast.c
+)
+target_include_directories(arabicc_tac_golden_test PRIVATE include)
+add_test(NAME arabicc_tac_golden COMMAND arabicc_tac_golden_test)
+find_program(DART_EXECUTABLE dart)
+if(DART_EXECUTABLE)
+  add_test(NAME arabicc_protocol_smoke
+    COMMAND ${DART_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/protocol_smoke.dart
+            $<TARGET_FILE:arabicc>)
+  add_test(NAME arabicc_manual_examples
+    COMMAND ${DART_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/manual_examples.dart
+            $<TARGET_FILE:arabicc>)
+  add_test(NAME arabicc_semicolon_rule
+    COMMAND ${DART_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/semicolon_rule.dart
+            $<TARGET_FILE:arabicc>)
+  add_test(NAME arabicc_composite_types
+    COMMAND ${DART_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/composite_types.dart
+            $<TARGET_FILE:arabicc>)
+else()
+  message(STATUS "Dart not found: skipping compiler Dart integration tests")
+endif()

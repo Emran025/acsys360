@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:compiler_contracts/compiler_contracts.dart';
 import 'package:flutter/foundation.dart';
 
@@ -8,13 +6,14 @@ import '../../domain/entities/document.dart';
 import '../../domain/entities/editor_diagnostic.dart';
 import '../../domain/entities/file_node.dart';
 import '../../domain/entities/workspace.dart';
+import '../../domain/repositories/program_runner.dart';
 import '../../domain/repositories/workspace_repository.dart';
 import '../../domain/usecases/find_replace.dart';
 import '../../domain/usecases/editor_language_server.dart';
 import '../../domain/usecases/format_arabic_source.dart';
 import '../../domain/usecases/workspace_actions.dart';
-import '../../../../core/services/workspace_path_service.dart';
 import '../../data/datasources/native_artifact_runner.dart';
+import '../../../../core/services/workspace_path_service.dart';
 
 /// مصدر حالة المحرر: workspace والوثائق والنتائج، بينما تبقى الملفات والمترجم خلف عقود repositories.
 class EditorController extends ChangeNotifier {
@@ -29,7 +28,7 @@ class EditorController extends ChangeNotifier {
   final CompilerRepository? compiler;
   final AssistRepository? assistant;
   final WorkspacePathService pathService;
-  final NativeArtifactRunner artifactRunner;
+  final ProgramRunner artifactRunner;
 
   Workspace workspace;
   List<String> files = const [];
@@ -524,9 +523,6 @@ class EditorController extends ChangeNotifier {
     );
     if (artifact == null || artifact.isEmpty) {
       throw StateError('لا يوجد executable ناتج. نفّذ البناء أولًا');
-    }
-    if (!File(artifact).existsSync()) {
-      throw StateError('ملف executable الناتج غير موجود: $artifact');
     }
     final output = await artifactRunner.run(
       artifact,

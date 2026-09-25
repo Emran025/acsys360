@@ -3,10 +3,9 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../../domain/repositories/workspace_repository.dart';
+import '../../domain/repositories/program_runner.dart';
 
-typedef NativeOutputHandler = void Function(String line);
-
-class NativeArtifactRunner {
+class NativeArtifactRunner implements ProgramRunner {
   const NativeArtifactRunner();
 
   Future<List<String>> run(

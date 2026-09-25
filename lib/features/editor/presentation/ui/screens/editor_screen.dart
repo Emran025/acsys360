@@ -7,12 +7,12 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../data/repositories_impl/local_workspace_repository_impl.dart';
 import '../../../domain/entities/compilation_result.dart';
 import '../../../domain/entities/document.dart';
 import '../../../domain/entities/editor_diagnostic.dart';
 import '../../../domain/entities/source_token.dart';
 import '../../../domain/repositories/workspace_repository.dart';
+import '../../../domain/services/source_file_policy.dart';
 import '../../../domain/usecases/toggle_line_comment.dart';
 import '../../controllers/editor_controller.dart';
 import '../widgets/arabic_code_controller.dart';
@@ -800,7 +800,7 @@ class _EditorShellState extends State<EditorShell> {
       dialogTitle: 'فتح ملف عربي',
       type: FileType.custom,
       allowedExtensions: [
-        LocalWorkspaceRepository.sourceExtension.substring(1),
+        SourceFilePolicy.extension.substring(1),
       ],
     );
     final path = files.isEmpty ? null : files.first.path;
@@ -830,15 +830,12 @@ class _EditorShellState extends State<EditorShell> {
       bytes: Uint8List.fromList(utf8.encode(active.text)),
       type: FileType.custom,
       allowedExtensions: [
-        LocalWorkspaceRepository.sourceExtension.substring(1),
+        SourceFilePolicy.extension.substring(1),
       ],
     );
     final path = selected?.toFilePath();
     if (path == null || !mounted) return;
-    final normalized =
-        path.toLowerCase().endsWith(LocalWorkspaceRepository.sourceExtension)
-        ? path
-        : '$path${LocalWorkspaceRepository.sourceExtension}';
+    final normalized = const SourceFilePolicy().ensureExtension(path);
     await widget.controller.saveAs(normalized);
   }
 

@@ -3,9 +3,13 @@ import 'dart:io';
 import '../../domain/entities/document.dart';
 import '../../domain/entities/file_node.dart';
 import '../../domain/repositories/workspace_repository.dart';
+import '../../domain/services/source_file_policy.dart';
 
 class LocalWorkspaceRepository implements WorkspaceRepository {
-  static const sourceExtension = '.arb';
+  static const sourceExtension = SourceFilePolicy.extension;
+  static const _sourcePolicy = SourceFilePolicy();
+
+  const LocalWorkspaceRepository();
 
   @override
   Future<List<String>> listFiles(String rootPath) async {
@@ -14,7 +18,7 @@ class LocalWorkspaceRepository implements WorkspaceRepository {
     return root
         .list(recursive: true, followLinks: false)
         .where(
-          (entity) => entity is File && entity.path.endsWith(sourceExtension),
+          (entity) => entity is File && _sourcePolicy.accepts(entity.path),
         )
         .map((entity) => entity.path)
         .toList();
@@ -96,9 +100,7 @@ class LocalWorkspaceRepository implements WorkspaceRepository {
       name,
       'اسم الملف يجب أن يكون اسمًا محليًا صالحًا',
     );
-    final normalized = value.endsWith(sourceExtension)
-        ? value
-        : '$value$sourceExtension';
+    final normalized = _sourcePolicy.ensureExtension(value);
     final file = File(_join(rootPath, normalized));
     await file.create(recursive: true, exclusive: true);
     return Document(path: file.path, text: '');
