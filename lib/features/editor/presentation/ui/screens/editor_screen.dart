@@ -799,9 +799,7 @@ class _EditorShellState extends State<EditorShell> {
     final files = await FilePicker.pickFiles(
       dialogTitle: 'فتح ملف عربي',
       type: FileType.custom,
-      allowedExtensions: [
-        SourceFilePolicy.extension.substring(1),
-      ],
+      allowedExtensions: [SourceFilePolicy.extension.substring(1)],
     );
     final path = files.isEmpty ? null : files.first.path;
     if (path != null && mounted) await widget.controller.open(path);
@@ -829,9 +827,7 @@ class _EditorShellState extends State<EditorShell> {
       fileName: currentName,
       bytes: Uint8List.fromList(utf8.encode(active.text)),
       type: FileType.custom,
-      allowedExtensions: [
-        SourceFilePolicy.extension.substring(1),
-      ],
+      allowedExtensions: [SourceFilePolicy.extension.substring(1)],
     );
     final path = selected?.toFilePath();
     if (path == null || !mounted) return;

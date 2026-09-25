@@ -1257,7 +1257,7 @@ static const char *tool_path(const char *tool) {
     "/opt/homebrew/bin"
   };
   for (size_t i = 0U; i < sizeof(directories) / sizeof(directories[0]); i++) {
-    snprintf(path, sizeof(path), "%s/%s", directories[i], tool);
+    snprintf(path, sizeof(paths[index]), "%s/%s", directories[i], tool);
     if (access(path, X_OK) == 0) return path;
   }
 #endif

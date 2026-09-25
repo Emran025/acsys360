@@ -48,9 +48,8 @@ class CollapsiblePanel extends StatelessWidget {
                         const SizedBox(width: 8),
                         Text(
                           title,
-                          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                         const Spacer(),
                         IconButton(
@@ -81,7 +80,8 @@ class CollapsiblePanel extends StatelessWidget {
                 cursor: SystemMouseCursors.resizeUpDown,
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onVerticalDragUpdate: (details) => onResize!(details.delta.dy),
+                  onVerticalDragUpdate: (details) =>
+                      onResize!(details.delta.dy),
                   child: Center(
                     child: Container(
                       width: 42,

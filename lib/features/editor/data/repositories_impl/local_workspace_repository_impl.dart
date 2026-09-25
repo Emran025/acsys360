@@ -17,9 +17,7 @@ class LocalWorkspaceRepository implements WorkspaceRepository {
     if (!await root.exists()) return const [];
     return root
         .list(recursive: true, followLinks: false)
-        .where(
-          (entity) => entity is File && _sourcePolicy.accepts(entity.path),
-        )
+        .where((entity) => entity is File && _sourcePolicy.accepts(entity.path))
         .map((entity) => entity.path)
         .toList();
   }
