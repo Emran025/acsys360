@@ -82,7 +82,7 @@ static int statements(const CAstNodeList *list, CTacResult *out, size_t *temp, s
     const CAstNode *s = list->items[i]; if (!s) continue;
     if (s->kind == C_AST_PROGRAM) { if (!statements(&s->data.program.statements, out, temp, label)) return 0; continue; }
     if (s->kind == C_AST_IF) {
-      char els[32], done[32]; snprintf(els,sizeof(els),"L%zu",(*label)++); snprintf(done,sizeof(done),"L%zu",(*label)++);
+      char els[32], done[32]; snprintf(els,sizeof(els),"if_else%zu",(*label)++); snprintf(done,sizeof(done),"if_done%zu",(*label)++);
       char *condition = expression(s->data.conditional.condition,out,temp);
       if (!condition || !add(out,C_TAC_BRANCH,els,condition,NULL,done,"منطقي",0U,s) || !statements(&s->data.conditional.then_branch,out,temp,label) || !add(out,C_TAC_JUMP,done,NULL,NULL,NULL,"",0U,s) || !add(out,C_TAC_LABEL,els,NULL,NULL,NULL,"",0U,s) || !statements(&s->data.conditional.else_branch,out,temp,label) || !add(out,C_TAC_LABEL,done,NULL,NULL,NULL,"",0U,s)) { free(condition); return 0; } free(condition); continue;
     }
