@@ -295,7 +295,8 @@ Future<void> main(List<String> args) async {
     final execution = await Process.run(artifactExecutable, const []);
     check(
       execution.exitCode == 0 && execution.stdout.trim() == '7\n3\n0.125',
-      'generated artifact failed: ${execution.stderr}',
+      'generated artifact failed: exit=${execution.exitCode}, '
+      'stdout=${execution.stdout}, stderr=${execution.stderr}',
     );
   } finally {
     await artifactDirectory.delete(recursive: true);
