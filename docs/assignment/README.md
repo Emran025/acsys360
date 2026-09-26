@@ -20,14 +20,17 @@
 | [10-vscode-highlighting-findings.md](10-vscode-highlighting-findings.md) | نتائج دراسة VS Code وتطبيقها على التلوين والتعليقات والإزاحة |
 | [11-editor-command-and-language-status.md](11-editor-command-and-language-status.md) | حالة أوامر المحرر وخدمة اللغة وقواعد RTL وبوابة الإثبات |
 | [12-code-component-guide.md](12-code-component-guide.md) | سبب وجود المكونات ومسار البيانات والمدخلات والمخرجات والحدود |
-| [13-deep-audit-report.md](13-deep-audit-report.md) | حلقة التدقيق المتكررة، العيوب المكتشفة، التصحيحات، الأدلة والحدود |
+| [13-deep-audit-report.md](13-deep-audit-report.md) | تقرير تدقيق تاريخي؛ ليس جرد البنية الحالية |
 | [../architecture/dependencies.md](../architecture/dependencies.md) | الأدوات والإصدارات والغرض ومواضع الاستخدام |
+| [../architecture/project-code-map.md](../architecture/project-code-map.md) | شجرة تنفيذية موسعة ومسؤوليات الملفات والدوال والمكتبات وأدوات البناء |
 
 ## مبدأ الدقة
 
 > لا تُسمّى الشفرة التنفيذية artifact إلا إذا وُجد الملف فعلًا، واجتاز البناء والتحقق التشغيلي المقصود، وأُعيد مساره من خلال العقد. ولا تُسمّى Assembly النصية binary assembled ما لم تمر عبر assembler حقيقي.
 
-تستخدم النسخة الحالية backend C في `packages/compiler_c` لبناء executable حقيقي باسم `arabicc` عبر CMake وFlex وBison. ويُضمّن executable بجانب تطبيق Desktop في Release. وتبقى صلاحية backend مرتبطة بالتركيبات التي يغطيها parser والتحليل الدلالي واختبارات smoke؛ لذلك لا تدعي هذه الوثائق دعم كل امتداد مستقبلي قبل إضافة اختبار صريح له. توجد أمثلة نجاح وأمثلة أخطاء في `examples/` و`examples/errors/`.
+تستخدم النسخة الحالية backend C في `packages/compiler_c` لبناء executable حقيقي باسم `arabicc` عبر CMake وFlex وBison. ويُضمّن executable بجانب تطبيق Desktop في حزم الإصدار وفق workflow المنصة. وتبقى صلاحية backend مرتبطة بالتركيبات التي يغطيها parser والتحليل الدلالي والاختبارات؛ لذلك لا تدعي هذه الوثائق دعم كل امتداد قبل إضافة اختبار صريح له. توجد أمثلة يستهلكها compiler في `examples/manual/` و`examples/`، وملفات أخطاء في `examples/errors/`.
+
+لشرح كيفية عمل كل جزء من المشروع، ومسار البيانات من الواجهة إلى compiler، راجع [خريطة الشيفرة](../architecture/project-code-map.md). وللحالة التنفيذية الحالية والاختبارات التي لا تزال بحاجة إلى تغطية، راجع [حدود المنتج](../architecture/product-boundary.md) و[استراتيجية الاختبار](../testing/test-strategy.md). أما [تقرير التدقيق](13-deep-audit-report.md) و[قائمة التأسيس](../roadmap/foundation-issues.md) فهما سجلان تاريخيان وليسا جردًا حاليًا.
 
 ## مراجع السلوك التحريري
 

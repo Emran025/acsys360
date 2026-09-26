@@ -1,24 +1,19 @@
 # استراتيجية الاختبار
 
-## بوابة كل مرحلة
+## الاختبارات الموجودة حاليًا
 
-| المرحلة | اختبارات إلزامية |
+| الحزمة/الطبقة | موضع الاختبارات وما تغطيه |
 |---|---|
-| Foundation | تحليل ساكن، format check، تشغيل التطبيق، تحقق بنية workspace |
-| Lexer | unit tests للرموز العربية والأعداد والسلاسل والمحارف والتعليقات والمواقع والأخطاء |
-| Parser | golden AST لكل production، recovery بعد الخطأ، حدود الأقواس والفواصل |
-| Semantic | تعريف مكرر، استخدام قبل التعريف، توافق الأنواع، scopes، parameters، arrays، records |
-| Runtime | نتائج تنفيذ deterministic، input/output، branch، loops، call stack، منع التنفيذ عند diagnostics |
-| TAC/Assembly | golden output، أسماء temporaries، labels، precedence، artifact validation |
-| Editor domain | document edits، undo/redo، commands، tabs، dirty state، workspace tree |
-| Editor widgets | explorer، tabs، editor، panels، themes، RTL، keyboard shortcuts |
-| Integration | CLI process، JSON schema، compile/run، multi-file workspace، cancellation |
-| Release | clean machine smoke test، desktop build، package contents، examples 01–10 |
+| تطبيق Flutter | `test/`: وحدات للمستندات وworkspace، المحرر وخدمات اللغة، التنسيق والبحث والتعليق، المستودعات المحلية، مسارات الملفات، والاتصال بعملية compiler. يتضمن `test/widget_test.dart` اختبارات واجهة للـrouting، workspace الترحيبي، لوحات النتائج، RTL والمؤشر، Minimap، themes، completion، الاختصارات والتشخيصات |
+| عقد JSON | `packages/compiler_contracts/test/`: اختبارات compilation وassist requests/responses |
+| مترجم C | `packages/compiler_c/tests/` وCTest: فحوص تشغيل `--version` و`--help`، golden tests لـTAC وAssembly، smoke لـnative 3AC، واختبار أمان artifact |
+| تكامل المترجم | اختبارات Dart المسجلة في CMake عند توفر Dart: protocol smoke، الأمثلة اليدوية، قاعدة الفاصلة المنقوطة، الأنواع المركبة، والاستقرار |
+| CI | `.github/workflows/ci.yml`: تحليل واختبار العقود، بناء C وتشغيل CTest، تنسيق وتحليل واختبار Flutter، ثم بناء Linux Desktop |
 
 ## Fixtures
 
-تنظم الأمثلة في `examples/valid`, `examples/syntax-errors`, و`examples/semantic-errors`. لا يكفي تغيير القيم داخل القاعدة نفسها؛ يجب أن تغطي الأمثلة أنواع البيانات، التعبيرات، الشروط، الحلقات الثلاث، الإجراءات، المصفوفات، السجلات، الإدخال والإخراج، وبرامج تجمع أكثر من قاعدة.
+توجد الأمثلة اليدوية المرقمة في `examples/manual/`، وأمثلة أخرى في `examples/`، وملفات الأخطاء في `examples/errors/`. لا تستخدم الشجرة الحالية مجلدات `examples/valid/` أو `examples/syntax-errors/` أو `examples/semantic-errors/`؛ تُضاف أي أمثلة جديدة إلى التنظيم الموجود مع تحديث الاختبارات التي تستهلكها.
 
 ## معايير الجودة
 
-لا تُقبل تحذيرات lint جديدة. يجب أن تكون التشخيصات ثابتة وقابلة للمقارنة، وأن يحتوي كل خطأ على المرحلة ورقم السطر والعمود والنطاق. يجب أن يفشل البرنامج برمز غير صفري عند وجود أخطاء، وألا يولد TAC أو Assembly قابلًا للتنفيذ لبرنامج غير صالح.
+استخدم أوامر CI الموجودة للتحقق من التغيير: `flutter analyze` و`flutter test` لتطبيق Flutter، و`dart analyze` و`dart test` داخل `packages/compiler_contracts/`، وCMake/CTest داخل `packages/compiler_c/`. يتطلب البناء الكامل للمحرر `flutter build linux --release`. لا تُضف ادعاءات تغطية لمرحلة أو target إلا إذا كانت مثبتة باختبار مناسب؛ Assembly المعادة في البروتوكول نص، وartifact التنفيذي يقتصر على التركيبات التي يقبلها backend.

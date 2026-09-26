@@ -1,5 +1,7 @@
 # تقرير التدقيق العميق والتصحيح
 
+> هذا تقرير تاريخي عن جولة تدقيق سابقة، وليس جردًا كاملًا للبنية الحالية. المرجع التشغيلي الحالي هو [وثيقة المعمارية](../architecture/architecture.md) و[استراتيجية الاختبار](../testing/test-strategy.md).
+
 ## الغرض
 
 يوثق هذا الملف دورة التدقيق التي سبقت الدمج التالي، لا مجرد قائمة بالميزات. كان معيار القبول هو أن يكون لكل وظيفة مصدر حقيقة واحد، وعقد واضح، وسيناريو فشل مفهوم، واختبار يثبت السلوك، ووثيقة تشرح الحد الذي لا يجوز تجاوزه في الادعاء.
@@ -26,7 +28,7 @@
 
 ### التلوين والتفاعل
 
-يستخدم `ArabicSyntaxHighlighter` Lexer الحقيقي من `compiler_core` لأنه يمنع تكرار قائمة الكلمات والعمليات في Flutter. يحوّل tokens إلى `SourceToken` ranges؛ ثم يضيف `ArabicCodeController` طبقة الأدوار الدلالية والتشخيص وghost للعرض فقط. التعليقات المعتمدة هي `//`، ولذلك لا يستخرج highlighter أو ToggleLineComment block comments غير موجودة في grammar.
+يستخدم `ArabicSyntaxHighlighter` الرموز التي ينتجها lexer الحقيقي في `packages/compiler_c` لمنع تكرار قائمة الكلمات والعمليات في Flutter. يحوّل tokens إلى `SourceToken` ranges؛ ثم يضيف `ArabicCodeController` طبقة الأدوار الدلالية والتشخيص وghost للعرض فقط. التعليقات المعتمدة هي `//`، ولذلك لا يستخرج highlighter أو ToggleLineComment block comments غير موجودة في grammar.
 
 كانت المحاولة السابقة تستخدم `TextDirection.ltr` مع `TextAlign.right` لعزل حركة المؤشر عن محاذاة السطر، لكنها أثبتت في اختبار caret أن موضع النهاية قد يعود إلى الحافة اليمنى عند النص العربي المختلط. التصحيح النهائي يستخدم `TextDirection.rtl` مع `TextAlign.right`؛ فتتحرك مواضع caret مع الإدخال العربي. ويطبّع `LineNumberedEditor` حالة hit-testing التي تعيد newline بــ`TextAffinity.upstream` عند النقر في الفراغ إلى نهاية السطر السابق. كما يعكس EditorShell السهمين الأيسر والأيمن بصريًا في RTL، مع إبقاء selection offsets وShift للتحديد. أصبح ترتيب العرض صريحًا: Minimap يسار مساحة الكود، وgutter أرقام الأسطر يمينها. التكبير عام عبر `MediaQuery.textScaler` مرة واحدة، ولا تضاعف LineNumberedEditor أو gutter حجم الخط فوقه.
 
@@ -58,7 +60,7 @@
 | compiler protocol وexecution output | `packages/compiler_contracts/test/compilation_protocol_test.dart` و`tool/verify_compiler_bundle.dart` | مثبت |
 | C backend build وsmoke | `packages/compiler_c/CMakeLists.txt` و`tool/verify_compiler_bundle.dart` | مثبت |
 | process timeout | `test/process_compiler_repository_test.dart` | مثبت |
-| syntax/semantic negative fixtures | `examples/errors/` و`grammar_coverage_test.dart` | مثبت |
+| syntax/semantic negative fixtures | `examples/errors/` واختبارات compiler المسجلة في `packages/compiler_c/CMakeLists.txt` | مثبت ضمن اختبارات compiler الحالية |
 
 ## نتيجة الجولة المحلية
 

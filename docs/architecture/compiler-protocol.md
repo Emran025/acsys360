@@ -6,7 +6,7 @@
 
 ## الإصدار الحالي
 
-الإصدار الحالي هو `0.5.0`. أضيفت في هذا الإصدار مرحلة `intermediateRepresentation` لتمرير Typed IR الذي تنتجه النواة بعد التحقق من التعليمات والقفزات. يجب أن يظهر الحقل `protocolVersion` في كل طلب واستجابة. يرفض الطرف المستقبل الإصدار غير المدعوم برسالة خطأ واضحة بدل تفسير payload مختلف بصمت.
+الإصدار الحالي هو `0.5.0`. يحتوي هذا الإصدار على حقل `intermediateRepresentation` لعرض بيانات Typed IR التي يبنيها compiler C. يجب أن يظهر الحقل `protocolVersion` في كل طلب واستجابة. يرفض الطرف المستقبل الإصدار غير المدعوم برسالة خطأ واضحة بدل تفسير payload مختلف بصمت.
 
 ## طلب الترجمة
 
@@ -35,7 +35,7 @@
 | `syntaxTree` | `Map?` | شجرة التحليل النحوي عند توفرها |
 | `symbolTable` | `List<SymbolRecord>` | الرموز المستخرجة مع مواقعها |
 | `threeAddressCode` | `List<String>` | الشفرة الوسيطة النصية |
-| `intermediateRepresentation` | `Map?` | Typed IR متحقق منه؛ وفي المشروع متعدد الملفات يضم IR الخاص بكل ملف |
+| `intermediateRepresentation` | `Map?` | تمثيل Typed IR المعروض من compiler؛ بنيته الحالية موجزة وليست دليلًا على اكتمال backend native |
 | `assembly` | `String` | الشفرة التجميعية النصية الناتجة من TAC |
 | `executionOutput` | `List<String>` | أسطر stdout من التنفيذ الفعلي للبرنامج الصحيح داخل compiler runtime |
 | `artifacts` | `List<String>` | مسارات الملفات التنفيذية أو مخرجات البناء؛ تكون فارغة ما لم ينفذ target backend موثوق |
@@ -58,6 +58,8 @@
 
 لا يعني ذلك أن Windows output ملف EXE منفردًا؛ Flutter Desktop يحتاج executable وDLL و`data` وملفات runtime. لذلك يوزّع إصدار Windows عبر مُثبّت Inno Setup بصيغة EXE يحتوي مجلد التطبيق الكامل و`compiler/arabicc.exe` وأدوات البناء المرفقة، وبذلك لا يحتاج المستخدم إلى تثبيت Dart SDK أو Flex أو Bison أو توفير مصدر المستودع.
 
-## ما لم ينفذ بعد
+## حدود السلوك الحالي
 
-العقد يعرّف شكل النقل، و`arabicc` يمرر كل ملف إلى lexer/parser/semantic ثم يجمع النتائج في استجابة project، ويمرر `intermediateRepresentation` عندما تتوفر في backend. لا تُسرّب المتغيرات بين الملفات دون import syntax. يبقى `target: none` السلوك الافتراضي للتحليل والتنفيذ الداخلي، ولا يعاد مسار artifact إلا بعد أن ينشئ backend المدعوم ملفًا حقيقيًا ويتحقق من وجوده.
+العقد ليس بديلًا عن تغطية compiler: الحقول الاختيارية قد تكون فارغة عندما لا تنتجها المرحلة أو لا يدعمها الطلب. يدعم executable أوضاع `active` و`project` واختيار `entryPath`، وتغطي اختبارات `protocol_smoke.dart` اختيار الملف النشط من طلب متعدد المصادر. لا يُستنتج من ذلك دعم import أو مشاركة كل الرموز بين الملفات؛ راجع grammar واختبارات project الحالية.
+
+المعالجة الافتراضية لا تطلب target artifact. `executionOutput` نتيجة تنفيذ داخلي ضمن التركيبات المدعومة، و`assembly` نص، و`artifacts` لا تحتوي مسارات إلا بعد أن ينشئ backend ملفًا حقيقيًا ويتحقق منه. اسم target `dart-native` قيمة في protocol يستخدمها backend C وليس مترجم Dart.

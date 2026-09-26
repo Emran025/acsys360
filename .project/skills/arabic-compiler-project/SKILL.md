@@ -21,7 +21,9 @@ The compiler must produce real tokens, parse/syntax tree, symbol table, syntax d
 
 Use Clean Architecture. Keep domain entities and use cases independent from Flutter and filesystem details. Keep compiler phases pure and typed. Keep process/filesystem adapters at infrastructure boundaries. Do not duplicate compiler logic in the editor. Use one source of truth for documents, diagnostics, project files, and compilation results. Store source spans with line, column, offset, and length.
 
-Preferred repository tree:
+The current implementation is a Flutter application under `lib/` with the editor feature in `lib/features/editor/`, a standalone C compiler in `packages/compiler_c/`, and Dart protocol models in `packages/compiler_contracts/`. Consult the [current code map](../../../docs/architecture/project-code-map.md) before changing structure. The tree below is an aspirational target layout, not a description of directories that currently exist; do not create or refer to those paths as implemented without an explicit migration task.
+
+### Aspirational repository tree
 
 ```text
 apps/
@@ -48,7 +50,7 @@ Support the complete supplied grammar: program structure; constant, type, variab
 
 ## Editor baseline
 
-Implement a workspace file explorer, multiple tabs, active/dirty document state, open/save/new commands, keyboard shortcuts, command palette, find/replace, indentation, formatting, syntax highlighting, light/dark themes, diagnostics and output panels, compiler-stage tabs, run/stop, and predictable per-document undo/redo. Use command objects or edit transactions for undo/redo. Make all commands testable without a widget pump where possible.
+The desired editor experience includes a workspace file explorer, multiple tabs, active/dirty document state, open/save/new commands, keyboard shortcuts, find/replace, indentation, formatting, syntax highlighting, light/dark themes, diagnostics and output panels, compiler-stage tabs, run/stop, and predictable per-document undo/redo. A general command palette is a future/optional goal, not a claim about the current UI. Check [product boundaries](../../../docs/architecture/product-boundary.md) and the [code map](../../../docs/architecture/project-code-map.md) to distinguish implemented behavior from planned work. Use command objects or edit transactions for undo/redo. Make all commands testable without a widget pump where possible.
 
 ## Tool policy
 

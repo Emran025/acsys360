@@ -2,6 +2,8 @@
 
 هذا هو backend المستقل للمترجم العربي في `packages/compiler_c`. يستخدم **Flex** للمحلل المعجمي و**GNU Bison** للمحلل النحوي، ويبني executable باسم `arabicc` يتصل بتطبيق Flutter عبر JSON Protocol الإصدار `0.5.0`.
 
+لخريطة تدفق البيانات ومسؤوليات ملفات C وDart والأدوات والمكتبات والاختبارات عبر المشروع، راجع [خريطة الشيفرة](../../docs/architecture/project-code-map.md). يركز هذا الملف على بناء وتشغيل backend C.
+
 ## المتطلبات
 
 ### Windows
@@ -108,18 +110,23 @@ dart run tool/verify_compiler_bundle.dart --executable build/arabicc
 |---|---|
 | `src/lexer.l` | قواعد Flex للرموز والكلمات العربية ومواقعها |
 | `src/parser.y` | قواعد Bison وبناء AST |
-| `src/protocol.c` | قراءة JSON request، بناء artifact native، وتجميع JSON response |
+| `src/protocol.c` | بوابة تربط CLI بـ`compiler_driver_run` |
+| `src/protocol/` | تحليل حقول JSON للطلب والتحقق منها وتسلسل الاستجابة |
+| `src/driver/compiler_driver.c` | تنسيق مراحل الترجمة وطلبات المساعدة والتنفيذ والبناء |
 | `src/main.c` | نقطة التشغيل ومعالجة `--protocol` و`--assist` و`--version` و`--help` |
 | `src/ast.c` | عقد AST والتسلسل المرتبط بها |
 | `src/semantic.c` | الرموز والتحقق الدلالي المحدود |
 | `src/ir/tac.c` | خفض AST إلى 3AC كامل للتعبيرات، الإدخال/الإخراج، والتحكم بالتدفق |
+| `src/ir/typed_ir.c` | إنشاء وفحص التمثيل الوسيط typed |
+| `src/runtime/interpreter.c` | تنفيذ AST للمسار الداخلي وإنتاج execution output |
 | `src/backend/x86_64/asm_x86_64.c` | ترجمة `CTacResult` + `CSemanticResult` إلى NASM؛ لا يقرأ AST |
+| `src/backend/artifact_builder.c`, `src/backend/toolchain.c` | بناء artifact وتشغيل NASM/GCC وجمع exit/output عند target مدعوم |
 | `include/*.h` | عقود البيانات وواجهات الوحدات |
 | `CMakeLists.txt` | توليد parser/scanner وبناء `arabicc` واختبارات CMake |
 
 ## التكامل مع التطبيق
 
-يبدأ تطبيق Flutter العملية من data layer عبر `ProcessCompilerRepositoryImpl`. يكتب الطلب إلى stdin، يقرأ الاستجابة من stdout، ثم يحولها عبر `packages/compiler_contracts` إلى كيانات domain. لا يعتمد `arabicc` على Flutter، ولا يجب أن تستدعي Widgets parser أو filesystem مباشرة.
+يبدأ تطبيق Flutter العملية من data layer عبر `ProcessCompilerRepository`. يكتب الطلب إلى stdin، يقرأ الاستجابة من stdout، ثم يحولها عبر `packages/compiler_contracts` إلى كيانات domain. لا يعتمد `arabicc` على Flutter، ولا يجب أن تستدعي Widgets parser أو filesystem مباشرة.
 
 ## References
 

@@ -1,5 +1,7 @@
 # نتائج دراسة سلوك VS Code
 
+هذه وثيقة مرجعية لمتطلبات تجربة التحرير وليست جردًا لما نُفّذ في Arabic360. للحالة الحالية وسلوك المحرر الفعلي، راجع [حدود المنتج](../architecture/product-boundary.md) و[خريطة الشيفرة](../architecture/project-code-map.md).
+
 ## مصادر رسمية
 
 1. [IntelliSense](https://code.visualstudio.com/docs/editing/intellisense) يعرّف الإكمال كميزة مستقلة عن إدخال النص، ويعرض الاقتراحات السياقية مع أوامر قبول واضحة.

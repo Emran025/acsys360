@@ -1,37 +1,30 @@
-# خطة التحسين والتوسعة الدقيقة
+# خطة تحسينات المحرر والمترجم
 
-## خط الأساس الفعلي
+## خط الأساس الحالي
 
-المستودع كان Flutter starter: تطبيق واحد في `lib/main.dart` بطول 122 سطرًا واختبار widget واحد خاص بعداد القالب، مع اعتماد Flutter و`cupertino_icons` و`flutter_lints` فقط. لا توجد نواة مترجم، ولا عقد بين عمليات، ولا workspace متعدد الملفات، ولا domain/data/presentation layers، ولا runtime أو مولد كود.
+لم يعد المستودع Flutter starter. يحتوي على تطبيق Flutter متعدد الطبقات في `lib/features/editor/`، وحزمة عقد JSON في `packages/compiler_contracts/`، ومترجم C مستقل في `packages/compiler_c/`، إضافة إلى اختبارات التطبيق والحزم في `test/` و`packages/`.
 
-هذه ليست مشكلة يجب تغطيتها بميزات كثيرة دفعة واحدة؛ التحسين الصحيح هو إزالة القالب ثم إنشاء حدود ثابتة تستطيع استيعاب المراحل اللاحقة.
+المرجع التشغيلي للتنفيذ الحالي هو [وثيقة المعمارية](../architecture/architecture.md)، أما هذه الوثيقة فتجمع فرص التحسين المتبقية. لا تعتبر بنود الأولوية التالية مهامًا منجزة لمجرد وجودها هنا.
 
-## التحسينات ذات الأولوية
+## فرص التحسين
 
-| الأولوية | التحسين | لماذا الآن | دليل الإنجاز |
+| الأولوية | التحسين | السبب | معيار الإغلاق |
 |---|---|---|---|
-| P0 | تنظيف `main.dart` وإزالة counter | يمنع استمرار قالب غير متعلق بالمشروع | لا يبقى كود أو تعليق من القالب |
-| P0 | إنشاء domain models للعقود والوثائق | يمنع ربط الواجهة بتفاصيل التنفيذ | unit tests بدون Flutter |
-| P0 | بناء Document/Workspace state | أساس التعدد والتبويبات وdirty state | اختبارات state transitions |
-| P0 | تحديد protocol JSON | نقطة الفصل بين compiler وeditor | schema وfixtures |
-| P1 | Lexer/Parser القواعد الرسمية | القيمة الأكاديمية الأساسية | golden tests وdiagnostics |
-| P1 | Symbol table وsemantic rules | منع نتائج ترجمة مضللة | fixtures موجبة وسالبة |
-| P1 | compiler process adapter | دمج حقيقي لا mock | integration smoke test |
-| P1 | editor shell وexplorer/tabs | تحويل التطبيق إلى أداة | widget tests |
-| P2 | interpreter ثم TAC | تشغيل وعرض نتائج حقيقية | execution/TAC goldens |
-| P2 | themes/shortcuts/find/format | إنتاجية قريبة من VS Code | command tests |
-| P3 | assembly وartifact | تسليم متطلبات المقرر | target build على منصة واحدة |
+| P1 | اختبارات widget لـWorkspaceExplorer | توثيق السلوك الحالي للعقد والـcontext menus وعرض الأسماء في RTL | اختبارات لأزرار explorer وقوائم الجذر/المجلد/الملف وتدفقات CRUD |
+| P1 | مصفوفة تغطية language وbackend | يمنع مساواة وجود المرحلة بدعم كل القواعد | fixture نجاح/فشل لكل construct معلن، وتحديث acceptance matrix |
+| P1 | اختبار أوامر المحرر | بعض bindings موجودة دون regression مخصص واضح | اختبار الأوامر ذات المخاطر على النص والاختيار وundo |
+| P2 | دعم مواقع الرموز والعمليات الدلالية | completion/roles الحالية ليست LSP كاملًا ولا توفر F2/F12 | protocol actions typed واختبارات متعددة الملفات ومواقع دقيقة |
+| P2 | تكافؤ تشغيل artifact | دعم artifact محدود بالـtarget والأدوات | fixtures موثقة، اختبار بناء وتشغيل، وتحقق على كل منصة مدعومة |
+| P2 | قابلية الوصول للمستكشف | القوائم والشجرة بحاجة إلى تحقق لوحة مفاتيح/قارئ شاشة | semantics وfocus traversal واختبارات وصولية |
 
-## حدود الدقة
+## حدود ثابتة للتحسين
 
-لا نخلط بين highlighting والتحليل النحوي. الـ Lexer هو مصدر token spans؛ المحرر يعرضها، لكن لا يعيد تنفيذها. ولا نخلط بين Save وCompile: الحفظ يحدّث الملف، والترجمة تأخذ snapshot معلومًا. ولا نخلط بين AST للعرض وAST typed للتحليل؛ العرض يستعمل serializer منفصلًا.
+- يبقى compiler التنفيذي C مستقلًا، ولا يُضاف parser ثانٍ داخل Flutter.
+- لا يُعرض artifact ناجح قبل إنشائه والتحقق من مساره.
+- لا توصف أسماء targets على أنها لغة تنفيذ backend.
+- لا تُعتمد منصة أو ميزة على أساس وجود مجلد أو Widget فقط؛ يجب اختبار المسار التشغيلي.
+- يجب عزل بيانات المستخدم، وحماية المسارات خارج جذر workspace، وإظهار فشل filesystem/process بوضوح.
 
-يجب أن يكون لكل عملية فشل محدد: الملف غير موجود، المصدر غير صالح، compiler غير متاح، timeout، أو artifact غير قابل للتنفيذ. لا تُحوّل هذه الحالات إلى رسالة عامة مثل "حدث خطأ".
+## تعريف الإنجاز
 
-## قرار التوسعات
-
-تُؤجل language server، completion الدلالي، refactoring، debugging، plugin marketplace، remote workspace، التعاون الجماعي، package manager، وcross-platform native compiler. لا تدخل أي واحدة منها إلا بعد إغلاق P0–P3 ووجود اختبارات تحمي الأساس.
-
-## Definition of Done
-
-تُعد القدرة منتهية فقط عندما يكون لها domain contract، تنفيذ infrastructure أو compiler مناسب، واجهة مستخدم إن كانت مرئية، unit test، integration/widget test عند الحاجة، diagnostic واضح عند الفشل، تحديث للوثائق، وCI أخضر. لا يكفي أن تعمل في لقطة شاشة أو في جهاز المطور فقط.
+تكتمل المهمة عند وجود تنفيذ مناسب للطبقة، واختبارات تغطي مسارات النجاح والفشل، ورسائل فشل واضحة، وتحديث للوثائق التي تتأثر بالتغيير. يراجع [دليل المكونات](../assignment/12-code-component-guide.md) حد كل طبقة و[استراتيجية الاختبار](../testing/test-strategy.md) الاختبارات الفعلية.

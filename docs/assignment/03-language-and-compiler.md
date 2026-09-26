@@ -1,5 +1,7 @@
 # 03 — قواعد اللغة ومراحل المترجم
 
+تعرض هذه الوثيقة قواعد اللغة ومراحلها من منظور المتطلبات والتنفيذ. خريطة ملفات التنفيذ ومسؤولية كل مرحلة وتدفق JSON بين التطبيق والمترجم موجودة في [خريطة الشيفرة](../architecture/project-code-map.md).
+
 ## 1. القاعدة العامة للبرنامج
 
 ```text
@@ -62,7 +64,7 @@
 | Parser | AST typed وsyntax diagnostics |
 | Semantic | scopes، symbol table، أنواع، lvalue، معاملات، استدعاءات، شروط وحلقات |
 | TAC | Three-Address Code للتعبيرات والتحكم والوصول والاستدعاءات |
-| Typed IR | تحقق من التعليمات والـ labels والقفزات قبل assembly/execution |
+| Typed IR | تمثيل وسيط typed مستقل بعمليات إنشاء وفحص؛ يستخدم backend مخرجات TAC ومعلومات التحليل الدلالي لتوليد Assembly، بينما مسار interpreter ينفذ AST |
 | Assembly | نص NASM-like مشتق من TAC وقابل للفحص الأكاديمي فقط في الوضع الحالي |
 | Interpreter | تنفيذ داخلي وإخراج stdout من البرنامج الصحيح |
 | C backend | بناء `arabicc` عبر CMake وتضمينه بعد التحقق من executable الحقيقي |

@@ -1,6 +1,6 @@
 # acsys360 — محرر ومترجم اللغة العربية
 
-هذا المستودع هو نقطة البداية لبناء محرر لغة مكتبي شبيه بـ VS Code ومترجم مستقل للغة البرمجة العربية المحددة في ملفات المقرر. المشروع يتجه إلى Flutter Desktop، مع فصل Clean Architecture بين الواجهة، منطق المحرر، البنية التحتية، ونواة المترجم.
+هذا المستودع يحتوي على محرر لغة عربية مبني بـ Flutter ومترجم مستقل بلغة C. يفصل التطبيق بين الواجهة ومنطق المحرر والوصول إلى الملفات وتشغيل المترجم، بينما يتواصل مع executable المترجم عبر JSON Protocol.
 
 ## نقطة الحقيقة المعرفية
 
@@ -21,29 +21,34 @@
 | الوثيقة | الغرض |
 |---|---|
 | `docs/architecture/architecture.md` | الطبقات وعقد التكامل |
-| `docs/architecture/product-boundary.md` | ما يدخل في النطاق وما يبقى خارج الادعاء |
+| `docs/architecture/project-code-map.md` | شجرة مفصلة، تدفق البيانات، وظائف المكونات والأدوات والمكتبات |
+| `docs/architecture/product-boundary.md` | حدود المنتج والحالة الحالية وسلوك Workspace Explorer |
+| `docs/architecture/compiler-c-acceptance-matrix.md` | تنفيذ compiler C وأدلة اختباره وحدوده |
+| `docs/assignment/04-editor-behavior.md` | سلوك الإدخال وRTL ومستكشف Workspace |
 | `docs/architecture/editor-shortcuts.md` | مصفوفة أوامر المحرر واختبارها |
 | `docs/assignment/12-code-component-guide.md` | سبب وجود كل مكون ومسار بياناته وحدوده |
-| `docs/roadmap/roadmap.md` | مراحل البناء ومعايير الانتقال |
+| `docs/roadmap/roadmap.md` | حالة المراحل وأولويات العمل التالية |
 | `docs/testing/test-strategy.md` | اختبارات كل مرحلة ومعايير الجودة |
 | `.github/workflows/ci.yml` | بوابة CI وبناء Desktop |
 | `CHANGELOG.md` | سجل الإصدارات وملاحظات البناء |
 
 ## المنتج المستهدف
 
-يقدم المحرر مستكشف ملفات، مجلد workspace، تعدد الملفات والتبويبات، تحرير RTL، اختصارات، command palette، بحث واستبدال، تنسيق، themes، Undo/Redo transaction-based، تشخيصات، تشغيل وإيقاف، ولوحات Tokens وAST وSymbol Table وSemantic Diagnostics وTAC وAssembly وRuntime Output.
+يقدم المحرر مستكشف ملفات واختيار مجلد، تبويبات ووثائق، تحرير RTL، حفظ وإنشاء وفتح الملفات، قوائم explorer لإجراءات الملفات، بحثًا واستبدالًا، تنسيقًا، themes، undo/redo، تشخيصات، compile/build/run، completion/help، وMinimap ولوحات لمراحل compiler. لا تتضمن الواجهة الحالية command palette عامة أو language server كاملًا؛ راجع [حدود المنتج](docs/architecture/product-boundary.md) و[الاختصارات](docs/architecture/editor-shortcuts.md).
 
 ## أسلوب العمل
 
 يُبنى كل تغيير في فرع مستقل ويُدمج عبر Pull Request بعد نجاح format وanalyze والاختبارات وبناء Desktop واختبار عقد JSON بين المحرر والمترجم. لا تُغلق أي Issue إلا بعد تنفيذ معايير القبول وخطة الاختبار المكتوبة فيها.
 
-## الحالة الحالية
+## الحالة الحالية وبنية النظام
 
-المستودع يحتوي على محرر Flutter Desktop ومترجم `compiler_core` مستقل يتواصل مع المحرر عبر JSON protocol الإصدار `0.5.0`. تدعم النواة Lexer وParser/AST والتحليل الدلالي وSymbol Table وTAC وTyped IR وAssembly النصية وInterpreter، إضافة إلى backend `dart-native` محدود ومثبت باختبارات parity وartifact metadata.
+يتكون التطبيق من واجهة Flutter في `lib/` ومترجم مستقل في `packages/compiler_c/`، مع نماذج عقد JSON المشتركة في `packages/compiler_contracts/`. يشغّل التطبيق executable باسم `arabicc` عبر JSON Protocol الإصدار `0.5.0`. يتضمن المترجم مراحل Lexer وParser/AST والتحليل الدلالي و3AC وTyped IR وInterpreter وتوليد Assembly نصية. كما يستطيع backend المكتوب بـC إنشاء artifacts تنفيذية لبعض التركيبات المدعومة عند طلب target باسم `dart-native`؛ هذا الاسم هو قيمة في البروتوكول وليس backend مكتوبًا بلغة Dart، والتغطية محدودة بما تثبته اختبارات المترجم.
 
-يحتوي المحرر على workspace حقيقي وشجرة ملفات وتبويبات وتحرير وحفظ وتنسيق وتشخيصات وquick fixes محدودة وcompletion وhelp وghost text وsyntax/semantic highlighting وMinimap واختصارات التحرير وthemes ونتائج مراحل المترجم. توجد عشرة أمثلة نجاح مختلفة في `examples/`، وfixtures سلبية مستقلة في `examples/errors/` لاختبار syntax وsemantic diagnostics.
+تبدأ دورة التطبيق من `lib/main.dart`، ويجهز `ServiceLocator` repositories والخدمات، ثم توجه `AppRouter` إلى `EditorShell`. ينسق `EditorController` حالات workspace والوثائق وطلبات compiler؛ تنفذ repositories عمليات الملفات وتشغيل `arabicc`؛ ويرجع compiler النتائج كـJSON للتحقق منها وعرضها عبر لوحات المحرر. يشرح [دليل خريطة الشيفرة](docs/architecture/project-code-map.md) الشجرة المفصلة ومسؤولية الملفات والدوال والأدوات والمكتبات واختبار كل طبقة.
 
-الإصدار الحالي هو [`v0.0.3`](https://github.com/Emran025/acsys360/releases/tag/v0.0.3)، ويشمل تحسينات محرر RTL، وإلزام الفاصلة المنقوطة العربية، وإصلاح بناء Windows، إضافة إلى قواعد المترجم العربي الأساسية وتحسين AST ومخرجات بروتوكول compiler. لا تُسمى Assembly binary، ولا يُعلن `dart-native` مترجمًا عامًا لكل قواعد اللغة؛ كلا الحدين موثق ومغطى فقط ضمن subset المثبت.
+يحتوي المحرر على workspace وشجرة ملفات وتبويبات وتحرير وحفظ وتنسيق وتشخيصات وإصلاحات محدودة وcompletion وhelp وghost text وتلوين معجمي مع تحسين دلالي محدود وMinimap واختصارات التحرير والثيمات ولوحات نتائج المترجم. توجد أمثلة يستهلكها الاختبار في `examples/manual/` وأمثلة إضافية في `examples/` و`examples/errors/`.
+
+مخرجات حقل `assembly` نصية وليست ملفًا تنفيذيًا بحد ذاتها. إنشاء artifact فعلي يتم عبر backend المترجم عند تحديد target مدعوم، ولا يعني ذلك دعم جميع قواعد اللغة.
 
 ## بناء المترجم المستقل
 

@@ -1,8 +1,10 @@
 # 02 — المعمارية والتنظيم الحالي
 
+لشجرة الملفات ومسؤولية الوحدات والدوال ومسارات البيانات والأدوات والاختبارات بالتفصيل، راجع [خريطة الشيفرة](../architecture/project-code-map.md).
+
 ## 1. المبدأ العام
 
-المحرر والمترجم عمليتان منفصلتان. تطبيق Flutter لا يضع Flex أو Bison أو التحليل الدلالي داخل طبقة العرض، والمترجم لا يعتمد على Widgets أو حالة Flutter. يربط `ProcessCompilerRepositoryImpl` بين التطبيق وexecutable `arabicc` عبر JSON Protocol الإصدار `0.5.0`، بينما توفر `packages/compiler_contracts` النماذج والتحقق من الطلب والاستجابة.
+المحرر والمترجم عمليتان منفصلتان. تطبيق Flutter لا يضع Flex أو Bison أو التحليل الدلالي داخل طبقة العرض، والمترجم لا يعتمد على Widgets أو حالة Flutter. يربط `ProcessCompilerRepository` بين التطبيق وexecutable `arabicc` عبر JSON Protocol الإصدار `0.5.0`، بينما توفر `packages/compiler_contracts` النماذج والتحقق من الطلب والاستجابة.
 
 ## 2. طبقات تطبيق Flutter
 
@@ -11,7 +13,7 @@
 | Presentation | `lib/features/editor/presentation` | `EditorShell`، المحرر، التبويبات، مستكشف الملفات، لوحات التشخيص والنتائج، الاختصارات، minimap وWidgets |
 | Controller | `lib/features/editor/presentation/controllers` | `EditorController` وتنسيق حالة الملفات والتبويبات والتحليل والتنفيذ |
 | Domain | `lib/features/editor/domain` | كيانات `Document` و`Workspace` و`FileNode` و`CompilationResult`، عقود repositories، وuse cases للتحرير واللغة |
-| Data | `lib/features/editor/data` | `LocalWorkspaceRepositoryImpl`، `ProcessCompilerRepositoryImpl`، مصادر مسارات workspace وإنشاء عملية compiler |
+| Data | `lib/features/editor/data` | `LocalWorkspaceRepository`، `ProcessCompilerRepository`، مصادر مسارات workspace وإنشاء عملية compiler |
 | Core | `lib/core` | الثوابت والأخطاء والخدمات العامة وواجهات use case الأساسية |
 | Shared | `lib/shared` | الثيمات وWidgets المشتركة |
 
@@ -24,17 +26,19 @@
 ```text
 main.c --protocol
     ↓
-protocol.c: JSON input/output
+protocol.c: c_run_protocol()
     ↓
-lexer.l عبر Flex → tokens
-    ↓
-parser.y عبر Bison → AST
-    ↓
-ast.c + semantic.c → AST وsymbols وdiagnostics
-    ↓
-backend/x86_64/asm_x86_64.c ومكوّناته → Assembly نصية ضمن subset المدعوم
-    ↓
-JSON response إلى Flutter
+compiler_driver_run()
+    ├─ protocol request parsing
+    ├─ lexer.l عبر Flex → tokens
+    ├─ parser.y عبر Bison → AST
+    ├─ semantic.c → symbols وdiagnostics
+    ├─ ir/tac.c → TAC → Typed IR summary
+    ├─ runtime/interpreter.c عند طلب execution
+    ├─ backend/x86_64/ → Assembly نصية من TAC
+    └─ artifact_builder.c + toolchain.c عند طلب target مدعوم
+         ↓
+    protocol response → JSON stdout
 ```
 
 يستقبل `arabicc` الطلب من stdin ويكتب استجابة واحدة إلى stdout. يدعم `--protocol` للتجميع والتحليل و`--assist` للمساعدة، ويدعم `--version` و`--help` للفحص التشغيلي.

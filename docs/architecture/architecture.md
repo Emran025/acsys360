@@ -8,35 +8,73 @@
 
 ```text
 acsys360/
-├── lib/
-│   ├── main.dart
-│   ├── config/di/                 # حقن الاعتماديات
-│   ├── core/                      # أخطاء وثوابت وخدمات عامة
+├── assets/
+│   ├── branding/arabic360.png     # شعار ملفات .arb وواجهة التطبيق
+│   └── fonts/Cairo.ttf            # خط Cairo المسجل في Flutter
+├── lib/                           # تطبيق Flutter/Dart
+│   ├── main.dart                  # ArabicEditorApp وتهيئة MaterialApp والثيمات
+│   ├── config/di/injection.dart   # ServiceLocator وتركيب الاعتماديات الفعلية
+│   ├── core/
+│   │   ├── constants/             # ألوان وثوابت التطبيق
+│   │   ├── error/                 # Exceptions وFailures
+│   │   ├── services/              # سياسة/عقد مسار workspace
+│   │   ├── usecases/              # واجهة use case العامة
+│   │   └── utils/                 # سلاسل ونصوص واجهة مشتركة
 │   ├── features/editor/
 │   │   ├── data/
-│   │   │   ├── datasources/       # تشغيل compiler ومسارات workspace
-│   │   │   └── repositories_impl/ # تنفيذ مستودعات الملفات والمترجم
+│   │   │   ├── datasources/
+│   │   │   │   ├── compiler_process_factory.dart
+│   │   │   │   ├── file_picker_document_service.dart
+│   │   │   │   ├── local_workspace_path_service.dart
+│   │   │   │   └── native_artifact_runner.dart
+│   │   │   └── repositories_impl/
+│   │   │       ├── local_workspace_repository_impl.dart
+│   │   │       └── process_compiler_repository_impl.dart
 │   │   ├── domain/
-│   │   │   ├── entities/          # Document وWorkspace وCompilationResult وغيرها
-│   │   │   ├── repositories/      # العقود المجردة
-│   │   │   └── usecases/          # اللغة العربية والتحرير وعمليات workspace
+│   │   │   ├── entities/          # Document/Workspace/FileNode/CompilationResult...
+│   │   │   ├── repositories/      # WorkspaceRepository وProgramRunner
+│   │   │   ├── services/          # document file service وسياسة امتدادات الملفات
+│   │   │   └── usecases/          # تحرير/تنسيق/بحث/لغة/عمليات Workspace
 │   │   └── presentation/
-│   │       ├── controllers/       # EditorController وحالة الشاشة
-│   │       └── ui/                # الشاشة وWidgets والمحرر ولوحات النتائج
-│   ├── routes/                    # التوجيه
-│   └── shared/                    # الثيمات وWidgets المشتركة
+│   │       ├── controllers/editor_controller.dart
+│   │       └── ui/
+│   │           ├── screens/editor_screen.dart
+│   │           └── widgets/       # explorer، editor، tabs، panels، minimap، dialogs...
+│   ├── routes/app_router.dart     # home/editor routes مع controller محقون
+│   └── shared/
+│       ├── themes/app_theme.dart
+│       └── widgets/collapsible_panel.dart
 ├── packages/
-│   ├── compiler_c/                # executable arabicc: Flex/Bison + C
-│   └── compiler_contracts/        # نماذج وعقد JSON المشتركة في Dart
-├── examples/                      # برامج عربية صحيحة وأمثلة أخطاء
-├── docs/                          # المعمارية والاختبارات وخارطة الطريق
-├── tool/                          # أدوات البيئة والتحقق وSmoke Test
-├── .github/workflows/
-│   ├── ci.yml                     # format/analyze/test وبناء Flutter
-│   ├── release.yml                # بناء Desktop والمترجم والتغليف
-│   └── container.yml              # نشر صورة GHCR لبيئة التطوير
-└── المنصات/                       # android وios وlinux وmacos وwindows وweb
+│   ├── compiler_contracts/        # Dart package: models/validation لـJSON protocol
+│   │   ├── lib/src/               # compilation وassist requests/responses
+│   │   └── test/                  # contract tests منفصلة عن widgets
+│   └── compiler_c/                # backend مستقل يبنى إلى arabicc
+│       ├── include/               # C public/internal module headers
+│       ├── src/
+│       │   ├── main.c             # CLI flags وstdin/stdout entry point
+│       │   ├── protocol/          # JSON parse/request/response serialization
+│       │   ├── lexer.l parser.y   # مصادر Flex/Bison
+│       │   ├── ast.c semantic.c   # AST وsemantic analysis
+│       │   ├── driver/            # تنسيق compile pipeline
+│       │   ├── ir/                # TAC وTyped IR
+│       │   ├── runtime/           # interpreter
+│       │   └── backend/           # NASM x86_64 وartifact/toolchain
+│       ├── tests/                 # C tests وDart protocol/example integration
+│       └── CMakeLists.txt         # توليد scanner/parser والبناء وCTest
+├── test/                          # Flutter unit/widget tests
+├── examples/
+│   ├── manual/                    # أمثلة يدويّة إيجابية وسلبية
+│   ├── errors/                    # ملفات خطأ إضافية
+│   └── *.arb                      # fixtures وأمثلة أخرى
+├── tool/                          # bundle smoke، self-test، بناء Windows والتعبئة
+├── docs/                          # architecture/assignment/roadmap/testing
+├── .github/workflows/             # ci.yml وrelease.yml وcontainer.yml
+├── android/ ios/ linux/ macos/
+├── windows/ web/                  # Flutter platform runners
+└── pubspec.yaml                   # تطبيق Flutter واعتمادياته والأصول
 ```
+
+تفاصيل وظيفة كل ملف رئيسي والدوال/الأنواع المحورية موضحة في [دليل خريطة الشيفرة](./project-code-map.md). يشير هذا الرسم إلى ملفات المصدر، لا إلى مخرجات البناء أو الملفات المتولدة داخل `build/`.
 
 ## طبقات تطبيق Flutter
 
@@ -57,24 +95,27 @@ JSON request
     ↓
 main.c (--protocol / --assist)
     ↓
-protocol.c: قراءة الطلب وبناء response
+protocol.c + protocol/: قراءة الطلب وتجميع response
     ↓
 Flex lexer.l → tokens + lexical diagnostics
     ↓
 Bison parser.y → AST + syntax diagnostics
     ↓
-ast.c + semantic.c → AST وsymbol table والتحقق الدلالي
+compiler_driver.c + ast.c + semantic.c → AST وsymbol table والتحقق الدلالي
     ↓
-backend/x86_64/asm_x86_64.c ومكوّناته → Assembly نصية محدودة
+ir/tac.c → 3AC → ir/typed_ir.c → Typed IR
+    ├── runtime/interpreter.c → execution output
+    └── backend/x86_64/ → نص Assembly
+          └── backend/artifact_builder.c + toolchain.c → artifact عند target مدعوم
     ↓
 protocol response → JSON stdout
 ```
 
-يُستخدم `packages/compiler_contracts` في Dart لتعريف نماذج الطلب والاستجابة والتحقق من العقد، بينما يظل `arabicc` executable مستقلًا عن Flutter. لا تُعد Assembly الناتجة binary؛ هي نص NASM ضمن النطاق المدعوم فقط.
+يُستخدم `packages/compiler_contracts` في Dart لتعريف نماذج الطلب والاستجابة والتحقق من العقد، بينما يظل `arabicc` executable مستقلًا عن Flutter. حقل `assembly` هو نص NASM؛ ويمكن لـbackend C إنشاء artifact تنفيذي منفصل عند طلب target مدعوم. القيمة `dart-native` اسم target في العقد ولا تعني وجود backend compiler مكتوب بـDart.
 
 ## عقد التكامل
 
-يرسل `ProcessCompilerRepositoryImpl` طلبًا يتضمن `protocolVersion` و`rootPath` و`sourcePaths` و`sourceTexts` و`mode`، ويمكنه إضافة `entryPath` و`target` و`artifactDirectory`. يعيد المترجم `success` و`diagnostics` و`tokens` و`syntaxTree` و`symbolTable` و`threeAddressCode` و`intermediateRepresentation` و`assembly` و`executionOutput` و`artifacts`.
+يرسل `ProcessCompilerRepository` طلبًا يتضمن `protocolVersion` و`rootPath` و`sourcePaths` و`sourceTexts` و`mode`، ويمكنه إضافة `entryPath` و`target` و`artifactDirectory`. يعيد المترجم `success` و`diagnostics` و`tokens` و`syntaxTree` و`symbolTable` و`threeAddressCode` و`intermediateRepresentation` و`assembly` و`executionOutput` و`artifacts`.
 
 يجب أن تكون النتيجة ناتجة عن المصدر الفعلي. لا يجوز للواجهة تركيب Tokens أو AST أو Diagnostics ثابتة بدل استجابة المترجم.
 

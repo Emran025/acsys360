@@ -1,90 +1,76 @@
-# دليل مكونات الكود ومسار البيانات
+# دليل مكونات الشيفرة
 
-## الغرض
+هذا الدليل يشرح توزيع المسؤوليات ومسار الاستدعاء الأساسي في النسخة الحالية. وهو ليس بديلًا عن [خريطة الشيفرة التفصيلية](../architecture/project-code-map.md)، التي تعرض شجرة الملفات، ومسؤولية الوحدات، والاعتماديات، وأدوات التطوير والاختبار.
 
-هذا الدليل هو خريطة شرح التقرير، وليس قائمة أسماء ملفات فقط. لكل مكون سبب وجود واضح، ومدخلات ومخرجات وحدود، ومسار ارتباط ببقية المشروع. يشرح الكود الفعلي في المستودع، ولا يستبدل الاختبارات أو يدعي اكتمال وظيفة لم يثبتها التنفيذ.
+## الصورة العامة
 
-## المسار العام
+يتكون النظام من تطبيق Flutter/Dart ومترجم C مستقل. التطبيق لا يربط compiler عبر FFI؛ بل يشغّل الملف التنفيذي `arabicc` كعملية نظام، ويرسل طلبات JSON عبر stdin، ثم يحلل الاستجابة القادمة من stdout. العقد `compiler_contracts` يوحد شكل الرسائل والتحقق منها بين Dart وC.
 
 ```text
-المستخدم
-  ↓
-Flutter EditorShell
-  ↓
-EditorController ← Workspace / Document / Edit transactions
-  ↓
-CompilerRepository و AssistRepository
-  ↓ JSON protocol 0.5.0
-arabicc executable
-  ↓
-ProjectCompiler → Compiler
-  ↓
-Lexer → Parser/AST → Semantic → TAC → Typed IR → Assembly → Interpreter
-  ↓
-CompilationResponse
-  ↓
-لوحات النتائج والتشخيص وملف artifact عند target مدعوم
+واجهة Flutter
+  → EditorController وحالات المحرر
+  → use cases / repositories
+  → ProcessCompilerRepository
+  → عملية arabicc وJSON Protocol 0.5.0
+  → compiler_driver_run
+  → Frontend → Semantic/IR → Interpreter أو Backend
+  → استجابة منظمة إلى المحرر ولوحات النتائج
 ```
 
-| المكون | سبب الإضافة | المدخلات | المخرجات | الارتباط والحدود |
-|---|---|---|---|---|
-| `Document` | جعل النص وdirty state وundo/redo مصدر حقيقة واحدًا لكل ملف | path، text، `TextEdit` | Document جديد immutable | لا يعرف Flutter أو filesystem، ويرفض stale edit لا يطابق النص الحالي |
-| `Workspace` | إدارة الجذر والوثائق المفتوحة والتبويب النشط | rootPath، documents، activeIndex | session immutable | يمنع فتح المسار نفسه مرتين ويعيد ضبط activeIndex عند الإغلاق |
-| `WorkspaceRepository` | فصل حالات الاستخدام عن نظام الملفات | مسار workspace وعمليات CRUD | Documents وFileNodes | التنفيذ المحلي في `LocalWorkspaceRepository`؛ يمكن استبداله في الاختبارات |
-| `WorkspacePathService` | عزل separator وparent/baseName/relocation عن حالة المحرر | مسارات workspace | مسار موحد حسب المنصة أو default قابل للاختبار | adapter المحلي يستخدم `dart:io` في data فقط؛ الـdomain لا يعرف Platform |
-| `EditorController` | تجميع حالة المحرر دون جعل Widget مصدرًا ثانيًا للنص | Workspace، commands، repositories | workspace، compilation، diagnostics، assistance | يرسل التعديلات والطلبات، ولا ينفذ parser أو semantic داخل الواجهة |
-| `LineNumberedEditor` | عرض مساحة الكود مع gutter وMinimap وTextField | ArabicCodeController، selection، diagnostics | محرر قابل للتحرير والتمرير | ترتيب العرض Minimap ثم code ثم gutter؛ TextField للكود RTL/right حتى يتحرك caret مع العربية، مع بقاء selection offsets مصدر الحركة المنطقية |
-| `ArabicCodeController` | تركيب النص الحقيقي مع lexical spans وsemantic refinement وdiagnostic وghost layers | source text، SourceTokens، diagnostics، ghost | `TextSpan` للعرض فقط | لا يغير النص بسبب التلوين أو ghost؛ التلوين ليس language server كاملًا |
-| `ArabicSyntaxHighlighter` | إعادة استخدام Lexer الفعلي ومنع ازدواج grammar في الواجهة | source، أدوار رموز اختيارية | `SourceToken` ranges | يحدد التصنيف المعجمي، أما الدور الدلالي الحالي فهو mapping خفيف بالاسم |
-| `ToggleLineComment` | تنفيذ command واحد قابل للتراجع وفق grammar | text وbase/extent selection | `LineCommentEdit` مع selection mapping | يدعم `//` فقط؛ لا يضيف block comments غير الموجودة في grammar |
-| `FormatArabicSource` | ترتيب indentation دون تغيير literals أو comments | source | source formatted أو النص الأصلي عند عدم اتزان الأقواس | formatter محافظ، وليس إعادة كتابة AST أو pretty-printer كاملًا |
-| `ProcessCompilerRepository` | عزل process وstdin/stdout وJSON عن domain وFlutter | documents، mode، target | Map من CompilationResponse أو process diagnostic | يثبت انفصال executable؛ يفرض timeout 30 ثانية ويقتل process العالق ويعيد diagnostic منظمًا بدل نص خام |
-| `arabicc.dart` | نقطة الدخول التنفيذية للعقد والمترجم والمساعدة | JSON protocol أو assist request | JSON response حقيقي وexit code | يجمع source snapshots، يمررها إلى ProjectCompiler، ويبني artifact فقط عند target مثبت |
-| `ProjectCompiler` | ربط عدة ملفات مع external procedures/types وتشخيصات المشروع | path→source | File results وproject diagnostics وexecution output | يمرر procedure/type declarations الخارجية إلى Interpreter؛ لا يخلط متغيرات الملفات، ولا يضيف module/import grammar مستقلة |
-| `Compiler` | تنسيق pipeline الأكاديمي لملف واحد | source وexternal symbols | tokens، AST، symbols، diagnostics، TAC، IR، Assembly، runtime output | كل مرحلة لاحقة مشروطة بصحة المراحل السابقة؛ IR typed مخرج حقيقي من TAC |
-| `Lexer` | تحويل source إلى tokens ومواقع وتشخيصات lexical | source | Token list وdiagnostics | مصدر واحد للتلوين والتصنيف؛ التعليقات `//` تُتجاهل في compiler وتُستخرج للعرض |
-| `Parser` وAST | تحويل tokens إلى شجرة تركيبية وفق grammar الرسمية | tokens | ProgramNode وsyntax diagnostics | لا يضيف C-like syntax؛ الشجرة serializable للعقد ولوحات النتائج |
-| `SemanticAnalyzer` | فحص scopes والأنواع والثوابت والوصول والاستدعاءات | AST وexternal symbols | Symbol table وsemantic diagnostics | يقدم declared spans وreferences الحالية؛ لا يحقق F2/F12 كاملين دون protocol actions |
-| `ThreeAddressGenerator` | إخراج تمثيل وسيط قابل للفحص الأكاديمي | AST | قائمة TAC | لا يعمل لمصدر غير صالح وفق pipeline contract |
-| `TypedIrProgram` | إضافة نوع IR والتحقق من labels/types فوق TAC | TAC وsymbol types | typed instructions وIR diagnostics | مخرج معروض في protocol 0.5.0؛ ليس native machine code |
-| `AssemblyGenerator` | عرض target-like assembly لأغراض المقرر | TAC | Assembly text | يجب تسميته نصًا تعليميًا؛ لا يُعد binary assembled دون assembler حقيقي |
-| `Interpreter` | إثبات execution فعلي داخل النطاق المدعوم | AST وinput provider | output وruntime diagnostics | مرجع parity للـdart-native backend في الاختبارات |
-| `NativeArtifactBackend` | بناء executable حقيقي للنطاق المثبت داخل compiler backend | Assembly وoutput directory وtoolchain | artifact paths أو diagnostics | لا تدير واجهة Dart NASM/GCC؛ يعيد protocol مسار الـ artifact الجاهز للتشغيل |
-| `CompilationResponse` | تثبيت seam typed وقابل للتحقق بين executableين | stage payloads وdiagnostics | JSON versioned | protocol `0.5.0` يتحقق من الأنواع والمواقع والقوائم والـIR الاختياري |
+## المكونات ومسؤولياتها
 
-## دورة التعديل
+| الجزء | المسؤولية وحدودها |
+|---|---|
+| `lib/main.dart`, `lib/config/di/injection.dart`, `lib/routes/app_router.dart` | نقطة التشغيل وتركيب الاعتماديات والتوجيه إلى `EditorShell`. لا تحتوي منطق الترجمة. |
+| `lib/features/editor/presentation/` | عرض `EditorShell`، وإدارة أحداث الواجهة وعرض الوثائق والتبويبات والشجرة والنتائج. لا ينبغي أن تنفذ عمليات نظام أو ترجمة داخل widgets. |
+| `EditorController` | في `presentation/controllers/`؛ ينسق الحالة ويستدعي domain use cases وrepositories مباشرة. لا توجد طبقة application مستقلة في tree الحالية. |
+| `lib/features/editor/domain/usecases/` | حالات استخدام مستقلة مثل `OpenDocument` و`SaveDocument` و`ApplyEdit` و`UndoEdit` و`RedoEdit` وخدمة اللغة والبحث والتنسيق والتعليق؛ تعمل على عقود ومستندات domain. لا توجد مجلدات `application/` أو controller منفصل عن presentation في البنية الحالية. |
+| `lib/features/editor/domain/` | نماذج وقواعد المحرر وسياساته، مثل المستندات ومسارات الملفات وسياسة الوصول. يجب أن تبقى مستقلة عن Flutter وعن تفاصيل JSON. |
+| `lib/features/editor/data/` | تنفيذ منافذ الملفات وcompiler وتشغيل البرامج. هنا تقع حدود التعامل مع filesystem والعملية `arabicc`. |
+| `ProcessCompilerRepository` | تحويل طلبات التطبيق إلى رسائل البروتوكول، تشغيل compiler وقراءة مخرجاته، ثم تحويل الاستجابة إلى نماذج التطبيق. لا يترجم الشيفرة بنفسه. |
+| `packages/compiler_contracts/` | نماذج ورسائل JSON ذات الإصدار 0.5.0 والتحقق من شكلها في Dart؛ لا تنفذ lexer أو parser ولا تستبدل تعامل executable C مع الطلب. |
+| `packages/compiler_c/src/protocol/` و`src/driver/compiler_driver.c` | تحليل/تسلسل protocol وتنسيق مراحل compiler، بما فيها handler المساعدة `protocol_handle_assist`. |
+| Frontend في compiler C | Lexer يجزّئ المصدر، وParser يبني AST؛ يرفق التشخيصات والبنى التي تحتاجها المراحل اللاحقة. |
+| Semantic وIR في compiler C | فحص المعاني والأنواع، وبناء التمثيل الوسيط والتحويلات ذات الصلة قبل التنفيذ أو توليد المخرجات. |
+| Runtime في compiler C | تنفيذ AST/التمثيل المدعوم، عبر دورة `runtime_begin` و`runtime_execute_ast` و`runtime_end`. |
+| Backend وtoolchain في compiler C | توليد المخرجات المدعومة وإدارة بناء وتشغيل artifact عند طلبها. `artifact_build_native` يبني artifact، و`toolchain_run_process` يشغّل أداة نظام؛ وهما ليسا جزءًا من واجهة Flutter. |
+| `packages/compiler_c/src/main.c` | نقطة دخول CLI: وضع البروتوكول والمساعدة يعالجان رسائل الأسطر، و`--asm` يقرأ الإدخال حتى EOF. |
 
-يبدأ الحدث من TextField، ثم يحسب `EditorShell` diff واحدًا بين النص السابق واللاحق. يمر `TextEdit` إلى `EditorController.edit` ثم `Document.edit`، حيث يُفحص `offset` و`before` قبل إنشاء Document جديد. بعد ذلك تُبطل diagnostics وassistance القديمة ويُزاد generation، وتُجدول عملية التحليل دون أن تكتب callback قديمة فوق النص الجديد.
+## مسارات العمل
 
-النتيجة غير المتزامنة لا تصبح صالحة إلا إذا ظل generation مطابقًا. عند تبديل الملف أو تعديل المصدر تُزال ghost completion القديمة، وعند رفضها ينتقل الحرف إلى TextField مرة واحدة. هذه السلسلة هي سبب فصل `Document` عن `ArabicCodeController`: الأول يملك المصدر، والثاني يملك طبقات العرض المؤقتة.
+### تشغيل التطبيق وفتح المحرر
 
-## دورة الترجمة
+1. يبدأ `main()` من `lib/main.dart` تهيئة Flutter والخدمات.
+2. يهيئ `ServiceLocator` implementations للخدمات والمستودعات، ثم يوجه `AppRouter` إلى واجهة المحرر.
+3. يربط `EditorShell` عناصر الواجهة بـ`EditorController`؛ وتعرض widgets الحالة ولا تنشئ ملكية ثانية للبيانات.
+4. يطلب المحرر workspace أو مستندًا، ثم تمر عملية الملفات عبر use case/repository حتى منفذ النظام.
 
-عند compile يرسل controller snapshot الوثائق المفتوحة إلى `ProcessCompilerRepository`. يبني adapter طلبًا من `CompilationRequest`، ويختار `active` أو `project`. يستقبل CLI الاستجابة، يتحقق من `CompilationResponse`، ثم يحول diagnostics إلى `EditorDiagnostic` مع إثراء quick fixes المحدودة. لا تنفذ Flutter parser أو semantic؛ فهي تعرض payload الذي عاد من compiler executable.
+### فتح الملفات وحفظها وإدارة workspace
 
-داخل compiler، يقرأ Lexer source أولًا، ثم يحاول Parser بناء AST. إذا فشل بناء البرنامج تتوقف المراحل التالية. بعد نجاح AST يعمل semantic، ثم TAC وTyped IR، ثم Assembly وInterpreter عند خلو diagnostics. في project mode يجمع ProjectCompiler تعريفات الإجراءات والأنواع الخارجية، ويمررها إلى كل ملف مع أولوية التعريف المحلي، لذلك يمكن تنفيذ procedure أو تهيئة record من ملف آخر. يختار CLI شجرة/IR الملف الواحد مباشرة، بينما يضع نتائج المشروع في كائن project مع قائمة files.
+واجهة Explorer ترسل أحداث الاختيار والإنشاء وإعادة التسمية والحذف إلى طبقة التطبيق. تتحقق سياسات المسارات من العمليات المسموح بها، وتقوم repositories بعمليات filesystem. بعد نجاح العملية، تُحدّث حالة المستندات والشجرة؛ أما فشل النظام فيبقى خطأً ظاهرًا ولا يتحول إلى نجاح صوري.
 
-## مخرجات التكليف وحدود الإثبات
+### Compile وAssist
 
-| مطلب التكليف | دليل التنفيذ الحالي | حالة الإثبات |
-|---|---|---|
-| Tokens | `Compiler` و`CompilationResponse.tokens` | مختبر ومُعرض |
-| Parse/Syntax Tree | AST `toJson` و`syntaxTree` | مختبر ومُعرض |
-| Symbol Table | `SemanticResult` و`symbolTable` | مختبر ومُعرض |
-| Syntax/Semantic Errors | diagnostics typed مع phase وspan | مختبر ومُعرض |
-| TAC | `ThreeAddressGenerator` و`threeAddressCode` | مختبر ومُعرض |
-| Typed IR | `TypedIrProgram` و`intermediateRepresentation` | مختبر ومُعرض |
-| Assembly | `AssemblyGenerator` | نص أكاديمي، ليس binary |
-| Execution output | `Interpreter` و`executionOutput` | مثبت بأمثلة ناجحة |
-| EXE | `dart-native` في backend محدود | مثبت فقط للتركيبات المختبرة |
-| عشرة أمثلة مختلفة | `examples/01` إلى `examples/10`، و`examples/errors/11` و`12` | عشرة نجاح + fixture syntax وfixture semantic سلبية |
-| محرر مستقل | Flutter executable + `arabicc` process | مثبت في CI/release |
-| عزل النتائج غير المتزامنة | `_stateVersion` في `EditorController` | مثبت باختبارات stale compile/completion/save |
-| فشل process | timeout وmalformed JSON وexit failure في adapter | مثبت باختبارات protocol وtimeout |
+1. يطلب المحرر compile أو assist للنص الحالي؛ ينسق `EditorController` الطلب وحالة الانتظار والنتيجة.
+2. يستدعي use case مستودع compiler. يحول `ProcessCompilerRepository` الطلب إلى JSON وفق العقد ويشغل `arabicc`.
+3. يدخل الطلب من `main.c` إلى مسار البروتوكول، ثم إلى `c_run_protocol` ومشغل compiler `compiler_driver_run`.
+4. يعالج compiler C النص بالمراحل المطلوبة للطلب، ويعيد التشخيصات والنتائج ضمن استجابة JSON.
+5. يتحقق Dart من شكل الرسالة ويحول بياناتها إلى نماذج، ثم يعرض الواجهة التشخيصات والمخرجات في اللوحات المناسبة.
 
-| تنفيذ multi-file | external procedures/types إلى Interpreter وprotocol output | مثبت باختبارات ProjectCompiler وJSON |
+الـsyntax highlighting الفوري في المحرر تجربة عرض مستقلة عن طلب compiler الكامل؛ لا ينبغي تفسيرها على أنها تشغيل للمترجم لكل تغيير نصي. تُراجع تفاصيل تحديث النص وتحليل الإدخال المؤجل في [سلوك المحرر](04-editor-behavior.md).
 
+### Build وتشغيل البرنامج
 
-## كيف يشرح هذا في التقرير
+الترجمة والتحليل لا تساويان بناء برنامج أصلي. عندما يطلب المستخدم بناء artifact أو تشغيله، يمر الطلب إلى backend C وأدوات toolchain المناسبة. `dart-native` اسم target يرسله العميل ويعالجه backend C، وليس مترجم Dart بديلًا. كما أن Assembly الناتج نص مصدر، وليس بحد ذاته executable. ينسق `EditorController` البناء والتشغيل، وتعرض الواجهة الحالة والنتائج.
 
-يُشرح كل مكون في التقرير وفق الترتيب: سبب وجوده، العقد أو المدخلات، الخرج، المتغيرات وهياكل البيانات المهمة، الوظائف الرئيسة، الملف الذي يعتمد عليه، ثم اختبار يثبت السلوك. وتوضع حدود المكون في فقرة مستقلة حتى لا يختلط «يعمل ضمن subset مثبت» مع «يدعم اللغة كاملة».
+## الحدود والمسؤولية
+
+- لا تستورد واجهة العرض تفاصيل بروتوكول C أو تنفذ عمليات filesystem مباشرة.
+- لا يفسر `compiler_contracts` الشيفرة؛ وظيفته نمذجة والتحقق من رسائل العقد.
+- لا يضمن نجاح بناء artifact لمجرد نجاح parsing أو semantic analysis.
+- عمليات التفاعل مع الملفات وأدوات النظام تنتمي إلى data/toolchain boundaries، وتعيد أخطاء صريحة إلى طبقة العرض.
+- أرقام البروتوكول وادعاءات الميزات تخضع للعقد والتنفيذ الحاليين؛ الخطط لا تثبت أن الميزة منفذة.
+
+## الاختبارات والأدوات
+
+تغطي اختبارات Dart العقود والوحدات وrepositories وwidgets؛ وتغطي اختبارات C مراحل compiler والبروتوكول وCTest؛ وتغطي أمثلة التكامل سلوك `arabicc` من خلال رسائل البروتوكول. أسماء CTest الثابتة هي `arabicc_version`, `arabicc_help`, `arabicc_tac_golden`, `arabicc_asm_3ac_golden`, `arabicc_native_3ac_smoke`, و`arabicc_artifact_security`؛ ومع Dart يسجل CMake اختبارات `arabicc_protocol_smoke`, `arabicc_manual_examples`, `arabicc_semicolon_rule`, `arabicc_composite_types`, و`arabicc_stability`. يستخدم البناء Flutter/Dart، CMake مع Flex وBison ومترجم C، وNASM/المجمّع عند الحاجة إلى target أصلي. راجع [الاعتماديات والأدوات](../architecture/dependencies.md) و[استراتيجية الاختبار](../testing/test-strategy.md) للتفاصيل.

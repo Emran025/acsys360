@@ -1,38 +1,24 @@
-# مصفوفة قبول compiler C
+# حالة تنفيذ compiler C وحدود التغطية
 
-## الهدف
+## النطاق
 
-تحدد هذه الوثيقة شروط اعتبار compiler C بديلًا إنتاجيًا للمترجم المرجعي الحالي. لا يُقبل الاستبدال بمجرد نجاح البناء؛ يجب أن يطابق compiler C عقد JSON `0.5.0`، ومخرجات المراحل، والتشخيصات، والتنفيذ، وملفات المشروع، ثم ينجح في التشغيل من واجهة Flutter.
+هذه المصفوفة تصف التنفيذ الحالي، لا خطة استبدال مستقبلية. يستخدم تطبيق Flutter executable `arabicc` المبني من `packages/compiler_c/` عبر JSON Protocol `0.5.0`. تحفظ نماذج الطلب والاستجابة المشتركة في `packages/compiler_contracts/`. تفاصيل الطبقات ومسار الطلب موجودة في [وثيقة المعمارية](./architecture.md) و[خريطة الشيفرة](./project-code-map.md)، وبوابات CI في `.github/workflows/ci.yml`.
 
-## قاعدة الاستبدال
+## التنفيذ وأدلة التحقق
 
-يبقى compiler المرجعي الحالي هو مسار الإنتاج إلى أن تتحقق جميع البوابات الموسومة `required`. لا يجوز لنسخة C أن تعيد `success: true` مع ناتج ناقص أو أن تعتمد على تنفيذ Dart خلفيًا.
-
-| البوابة | شرط القبول | دليل الاختبار | الحالة |
+| المجال | التنفيذ الحالي | دليل التحقق في المستودع | الحدود |
 |---|---|---|---|
-| C17 build | بناء نظيف مع `-Wall -Wextra -Werror -pedantic` | CMake على Linux وCI | منجز للـmilestone الحالي |
-| Lexer | جميع الكلمات والرموز والتعليقات والـspans مطابقة للمرجع | golden token fixtures | جزئي |
-| Parser/AST | كل declarations/statements/expressions وقيم AST ومواضعها مطابقة | parser fixtures وAST JSON golden | جزئي |
-| Diagnostics | نفس phase/code/severity/span والمعنى، مع رفض المصدر غير الصحيح | negative fixtures | جزئي |
-| Semantic/scopes | aliases، records، procedures، parameters، returns، arrays، project symbols | semantic matrix | جزئي |
-| TAC | temporaries، calls، branches، loops، labels، control-flow | TAC golden | جزئي |
-| Typed IR | primitive/compound types وconversion وcontrol-flow validation | typed IR golden | جزئي |
-| Runtime | نفس execution output وحدود الخطوات والأخطاء | parity fixtures | غير منجز |
-| NASM | x86-64 NASM صحيح وقابل للتجميع والربط والتشغيل | `nasm` + `gcc` native test | integer subset فقط |
-| Project mode | ملفات متعددة وexternal procedures/types وentry path | multi-file fixtures | غير منجز |
-| Protocol compile | قراءة `CompilationRequest` وإرجاع كل حقول `CompilationResponse` | protocol round-trip tests | غير منجز؛ stub يرفض عمدًا |
-| Protocol assist | completion/help بنفس الحقول والاستبدالات | assist parity tests | غير منجز |
-| Flutter adapter | `ProcessCompilerRepository` يستخدم C دون تغيير domain/presentation | editor integration tests | غير منجز |
-| Release | executable C مضمّن في Windows/Linux/macOS مع smoke tests | release matrix | غير منجز |
+| بناء C | C17، Flex، Bison وCMake لبناء `arabicc` | `packages/compiler_c/CMakeLists.txt` وjob `compiler-c` في CI | يلزم توفر أدوات البناء |
+| Lexer وParser/AST | `src/lexer.l` و`src/parser.y` و`src/ast.c` | اختبارات الأمثلة والبروتوكول في `packages/compiler_c/tests/` | تغطية اللغة تتبع grammar المنفذة، وليست ادعاءً باكتمال اللغة |
+| Semantic وDiagnostics | `src/semantic.c` وبيانات الاستجابة | `protocol_smoke.dart` واختبارات compiler | القدرات محدودة بما يطبقه backend |
+| TAC وTyped IR | `src/ir/tac.c` و`src/ir/typed_ir.c` | `tac_golden_test.c` ونتائج البروتوكول | Typed IR وسيط، وليس machine code |
+| Runtime | `src/runtime/interpreter.c` | اختبارات protocol والأمثلة المسجلة في CMake | التشغيل ضمن التركيبات التي يدعمها compiler |
+| Assembly وartifact | `src/backend/x86_64/` و`src/backend/artifact_builder.c` و`src/backend/toolchain.c` | `asm_3ac_golden_test.c` و`native_3ac_smoke.sh` و`artifact_security_test.c` | `assembly` نص؛ artifact منفصل ومحدود بالـtarget والـtoolchain |
+| Protocol | `src/protocol/` و`packages/compiler_contracts/` | اختبارات العقد و`packages/compiler_c/tests/protocol_smoke.dart` | يجب تحديث الجانبين معًا عند تغيير schema |
+| Assist | executable يقبل `--assist`، وحزمة Dart تعرف موديلات assist | `packages/compiler_contracts/test/assist_protocol_test.dart` يختبر نماذج العقد؛ لا يوجد حاليًا اختبار CTest مستقل لتكامل executable assist | لا يعني اكتمال ميزات Language Server |
+| Flutter integration | `ProcessCompilerRepository` يشغّل executable | `test/process_compiler_repository_test.dart` واختبارات التطبيق | لا تستدعي Widgets compiler أو أدوات toolchain مباشرة |
+| CI | jobs للعقد وC وFlutter وبناء Linux Desktop | `.github/workflows/ci.yml` | راجع workflow نفسه لنطاق المنصات المنشور |
 
-## ما هو منجز فعليًا الآن
+## قاعدة وصف الدعم
 
-المسار C الحالي مستقل وحقيقي: Lexer، AST، Parser محدود، Semantic محدود، TAC كامل لمرحلة الخفض، Typed IR محدود، وNASM backend مبني على 3AC. ثبتت الاختبارات أن برنامجًا integer صغيرًا يولد Assembly، ويُجمع بـNASM، ويُربط، ويعمل على Linux. هذه النتيجة لا تعني اكتمال البديل.
-
-## ترتيب الإغلاق الإلزامي
-
-يُغلق العمل بالترتيب التالي: توسيع grammar وAST، ثم serialization، ثم Semantic وscopes وproject mode، ثم TAC وTyped IR وcontrol-flow، ثم runtime، ثم NASM runtime helpers والأنواع غير integer، ثم protocol compile/assist، ثم adapter الواجهة، ثم parity matrix وCI متعددة المنصات، وأخيرًا release.
-
-## مبدأ عدم التراجع
-
-لا يُحذف compiler المرجعي ولا تُنقل مسؤولية Flutter إلى C قبل وجود اختبار تكافؤ مقابل لكل fixture نجاح وفشل. إذا فشل C في حالة واحدة، يبقى المسار المرجعي فعالًا وتظهر الحالة كفشل CI لا كنجاح صامت.
+وجود ملف تنفيذ أو حقل في JSON لا يثبت دعم كل قواعد اللغة. عند توثيق دعم construct أو artifact، اربط الادعاء باختبار في المترجم أو fixture يستخدمه اختبار التكامل. لا توصف قيمة target `dart-native` بأنها مترجم Dart؛ هي اسم target ينفذه backend C. كما لا توصف نصوص Assembly بأنها ملفات تنفيذية.

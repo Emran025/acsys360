@@ -1,63 +1,39 @@
-# حدود المنتج والقرارات الهندسية
+# حدود المنتج والحالة الحالية
 
-## الخلاصة
+## تعريف المنتج
 
-المشروع ليس محاولة لبناء Visual Studio أو لغة إنتاجية عامة. هو **بيئة تطوير تعليمية مكتبية للغة عربية محددة**، هدفها تنفيذ متطلبات مقرر المترجمات بوضوح، مع تجربة تحرير قريبة من VS Code في الوظائف الأساسية فقط. سيُقاس النجاح بصحة الترجمة، وضوح مراحلها، ثبات النتائج، وسهولة دورة العمل، لا بعدد الخصائص أو حجم الواجهة.
+Arabic360 بيئة تطوير تعليمية للغة برمجة عربية محددة. يتكون التطبيق من واجهة Flutter ومترجم C مستقل باسم `arabicc` يتواصل معها عبر JSON Protocol. الهدف هو توضيح دورة التحرير والترجمة وعرض نتائج المراحل، لا بناء بديل عام لـ VS Code أو منصة لغات متعددة.
 
-## ما يدخل داخل Boundary
+## نطاق التطبيق الحالي
 
-| المجال | يدخل في المنتج | معيار الانتهاء |
+| المجال | الموجود في المستودع | الحدود |
 |---|---|---|
-| Workspace | مجلد مشروع واحد، ملفات لغة متعددة، إنشاء/فتح/حفظ/إعادة تسمية وحذف مع حماية الملفات غير المحفوظة | دورة عمل كاملة على ملفين أو أكثر |
-| Editor | تبويبات، رقم السطر، RTL، تحديد ونسخ ولصق، indentation، بحث واستبدال، اختصارات، Undo/Redo | اختبارات controller وwidget مستقرة |
-| Navigation | explorer هرمي، الملف النشط، فتح سريع، command palette صغيرة | كل أمر أساسي متاح من لوحة المفاتيح |
-| Themes | Light/Dark وقياسات ألوان موحدة | لا تتغير دلالة diagnostics بين الثيمات |
-| Compiler frontend | Lexer، Parser، AST typed، recovery، syntax diagnostics | تغطية كل القواعد الرسمية المخطط لها |
-| Semantic | scopes، symbols، types، constants، procedures، arrays، records | رفض البرامج غير الصالحة قبل التوليد |
-| Runtime | interpreter تعليمي deterministic مع input/output وlimits | نتائج fixtures مطابقة |
-| Outputs | Tokens، AST، Symbol Table، semantic/syntax diagnostics، TAC، Assembly، runtime output | عقد JSON versioned ومخرجات قابلة للحفظ |
-| Release | Linux أولًا للتطوير، ثم Windows إذا توفرت بيئة البناء، مع artifact واضح | smoke test على جهاز نظيف |
+| Workspace | اختيار مجلد، شجرة ملفات، فتح/إنشاء/حفظ/إعادة تسمية/حذف، وقص/لصق ضمن workspace | طبقة المستودع تختبر عمليات filesystem؛ اختبارات الواجهة لا تغطي كل تفاعلات الشجرة |
+| Editor | تبويبات ووثائق وتحرير RTL وundo/redo وتنسيق وبحث واستبدال | ليس محررًا عامًا بامتدادات أو مكونات VS Code |
+| Explorer | أزرار إنشاء وفتح وتحديث، تحديد مجلد الوجهة، وقوائم سياق للملف والمجلد والجذر | لا يوجد فتح سريع أو command palette عامة |
+| Language UX | تلوين lexer، completion/help عبر assist، diagnostics، ومصباح تشخيص | ليس Language Server كاملًا وفق LSP؛ دلالات التعريف وإعادة التسمية محدودة |
+| Compiler | Lexer وParser وAST وSemantic وTAC وTyped IR وInterpreter وNASM backend بلغة C | الدعم محكوم بقواعد التنفيذ والاختبارات؛ لا يعني وجود مرحلة اكتمال كل تراكيب اللغة |
+| Artifacts | `arabicc` executable مستقل؛ ويمكن للـbackend إنشاء artifact لبعض targets والتركيبات | نص `assembly` ليس executable. الهدف `dart-native` اسم target في البروتوكول وليس مترجمًا مكتوبًا بـDart |
+| Platforms | مجلدات runners لـAndroid وiOS وLinux وmacOS وWindows وWeb موجودة | وجود runner لا يثبت دعم تشغيل/تغليف compiler عليه. بوابة CI الحالية تبني Linux Desktop |
+| Release | سكربتات بناء Windows وworkflows منفصلة لـCI والإصدار | نجاح CI لا يُستنتج من وجود ملفات workflow؛ تُراجع نتيجة التشغيل الفعلية لكل إصدار |
 
-## ما يبقى خارج Boundary الإصدار الدراسي
+## سلوك مستكشف مساحة العمل
 
-لن نبني سوق إضافات، debugger كامل، language server بمعيار LSP، refactoring دلالي متقدم، package manager، نظام build عام، دعم لغات متعددة، تعاون لحظي، cloud workspace، أو مترجم native محسن للأداء. هذه خصائص قد تصلح لإصدار مستقبلي، لكنها تشتت عن متطلبات المقرر ولا تُضاف قبل اكتمال الأساس.
+يعرض `WorkspaceExplorer` أسماء المجلدات والملفات بالاتجاه `TextDirection.ltr` ومحاذاة `TextAlign.right`. هذا مقصود لأسماء المسارات والامتدادات اللاتينية داخل واجهة RTL: يحافظ على ترتيب الاسم كما يظهر في نظام الملفات، مع محاذاته إلى الطرف الأيمن من صف الشجرة. لا يعني ذلك أن منطقة تحرير الشفرة تستخدم LTR؛ اتجاه المحرر وسلوكه موضحان في [مواصفة سلوك المحرر](../assignment/04-editor-behavior.md).
 
-لا نعد بملف EXE أو Assembly أصلي متعدد المنصات قبل اختيار Target محدد. المسار الواقعي هو: interpreter موثق أولًا، ثم TAC، ثم Assembly تعليمي أو target واحد قابل للتشغيل. أي target إضافي يحتاج اختبارًا وأداة بناء وruntime خاصًا به.
+تعمل أزرار explorer على المجلد المحدد أو جذر workspace عند عدم تحديد مجلد. تتيح قائمة السياق على الملف الفتح والقص وإعادة التسمية والحذف؛ وعلى المجلد اللصق والإنشاء والقص وإعادة التسمية والحذف؛ وعلى الجذر اللصق وإنشاء ملف/مجلد واختيار workspace. هذه السلوكيات موجودة في widget، لكن لا توجد حاليًا مجموعة widget tests مخصصة تغطي كل عناصر القائمة؛ اختبارات repository تثبت عمليات الملفات وحدود المسارات فقط.
 
-## مستوى التشابه مع VS Code
+## ما لا يدعيه المنتج
 
-| مستوى | سننفذه | لن ندّعيه |
-|---|---|---|
-| تحرير | نص متعدد الملفات، تبويبات، اختصارات، Undo/Redo، بحث، تنسيق بسيط | محرر نصوص كامل بامتدادات VS Code |
-| مشروع | explorer وworkspace وdirty state وفتح سريع | workspace remote أو إدارة حزم |
-| لغة | highlighting مبني على Lexer وقائمة كلمات ومشغلات | LSP كامل وcompletion دلالي متقدم |
-| تشغيل | compile/run/stop وoutput وdiagnostics | debugger step-through وbreakpoints متقدمة |
-| عرض الترجمة | تبويبات مراحل واضحة | منصة تحليل أداء أو profiling |
+- لا يدعي توافقًا كاملًا مع VS Code أو تطبيق LSP كاملًا.
+- لا يدعي دعم كل صياغات اللغة لمجرد وجود AST أو حقل نتيجة.
+- لا يسمي نص NASM ملفًا تنفيذيًا.
+- لا يعتبر وجود مجلد منصة Flutter إثباتًا لتغليف المترجم وتشغيله على تلك المنصة.
+- لا يعتبر `dart-native` اسمًا للغة تنفيذ backend.
 
-## الأدوات المختارة
+## المراجع التنفيذية
 
-| الأداة | القرار | السبب والحد |
-|---|---|---|
-| Flutter Desktop | أساسي | يدعم Windows وmacOS وLinux من قاعدة كود واحدة وفق الوثائق الرسمية [1] |
-| Dart | أساسي لنواة المترجم والعقود | ينسجم مع Flutter ويتيح CLI مستقلًا واختبارات سريعة |
-| `file_picker` | يضاف عند تنفيذ explorer | يوفر file/directory picker وsave dialog لسطح المكتب، والإصدار الحالي المنشور 12.0.0 [2] |
-| `flutter_code_editor` | مرشح، لا يُعتمد تلقائيًا | يوفر highlighting وfolding وautocomplete وthemes، لكن folding محدود اللغات والتحليل التجريبي؛ سنستخدمه فقط إن خدم RTL والتكامل دون تقييد Undo/Redo [3] |
-| `peg` | مؤجل | يمكن أن يولد PEG parser في Dart والإصدار المنشور 9.0.1 [4]، لكن recursive-descent يدوي أفضل مبدئيًا لشرح القواعد ورسائل الخطأ والتحكم في AST |
-| Flutter `test`/`integration_test` | أساسي | اختبارات unit/widget/integration الرسمية تغطي الطبقات وسلوك التطبيق الكامل [5] |
-| GitHub Actions | أساسي | فحص PR وبناء artifact، وليس بديلًا عن اختبار target محلي |
-
-## سياسة الاعتماديات
-
-لا تُضاف مكتبة لتجميل الشكل إذا كان Flutter يوفر الوظيفة. تُضاف dependency فقط إذا خفضت مخاطرة واضحة، مع تسجيل الإصدار والرخصة والمنصة والاستخدام. لا نستخدم parser generator قبل وجود grammar tests؛ الأداة لا تعفي الفريق من فهم Lexer/Parser ولا من فحص AST.
-
-## ترتيب البناء الواقعي
-
-نثبت العقد والنماذج أولًا، ثم نواة اللغة، ثم semantic/runtime، ثم TAC وtarget، ثم editor shell، ثم الإنتاجية والدمج. لا نبدأ بتصميم واجهة كبير قبل وجود compiler service يعيد نتيجة حقيقية؛ وإلا سنبني شاشة تعرض بيانات وهمية يصعب استبدالها.
-
-## References
-
-[1]: https://docs.flutter.dev/platform-integration/desktop "Flutter desktop support"
-[2]: https://pub.dev/packages/file_picker "file_picker package"
-[3]: https://pub.dev/packages/flutter_code_editor "flutter_code_editor package"
-[4]: https://pub.dev/documentation/peg/latest/ "peg Dart documentation"
-[5]: https://docs.flutter.dev/testing/integration-tests "Flutter integration testing"
+- [البنية](./architecture.md)
+- [عقد compiler](./compiler-protocol.md)
+- [اختصارات المحرر](./editor-shortcuts.md)
+- [استراتيجية الاختبار](../testing/test-strategy.md)

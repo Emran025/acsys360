@@ -1,35 +1,37 @@
-# Baseline للـ C compiler backend
+# Baseline الحالي للـ C compiler backend
 
-## النطاق الحالي
+## النطاق التنفيذي
 
-المرجع التنفيذي الحالي هو `packages/compiler_c`. يبني هذا المجلد executable `arabicc` باستخدام Flex وBison وCMake. ويتصل التطبيق به عبر JSON Protocol الإصدار `0.5.0` من خلال `packages/compiler_contracts`.
+المترجم العامل موجود في `packages/compiler_c/` ويُبنى عبر CMake وFlex وBison إلى executable باسم `arabicc`. يستهلك التطبيق هذا executable من data layer عبر JSON Protocol `0.5.0`؛ وتوجد النماذج والتحقق من العقد في `packages/compiler_contracts/`.
 
-يوفر backend الحالي Lexer وParser وAST وتحليلًا دلاليًا محدودًا وتوليد Assembly نصية من 3AC ضمن subset موثق. توجد اختبارات CMake للفحص التشغيلي (`--version` و`--help`)، ويغطي smoke test في `tool/verify_compiler_bundle.dart` المسار الكامل من طلب JSON إلى استجابة JSON بعد تضمين executable.
+يمر مسار الترجمة في compiler C من protocol request إلى Lexer وParser/AST والتحليل الدلالي، ثم TAC وTyped IR. بحسب الطلب والنجاح، تتضمن الاستجابة نتائج interpreter وAssembly النصية وبيانات artifact. المكونات موضحة في [`packages/compiler_c/README.md`](../../packages/compiler_c/README.md) و[CMakeLists](../../packages/compiler_c/CMakeLists.txt)، مع خريطة وظائف مفصلة في [خريطة الشيفرة](./project-code-map.md).
 
-## المكونات الحالية
+## التنفيذ والاختبارات
 
-| المجال | التنفيذ الحالي | دليل التحقق |
+| المجال | التنفيذ الحالي | اختبار/دليل قائم |
 |---|---|---|
-| Lexer | `src/lexer.l` عبر Flex، مع رموز عربية ومواقع مصدر | smoke test ونتيجة `tokens` |
-| Parser | `src/parser.y` عبر Bison وبناء AST | نتيجة `syntaxTree` |
-| Semantic | `src/semantic.c` ورموز وتشخيصات محدودة | `symbolTable` و`diagnostics` |
-| Protocol | `src/protocol.c` و`include/protocol.h` | `protocolVersion: 0.5.0` وJSON round-trip |
-| Assembly | `src/backend/x86_64/asm_x86_64.c ومكوّنات backend/x86_64 الداخلية`، نص NASM-like محدود | حقل `assembly` |
-| Assist | `--assist` في executable | طلبات المساعدة من المحرر |
-| Packaging | CMake ثم bundling في `release.yml` | Linux وWindows وmacOS smoke tests |
+| executable | `src/main.c` وCMake target باسم `arabicc` | اختبارات CTest لـ`--version` و`--help` |
+| Lexer وParser | `src/lexer.l` و`src/parser.y` مع AST في `src/ast.c` | اختبارات compiler integration والأمثلة اليدوية |
+| Semantic | `src/semantic.c` | protocol smoke، fixtures سلبية، ونتائج `symbolTable` و`diagnostics` |
+| Protocol | `src/protocol.c` و`src/protocol/` | `packages/compiler_c/tests/protocol_smoke.dart` وعقد `packages/compiler_contracts/test/` |
+| TAC وTyped IR | `src/ir/tac.c` و`src/ir/typed_ir.c` | `tac_golden_test.c` وحقول الاستجابة |
+| Interpreter | `src/runtime/interpreter.c` | protocol smoke واختبارات أمثلة CMake |
+| Assembly | `src/backend/x86_64/` | `asm_3ac_golden_test.c` و`assembly` النصية |
+| Artifact/toolchain | `src/backend/artifact_builder.c` و`src/backend/toolchain.c` | `artifact_security_test.c` و`native_3ac_smoke.sh` |
+| Assist | `--assist` في executable | `assist_protocol_test.dart` يختبر نماذج العقد؛ لا يوجد في CMake الحالي اختبار integration مستقل لمسار executable `--assist` |
+| Bundle | compiler يُرفق داخل ملفات Desktop في release workflow | `tool/verify_compiler_bundle.dart` لكل bundle منشور |
 
-## قواعد القياس
+يسجل CMake اختبارات integration إضافية عند العثور على Dart، ومنها protocol smoke والأمثلة اليدوية واختبارات الفاصلة المنقوطة والأنواع المركبة والاستقرار. أما CI الرئيسي فيبني compiler ويشغل CTest؛ راجع `.github/workflows/ci.yml` لنطاق كل job.
 
-لا تُحسب مرحلة مكتملة إلا إذا امتلكت تنفيذًا في C واختبارًا مستقلًا، وظهرت نتيجتها في عقد JSON أو artifact موثق، ونجحت على runner المنصة المعنية. لا يُسمح بتفعيل نتيجة ثابتة داخل Flutter بدل استجابة `arabicc`، ولا يُسمح بوصف Assembly النصية بأنها binary.
+## حدود الاستنتاج
 
-## حدود المقارنة التاريخية
+لا تعني الاختبارات الموجودة اكتمال كل productions أو دعم artifact على كل منصة. تحقق من اختبار بعينه قبل إعلان دعم construct أو target. حقل `assembly` يحتوي نص Assembly ولا يثبت وحده إنشاء ملف تنفيذي. اسم target `dart-native` قيمة بروتوكول يخدمها backend C، وليس implementation بلغة Dart.
 
-كانت وثائق سابقة تشير إلى `packages/compiler_core` و`apps/compiler_cli` ونسخة Dart من المترجم. هذه المسارات لم تعد البنية المنفذة في المستودع الحالي. يجب قراءة تلك الإشارات بوصفها تصميمًا تاريخيًا أو خطة انتقال، بينما تكون المسارات المعتمدة للتنفيذ هي `packages/compiler_c` و`packages/compiler_contracts` و`lib/features/editor/data`.
+لا توجد في البنية الحالية حزمة `packages/compiler_core` أو CLI Dart مستقل باسم `apps/compiler_cli`. أي ظهور لهذين المسارين في سجل migration أو audit قديم تاريخي، وليس دليلًا على مسار تشغيل حالي.
 
-## References
+## المراجع
 
-[1]: https://github.com/Emran025/acsys360/tree/main/packages/compiler_c "Current C compiler backend"
-[2]: https://github.com/Emran025/acsys360/tree/main/packages/compiler_contracts "Current compiler contracts"
-[3]: https://github.com/Emran025/acsys360/blob/main/tool/verify_compiler_bundle.dart "Bundled compiler smoke test"
-
-المراجع: [1] [2] [3]
+- [معمارية المشروع](./architecture.md)
+- [مصفوفة القبول وحدود compiler](./compiler-c-acceptance-matrix.md)
+- [عقد protocol](./compiler-protocol.md)
+- [استراتيجية الاختبار](../testing/test-strategy.md)

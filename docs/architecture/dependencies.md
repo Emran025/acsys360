@@ -1,5 +1,7 @@
 # الاعتماديات والأدوات
 
+لشرح وظيفة كل أداة مع مواضع استعمالها والملفات/الدوال المحورية في المشروع، راجع [خريطة الشيفرة ومسؤولية الأجزاء](./project-code-map.md). يركز هذا الملف على مصدر الاعتمادية ودورها وحدودها.
+
 ## سياسة الاختيار
 
 تُضاف dependency فقط عندما يكون لها دور واضح يمكن اختباره وشرحه. يعتمد المشروع على Flutter للواجهة، وعلى Dart لعقود التكامل وأدوات المحرر، وعلى CMake وFlex وBison لبناء backend المترجم. لا تحتوي الواجهة على parser موازٍ لقواعد اللغة.
@@ -20,7 +22,7 @@
 
 يتكون تطبيق Flutter من feature واحدة رئيسية حاليًا هي `lib/features/editor`. تحتوي `domain` على الكيانات والعقود وعمليات الاستخدام، وتحتوي `data` على تنفيذ filesystem وتشغيل عملية `arabicc`، بينما تحتوي `presentation` على controller والواجهة وWidgets. توجد الخدمات والثوابت العامة في `lib/core` والمكونات والثيمات المشتركة في `lib/shared`.
 
-أما المترجم المستقل فيوجد في `packages/compiler_c`. ويضم `src/lexer.l` و`src/parser.y` وملفات AST والتحليل الدلالي والبروتوكول وbackend Assembly، إضافة إلى headers في `include`. لا يوجد حاليًا مجلد `packages/compiler_core` أو تطبيق `apps/compiler_cli`؛ هذه أسماء كانت في التصميم السابق وليست مسارات يجب استخدامها.
+أما المترجم المستقل فيوجد في `packages/compiler_c`. ويضم `src/lexer.l` و`src/parser.y` وملفات AST والتحليل الدلالي والبروتوكول وbackend Assembly وIR/runtime/toolchain، إضافة إلى headers في `include`. لا يوجد حاليًا مجلد `packages/compiler_core` أو تطبيق `apps/compiler_cli`؛ هذه أسماء كانت في التصميم السابق وليست مسارات يجب استخدامها.
 
 ## أدوات التحقق والبناء
 
@@ -30,7 +32,7 @@
 | `flutter analyze` | تحليل ساكن | بوابة CI الأساسية |
 | `flutter test` | اختبارات Flutter والعقد | CI وRelease |
 | `cmake --build` | بناء `arabicc` | كل منصة مستهدفة |
-| `ctest` | اختبارات C البسيطة | `--version` و`--help` |
+| `ctest` | اختبارات compiler C المسجلة في CMake | version/help وgolden TAC/Assembly وnative smoke واختبار artifact؛ وقد يضيف CMake اختبارات Dart تكاملية عند توفر Dart |
 | `tool/verify_compiler_bundle.dart` | Smoke test للتكامل | بعد تضمين executable داخل Desktop bundle |
 | GitHub Actions | CI وRelease وصورة GHCR | `ci.yml` و`release.yml` و`container.yml` |
 

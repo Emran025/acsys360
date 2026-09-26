@@ -6,29 +6,20 @@
 |---|---|
 | Lexer tests | تصنيف الكلمات والرموز والأعداد والخيوط والمحارف والتعليقات والأخطاء غير المغلقة |
 | Parser tests | إنتاج AST للتعريفات والتعليمات والتعبيرات والوصول والحلقات والاستدعاءات |
-| Semantic tests | الأنواع والنطاقات والثوابت والمراجع والسجلات والقوائم والأخطاء الموضعية |
-| IR/TAC tests | تعليمات typed، labels، jumps، وقواعد التحقق من CFG الأساسي |
-| Interpreter tests | الناتج والسلوك الحسابي والتحكم والإدخال والأخطاء التنفيذية |
-| C backend smoke | التحقق من JSON protocol وexit code للـ executable `arabicc` المولد عبر CMake |
-| Protocol tests | round-trip JSON، الإصدار، قوائم النتائج، target، artifactDirectory، والأخطاء B001–B004 |
-| Flutter widget tests | ghost text، رفض الاقتراح، الأسهم، اتجاه TextField، Enter indentation، المصباح، الأيقونة، والشجرة |
-| CI build | format، analyze، test، Flutter desktop build، compiler bundle smoke test، والحزم الثلاث |
+| Domain/editor tests | document/workspace، controller والطلبات غير المتزامنة، تنسيق وبحث وتعليق، repositories ومسارات الملفات |
+| Flutter widget tests | routing، workspace الترحيبي، لوحات النتائج، RTL والمؤشر، Minimap، themes، completion، indentation، الاختصارات والتشخيصات |
+| Protocol contract tests | compilation وassist request/response في `packages/compiler_contracts/test/` |
+| C backend tests | CTest: تشغيل executable، golden tests لـTAC وAssembly، native 3AC smoke، واختبار artifact security |
+| Compiler integration | protocol smoke، الأمثلة اليدوية، قاعدة الفاصلة المنقوطة، الأنواع المركبة، والاستقرار؛ تسجل عبر CMake عند توفر Dart |
+| CI build | تحليل واختبار العقود، بناء C وتشغيل CTest، format/analyze/test للتطبيق، وبناء Flutter Linux |
 
-## 2. حالات native المثبتة
+## 2. أمثلة اللغة وحدود التغطية
 
-تغطي اختبارات parity الحالية الخيوط والمحارف والقيم المنطقية والحقيقية والثوابت، الإدخال الصحيح، if/else، repeat وrepeat-until، القوائم والسجلات، والإجراءات بالمرجع. ويجب إضافة أي construct جديد إلى parity قبل وصفه بأنه مدعوم في native backend.
+تقع الأمثلة اليدوية المرقمة في `examples/manual/`، وتوجد ملفات أخطاء في `examples/errors/`. لا يعني وجود مثال أو مرحلة في JSON أن كل صيغ اللغة مدعومة؛ تُذكر التغطية وفق اختبارات المترجم في `packages/compiler_c/tests/` ونتائج CI. target `dart-native` قيمة بروتوكول يستخدمها backend المكتوب بلغة C لإنشاء artifact ضمن مجموعة التركيبات المدعومة، وليس مترجم Dart منفصلًا.
 
 ## 3. فحوص الجودة
 
-يجب أن ينجح الأمر التالي داخل حزمة compiler:
-
-```text
-dart format --output=none --set-exit-if-changed lib test
-dart analyze
-dart test
-```
-
-ويجب أن ينجح داخل تطبيق Flutter:
+يجب أن ينجح داخل تطبيق Flutter:
 
 ```text
 flutter pub get
@@ -38,11 +29,24 @@ flutter test
 flutter build linux --release
 ```
 
-تستخدم GitHub Actions إصدار Flutter `3.44.5` نفسه المحدد في release workflow. ولا يكفي نجاح اختبار محلي على بيئة لا تحتوي Flutter SDK؛ عند غيابه يُذكر القيد ويُعتمد CI للتحقق من تطبيق Flutter.
+وتُختبر حزمة العقد والمترجم منفصلتين:
+
+```sh
+cd packages/compiler_contracts
+dart analyze
+dart test
+
+cd ../compiler_c
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+```
+
+تستخدم GitHub Actions Flutter `3.44.5` وDart `3.12.2` وفق `.github/workflows/ci.yml`. لا يُستعاض عن الفحوص غير المتاحة محليًا بادعاء نجاحها؛ يذكر القيد وتُراجع نتيجة CI.
 
 ## 4. البناء والنشر
 
-يُبنى compiler عبر CMake وFlex وBison على كل runner، ثم يوضع executable `arabicc` أو `arabicc.exe` بجانب التطبيق داخل `compiler/`. يتم اختبار compiler المضمّن عبر protocol smoke، ثم تُرفع حزم Linux وWindows وmacOS إلى GitHub Release.
+يُبنى `packages/compiler_c/` عبر CMake وFlex وBison. يحدد Workflow الإصدار مسارات التغليف ويشغّل اختبارات bundle قبل نشر ملفات المنصات؛ أما CI الرئيسي الحالي فيتحقق من بناء Linux Desktop. راجع workflow الإصدار لمعرفة التوزيعات الفعلية وتفاصيل مكان executable.
 
 ## 5. معايير قبول الإصدار
 
@@ -52,9 +56,9 @@ flutter build linux --release
 
 | العنصر | الحالة المثبتة |
 |---|---|
-| protocol `0.5.0` | مدمج ومختبر مع Typed IR طرفيًا |
-| typed IR | مدمج مع اختبارات تحقق |
-| C executable | مدعوم عبر `arabicc` للتركيبات التي يغطيها backend |
-| release self-contained | منشور في v0.0.1 مع compiler C المضمن |
-| Flutter CI | format/analyze/test/build ناجحة في آخر run موثق بالمستودع |
-| Assembly binary | غير مدعوم؛ المخرج الحالي نص NASM-like أكاديمي |
+| protocol `0.5.0` | العقد معرّف في `packages/compiler_contracts` والمترجم C في `packages/compiler_c` |
+| typed IR | مخرج من compiler C ويظهر ضمن بروتوكول النتائج |
+| C executable | يُبنى باسم `arabicc`؛ دعم التركيبات محكوم باختبارات backend |
+| اختبارات Flutter | موجودة في `test/` وتشمل اختبارات وحدات وWidgets |
+| CI | راجع `.github/workflows/ci.yml` للحالة والبوابات الحالية |
+| Assembly | النص في الاستجابة ليس binary؛ إنشاء artifact المنفصل متاح عبر target مدعوم |
