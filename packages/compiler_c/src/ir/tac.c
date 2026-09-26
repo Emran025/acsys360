@@ -45,6 +45,16 @@ static const char *expr_type(const CAstNode *n) {
     const char *l = expr_type(n->data.binary.left), *r = expr_type(n->data.binary.right);
     const char *op = n->data.binary.operator;
     if (!strcmp(op, "==") || !strcmp(op, "!=") || !strcmp(op, "<") || !strcmp(op, ">") || !strcmp(op, "<=") || !strcmp(op, ">=") || !strcmp(op, "&&") || !strcmp(op, "||")) return "منطقي";
+    if (!strcmp(op, "^")) {
+      if (n->data.binary.right != NULL &&
+          n->data.binary.right->kind == C_AST_LITERAL &&
+          n->data.binary.right->data.literal.literal_kind == C_TOKEN_INTEGER &&
+          n->data.binary.right->data.literal.value != NULL &&
+          n->data.binary.right->data.literal.value[0] != '-') {
+        return !strcmp(l, "حقيقي") ? "حقيقي" : "صحيح";
+      }
+      return "حقيقي";
+    }
     if (!strcmp(l, "حقيقي") || !strcmp(r, "حقيقي")) return "حقيقي";
     if (!strcmp(l, "خيط_رمزي") || !strcmp(r, "خيط_رمزي")) return "خيط_رمزي";
     return l;

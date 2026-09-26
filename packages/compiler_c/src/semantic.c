@@ -138,6 +138,16 @@ static const char *expression_type(const CSemanticResult *result,
         strcmp(op, "<") == 0 || strcmp(op, ">") == 0 ||
         strcmp(op, "<=") == 0 || strcmp(op, ">=") == 0 ||
         strcmp(op, "&&") == 0 || strcmp(op, "||") == 0) return "منطقي";
+    if (strcmp(op, "^") == 0) {
+      if (node->data.binary.right != NULL &&
+          node->data.binary.right->kind == C_AST_LITERAL &&
+          node->data.binary.right->data.literal.literal_kind == C_TOKEN_INTEGER &&
+          node->data.binary.right->data.literal.value != NULL &&
+          node->data.binary.right->data.literal.value[0] != '-') {
+        return strcmp(left, "حقيقي") == 0 ? "حقيقي" : "صحيح";
+      }
+      return "حقيقي";
+    }
     if (strcmp(op, "+") == 0 &&
         (strcmp(left, "خيط_رمزي") == 0 || strcmp(right, "خيط_رمزي") == 0)) {
       return "خيط_رمزي";
