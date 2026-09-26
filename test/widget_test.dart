@@ -64,6 +64,28 @@ class FakeWorkspaceRepository implements WorkspaceRepository {
   Future<void> rename(String path, String newName) async {}
 }
 
+void mockClipboardForTest() {
+  String? clipboardText;
+  final messenger =
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+  messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+    if (call.method == 'Clipboard.setData') {
+      final arguments = call.arguments;
+      if (arguments is Map && arguments['text'] is String) {
+        clipboardText = arguments['text'] as String;
+      }
+      return null;
+    }
+    if (call.method == 'Clipboard.getData' && clipboardText != null) {
+      return {'text': clipboardText};
+    }
+    return null;
+  });
+  addTearDown(
+    () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
+  );
+}
+
 void main() {
   test('routes resolve to the injected editor shell', () {
     final controller = EditorController(
@@ -142,6 +164,7 @@ void main() {
   testWidgets('shows syntax tree as a table and preserves its JSON', (
     tester,
   ) async {
+    mockClipboardForTest();
     final controller = EditorController(
       repository: FakeWorkspaceRepository(),
       rootPath: '.',
@@ -389,6 +412,7 @@ void main() {
   testWidgets('shows Assembly in a selectable left-to-right code block', (
     tester,
   ) async {
+    mockClipboardForTest();
     final controller = EditorController(
       repository: FakeWorkspaceRepository(),
       rootPath: '.',
