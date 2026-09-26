@@ -1,4 +1,6 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import '../../../domain/entities/editor_diagnostic.dart';
 import '../../../../../../shared/themes/app_theme.dart';
@@ -48,6 +50,7 @@ class _LineNumberedEditorState extends State<LineNumberedEditor> {
   final gutterScrollController = ScrollController();
   late int lineCount;
   late TextSelection lastSelection;
+  Offset? _lastPrimaryPointer;
 
   @override
   void initState() {
@@ -78,24 +81,106 @@ class _LineNumberedEditorState extends State<LineNumberedEditor> {
   void _handleControllerChange() {
     final next = _lineCount(widget.controller.text);
     if (next != lineCount && mounted) setState(() => lineCount = next);
-    // Keep the upstream visual caret at the end of the current line instead
-    // of exposing the same position as the next line's first position.
-    var selection = widget.controller.selection;
-    if (selection.isCollapsed &&
-        selection.affinity == TextAffinity.upstream &&
-        selection.extentOffset > 0 &&
-        selection.extentOffset <= widget.controller.text.length &&
-        widget.controller.text[selection.extentOffset - 1] == '\n') {
-      selection = TextSelection.collapsed(
-        offset: selection.extentOffset - 1,
-        affinity: TextAffinity.downstream,
-      );
-      widget.controller.selection = selection;
+    final incomingSelection = widget.controller.selection;
+    final pointer = _lastPrimaryPointer;
+    if (pointer != null && incomingSelection.isCollapsed) {
+      _normalizePointerAtLineBoundary(pointer, selection: incomingSelection);
     }
+    final selection = widget.controller.selection;
     if (selection != lastSelection) {
       lastSelection = selection;
       widget.onSelectionChanged?.call(selection);
     }
+  }
+
+  void _rememberPrimaryPointer(PointerDownEvent event) {
+    if (event.buttons & kPrimaryButton != 0) {
+      _lastPrimaryPointer = event.position;
+    }
+  }
+
+  void _handleEditorTap() {
+    widget.onTap?.call();
+  }
+
+  void _handlePrimaryPointerUp(PointerUpEvent event) {
+    _schedulePointerNormalization(event.position);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _lastPrimaryPointer = null;
+    });
+  }
+
+  void _schedulePointerNormalization(Offset globalPosition) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _normalizePointerAtLineBoundary(globalPosition);
+    });
+  }
+
+  void _normalizePointerAtLineBoundary(
+    Offset globalPosition, {
+    TextSelection? selection,
+  }) {
+    final editable = _findRenderEditable(context.findRenderObject());
+    if (editable == null || !editable.attached) return;
+    // A non-collapsed selection is normally a word selection (double-click)
+    // or a deliberate drag. Never rewrite it as a line-boundary selection.
+    // This keeps Flutter's native word-selection behavior intact.
+    final current = selection ?? widget.controller.selection;
+    if (!current.isCollapsed) return;
+
+    final text = widget.controller.text;
+    final local = editable.globalToLocal(globalPosition);
+    var lineStart = 0;
+    var lineEnd = text.indexOf('\n');
+    if (lineEnd == -1) lineEnd = text.length;
+    var bestDistance = double.infinity;
+    var scanStart = 0;
+    while (true) {
+      final scanEnd = text.indexOf('\n', scanStart);
+      final candidateEnd = scanEnd == -1 ? text.length : scanEnd;
+      final caret = editable.getLocalRectForCaret(
+        TextPosition(offset: scanStart),
+      );
+      final distance = (caret.center.dy - local.dy).abs();
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        lineStart = scanStart;
+        lineEnd = candidateEnd;
+      }
+      if (scanEnd == -1) break;
+      scanStart = scanEnd + 1;
+      if (scanStart > text.length) break;
+    }
+
+    var left = double.infinity;
+    var right = double.negativeInfinity;
+    for (var offset = lineStart; offset <= lineEnd; offset++) {
+      final caret = editable.getLocalRectForCaret(TextPosition(offset: offset));
+      left = left < caret.left ? left : caret.left;
+      right = right > caret.left ? right : caret.left;
+    }
+    if (!left.isFinite || !right.isFinite) return;
+
+    const tolerance = 4.0;
+    final target = local.dx < left - tolerance
+        ? lineEnd
+        : local.dx > right + tolerance
+        ? lineStart
+        : null;
+    if (target == null) return;
+
+    _lastPrimaryPointer = null;
+    widget.controller.selection = TextSelection.collapsed(offset: target);
+  }
+
+  RenderEditable? _findRenderEditable(RenderObject? root) {
+    if (root == null) return null;
+    if (root is RenderEditable) return root;
+    RenderEditable? result;
+    root.visitChildren((child) {
+      result ??= _findRenderEditable(child);
+    });
+    return result;
   }
 
   int _lineCount(String text) =>
@@ -160,29 +245,31 @@ class _LineNumberedEditorState extends State<LineNumberedEditor> {
                   onKeyEvent: widget.onKeyEvent,
                   child: ScrollConfiguration(
                     behavior: const _EditorScrollBehavior(),
-                    child: TextField(
-                      key: const ValueKey('code-editor-field'),
-                      controller: widget.controller,
-                      focusNode: widget.focusNode,
-                      scrollController: editorScrollController,
-                      onChanged: widget.onChanged,
-                      onTap: widget.onTap,
-                      expands: true,
-                      maxLines: null,
-                      minLines: null,
-                      // Use an RTL paragraph base so mouse and touch selections
-                      // follow the visual Arabic text across mixed-direction runs.
-                      // Horizontal keyboard movement is normalized by the parent
-                      // Focus handler before TextField processes the key.
-                      textDirection: TextDirection.rtl,
-                      textAlign: TextAlign.right,
-                      cursorColor: colors.primary,
-                      style: editorStyle,
-                      decoration: const InputDecoration(
-                        contentPadding: EdgeInsets.fromLTRB(18, 14, 18, 14),
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
+                    child: Listener(
+                      onPointerDown: _rememberPrimaryPointer,
+                      onPointerUp: _handlePrimaryPointerUp,
+                      child: TextField(
+                        key: const ValueKey('code-editor-field'),
+                        controller: widget.controller,
+                        focusNode: widget.focusNode,
+                        scrollController: editorScrollController,
+                        onChanged: widget.onChanged,
+                        onTap: _handleEditorTap,
+                        expands: true,
+                        maxLines: null,
+                        minLines: null,
+                        // One RTL paragraph base for Arabic and mixed content;
+                        // margin correction is based only on caret geometry.
+                        textDirection: TextDirection.rtl,
+                        textAlign: TextAlign.right,
+                        cursorColor: colors.primary,
+                        style: editorStyle,
+                        decoration: const InputDecoration(
+                          contentPadding: EdgeInsets.fromLTRB(18, 14, 18, 14),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                        ),
                       ),
                     ),
                   ),

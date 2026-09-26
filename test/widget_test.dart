@@ -602,15 +602,86 @@ void main() {
       ),
     );
 
-    textController.selection = const TextSelection.collapsed(
-      offset: 5,
-      affinity: TextAffinity.upstream,
-    );
+    final field = find.byKey(const ValueKey('code-editor-field'));
+    final topLeft = tester.getTopLeft(field);
+    await tester.tapAt(topLeft + const Offset(1, 10));
     await tester.pump();
 
     expect(textController.selection.extentOffset, 4);
-    expect(textController.selection.affinity, TextAffinity.downstream);
   });
+
+  testWidgets('maps mixed Arabic Latin and digit line margin to line end', (
+    tester,
+  ) async {
+    final textController = TextEditingController(
+      text: 'العربية English 42\nالسطر الثاني',
+    );
+    addTearDown(textController.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Material(
+          child: SizedBox(
+            width: 800,
+            height: 240,
+            child: LineNumberedEditor(controller: textController),
+          ),
+        ),
+      ),
+    );
+
+    final field = find.byKey(const ValueKey('code-editor-field'));
+    final topLeft = tester.getTopLeft(field);
+    await tester.tapAt(topLeft + const Offset(1, 10));
+    await tester.pump();
+
+    expect(
+      textController.selection.extentOffset,
+      textController.text.indexOf('\n'),
+    );
+  });
+
+  testWidgets(
+    'keeps double-click word selection independent from line margin',
+    (tester) async {
+      final textController = TextEditingController(
+        text: 'العربية English 42\nالسطر الثاني',
+      );
+      addTearDown(textController.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Material(
+            child: SizedBox(
+              width: 800,
+              height: 240,
+              child: LineNumberedEditor(controller: textController),
+            ),
+          ),
+        ),
+      );
+
+      final field = find.byKey(const ValueKey('code-editor-field'));
+      final topLeft = tester.getTopLeft(field);
+      final wordPoint = topLeft + const Offset(550, 10);
+      await tester.tapAt(wordPoint);
+      await tester.pump(const Duration(milliseconds: 80));
+      await tester.tapAt(wordPoint);
+      await tester.pump();
+
+      final lineBreak = textController.text.indexOf('\n');
+      expect(textController.selection.isCollapsed, isFalse);
+      expect(textController.selection.end, lessThanOrEqualTo(lineBreak));
+      expect(
+        textController.text
+            .substring(
+              textController.selection.start,
+              textController.selection.end,
+            )
+            .trim(),
+        isNotEmpty,
+      );
+    },
+  );
 
   testWidgets('moves arrows by visual direction in the Arabic editor', (
     tester,
