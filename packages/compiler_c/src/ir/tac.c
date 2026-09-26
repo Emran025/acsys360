@@ -62,6 +62,16 @@ static const char *expr_type(const CAstNode *n) {
   }
   return "غير معروف";
 }
+static const char *declared_type(const char *name) {
+  if (!g_root || !name) return NULL;
+  for (size_t i=0;i<g_root->data.program.declarations.count;i++) {
+    const CAstNode *d=g_root->data.program.declarations.items[i];
+    if (d->kind==C_AST_VARIABLE_DECLARATION && d->data.variable.type && d->data.variable.type->name)
+      for (size_t j=0;j<d->data.variable.name_count;j++)
+        if (!strcmp(d->data.variable.names[j],name)) return d->data.variable.type->name;
+  }
+  return NULL;
+}
 static char *expression(const CAstNode *node, CTacResult *out, size_t *temporary) {
   if (!node) return dup("0");
   if (node->kind == C_AST_LITERAL) return dup(node->data.literal.value);
@@ -144,7 +154,19 @@ static int statements(const CAstNodeList *list, CTacResult *out, size_t *temp, s
       }
       free(condition); continue;
     }
-    if (s->kind == C_AST_ASSIGNMENT) { char *v=expression(s->data.assignment.expression,out,temp); if (!v || !add(out,C_TAC_ASSIGN,s->data.assignment.name,v,NULL,NULL,expr_type(s->data.assignment.expression),0U,s)) { free(v); return 0; } free(v); continue; }
+    if (s->kind == C_AST_ASSIGNMENT) {
+      char *v=expression(s->data.assignment.expression,out,temp);
+      const char *target_type=declared_type(s->data.assignment.name);
+      if (!v) return 0;
+      if (target_type && !strcmp(target_type,"حقيقي") && v[0]=='t') {
+        for (size_t j=0;j<out->count;j++) if (out->items[j].result && !strcmp(out->items[j].result,v)) {
+          free(out->items[j].type); out->items[j].type=dup("حقيقي"); break;
+        }
+      }
+      if (!add(out,C_TAC_ASSIGN,s->data.assignment.name,v,NULL,NULL,
+               target_type && !strcmp(target_type,"حقيقي") ? "حقيقي" : expr_type(s->data.assignment.expression),0U,s)) { free(v); return 0; }
+      free(v); continue;
+    }
     if (s->kind == C_AST_READ) { if (!add(out,C_TAC_READ,s->data.access.name,NULL,NULL,NULL,"غير معروف",0U,s)) return 0; continue; }
     if (s->kind == C_AST_PRINT) { for (size_t j=0;j<s->data.print.values.count;j++) { char *v=expression(s->data.print.values.items[j],out,temp); if (!v || !add(out,C_TAC_PRINT,NULL,v,NULL,NULL,expr_type(s->data.print.values.items[j]),1U,s)) { free(v); return 0; } free(v); } continue; }
     if (s->kind == C_AST_CALL) { for (size_t j=0;j<s->data.call.arguments.count;j++) { char *v=expression(s->data.call.arguments.items[j],out,temp); if (!v || !add(out,C_TAC_PARAM,NULL,v,NULL,NULL,expr_type(s->data.call.arguments.items[j]),1U,s)) { free(v); return 0; } free(v); } if (!add(out,C_TAC_CALL,s->data.call.name,NULL,NULL,NULL,"إجراء",s->data.call.arguments.count,s)) return 0; continue; }

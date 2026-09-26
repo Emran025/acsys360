@@ -16,7 +16,9 @@ SRC
 "$compiler" --asm <"$tmp/input.arb" >"$tmp/input.asm"
 nasm -f elf64 "$tmp/input.asm" -o "$tmp/input.o"
 cc -no-pie "$tmp/input.o" -o "$tmp/input"
-test "$(printf '7\n2.5\n1\nعلي\n' | "$tmp/input" | tail -4)" = '7
+printf '7\n2.5\n1\nعلي\n' | "$tmp/input" >"$tmp/input.output"
+test "$(grep -c '"requestType":"input"' "$tmp/input.output")" -eq 4
+test "$(tail -4 "$tmp/input.output")" = '7
 2.5
 صح
 علي'
