@@ -199,12 +199,26 @@ class _EditorShellState extends State<EditorShell> {
     if (!mounted) return;
     final completer = pendingInput;
     final name = pendingInputNames.isEmpty ? null : pendingInputNames.first;
+    final value = name == null ? '' : (values[name] ?? '').trim();
+    final valid = switch (pendingInputType) {
+      'حرفي' => value.runes.length == 1,
+      'صحيح' => int.tryParse(value) != null,
+      'حقيقي' => double.tryParse(value) != null,
+      'منطقي' => value == 'صح' || value == 'خطأ',
+      _ => value.isNotEmpty,
+    };
+    if (!valid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('القيمة لا توافق النوع المطلوب: $pendingInputType')),
+      );
+      return;
+    }
     pendingInput = null;
     setState(() {
       pendingInputNames = const [];
       pendingInputType = 'غير معروف';
     });
-    completer?.complete(name == null ? '' : values[name] ?? '');
+    completer?.complete(value);
   }
 
   void _cancelPendingInputs() {

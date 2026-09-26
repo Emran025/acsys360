@@ -75,7 +75,7 @@ static const char *declared_type(const char *name) {
 static char *expression(const CAstNode *node, CTacResult *out, size_t *temporary) {
   if (!node) return dup("0");
   if (node->kind == C_AST_LITERAL) return dup(node->data.literal.value);
-  if (node->kind == C_AST_VARIABLE_REFERENCE) { const CAstNode *constant = constant_value(node->data.reference.name); if (constant && constant->kind == C_AST_LITERAL) return dup(constant->data.literal.value); return dup(node->data.reference.name); }
+  if (node->kind == C_AST_VARIABLE_REFERENCE) { const CAstNode *constant = constant_value(node->data.reference.name); if (constant) return expression(constant, out, temporary); return dup(node->data.reference.name); }
   if (node->kind == C_AST_BINARY || node->kind == C_AST_UNARY) {
     char *left = expression(node->kind == C_AST_BINARY ? node->data.binary.left : node->data.unary.operand, out, temporary);
     char *right = node->kind == C_AST_BINARY ? expression(node->data.binary.right, out, temporary) : NULL;

@@ -22,6 +22,18 @@ test "$(tail -4 "$tmp/input.output")" = '7
 2.5
 صح
 علي'
+cat >"$tmp/regressions.arb" <<'SRC'
+برنامج تراجعات؛ ثابت حد = 2 + 3؛ متغير صحيح_م: صحيح؛ متغير حقيقي_م: حقيقي؛ متغير سالب: حقيقي؛ متغير i: صحيح؛ { صحيح_م = 4؛ حقيقي_م = صحيح_م + 2.5؛ سالب = -2.5؛ اطبع(حد، حقيقي_م، سالب)؛ كرر(i = 3 الى 1 أضف -1) اطبع(i)؛ }.
+SRC
+"$compiler" --asm <"$tmp/regressions.arb" >"$tmp/regressions.asm"
+nasm -f elf64 "$tmp/regressions.asm" -o "$tmp/regressions.o"
+cc -no-pie "$tmp/regressions.o" -o "$tmp/regressions"
+test "$("$tmp/regressions")" = '5
+6.5
+-2.5
+3
+2
+1'
 python3 - "$compiler" <<'PY'
 import json, subprocess, sys
 source='برنامج حلقات؛ متغير س: صحيح؛ { كرر(س = 1 الى 3 أضف 1) اطبع(س)؛ }.'

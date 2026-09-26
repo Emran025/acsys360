@@ -107,7 +107,7 @@ full_block
   ;
 full_declarations : /* empty */ { $$.items = NULL; $$.count = 0; } | full_declarations full_declaration ';' { $$=$1; c_ast_list_append(&$$,$2); } ;
 full_declaration : full_const {$$=$1;} | full_type_decl {$$=$1;} | full_var {$$=$1;} | full_proc {$$=$1;} ;
-full_const : TOK_CONST TOK_IDENTIFIER '=' full_factor { $$=calloc(1,sizeof(CAstNode)); $$->kind=C_AST_CONSTANT_DECLARATION; $$->data.constant.name=$2; $$->data.constant.value=$4; } ;
+full_const : TOK_CONST TOK_IDENTIFIER '=' full_expr { $$=calloc(1,sizeof(CAstNode)); $$->kind=C_AST_CONSTANT_DECLARATION; $$->data.constant.name=$2; $$->data.constant.value=$4; } ;
 full_type_decl : TOK_TYPE TOK_IDENTIFIER '=' full_type { $$=calloc(1,sizeof(CAstNode)); $$->kind=C_AST_TYPE_DECLARATION; $$->data.type_declaration.name=$2; $$->data.type_declaration.type=$4; } ;
 full_var : TOK_VAR full_names ':' full_type { $$=calloc(1,sizeof(CAstNode)); $$->kind=C_AST_VARIABLE_DECLARATION; $$->data.variable.names=$2.items; $$->data.variable.name_count=$2.count; $$->data.variable.type=$4; } ;
 full_names : TOK_IDENTIFIER {$$.items=NULL;$$.count=0; char **p=realloc($$.items,sizeof(char*)); $$.items=p; $$.items[$$.count++]=$1;} | full_names ',' TOK_IDENTIFIER {$$=$1; char **p=realloc($$.items,($$.count+1)*sizeof(char*)); $$.items=p; $$.items[$$.count++]=$3;} ;
