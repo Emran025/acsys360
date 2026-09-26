@@ -94,6 +94,28 @@ Future<void> main(List<String> args) async {
     'symbol table is wrong',
   );
 
+  // The sourceTexts map is deliberately ordered with a distractor first, and
+  // a value contains text that resembles an entryPath property. The compiler
+  // must match actual JSON keys rather than the first textual occurrence.
+  final reordered = await run(executable, <String, dynamic>{
+    'rootPath': 'text "entryPath": "wrong.arb"',
+    'sourceTexts': <String, String>{
+      'other.arb': 'برنامج مشتت؛ { اطبع(99)؛ }.',
+      'main.arb': 'برنامج مختار؛ { اطبع(42)؛ }.',
+    },
+    'entryPath': 'main.arb',
+    'protocolVersion': '0.5.0',
+    'sourcePaths': ['other.arb', 'main.arb'],
+    'mode': 'project',
+    'execute': true,
+  });
+  check(reordered.$1 == 0 && reordered.$2['success'] == true,
+      'reordered source request should compile');
+  check(
+    listEquals(reordered.$2['executionOutput'], ['42']),
+    'compiler selected the wrong sourceTexts entry',
+  );
+
   final power = await run(
     executable,
     requestFor('برنامج قوة؛ { اطبع(2 ^ 3)؛ اطبع(9 ^ 0.5)؛ }.'),

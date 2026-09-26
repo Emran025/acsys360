@@ -94,152 +94,215 @@ char *protocol_strdup(const char *src) {
   return dst;
 }
 
-char *protocol_extract_string_value(const char *payload, const char *key) {
-  if (!payload || !key) return NULL;
-  const char *p = strstr(payload, key);
-  if (!p) return NULL;
-  p += strlen(key);
-  while (*p && *p != ':') p++;
-  if (!*p) return NULL;
-  p++;
-  while (*p && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')) p++;
-  if (*p != '"') return NULL;
-  p++;
-  size_t cap = 256;
-  size_t len = 0;
-  char *buf = malloc(cap);
-  if (!buf) return NULL;
-  while (*p && *p != '"') {
-    char ch = *p++;
-    if (ch == '\\' && *p) {
-      char esc = *p++;
-      switch (esc) {
-        case 'n': ch = '\n'; break;
-        case 'r': ch = '\r'; break;
-        case 't': ch = '\t'; break;
-        case '\\': ch = '\\'; break;
-        case '"': ch = '"'; break;
-        default: ch = esc; break;
-      }
-    }
-    if (len + 1 >= cap) {
-      cap *= 2;
-      char *nb = realloc(buf, cap);
-      if (!nb) { free(buf); return NULL; }
-      buf = nb;
-    }
-    buf[len++] = ch;
+static void json_skip_space(const char **cursor) {
+  while (**cursor == ' ' || **cursor == '\t' || **cursor == '\n' || **cursor == '\r') (*cursor)++;
+}
+
+static int json_hex_digit(char c) {
+  if (c >= '0' && c <= '9') return c - '0';
+  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+  if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+  return -1;
+}
+
+static int json_append_decoded(JsonBuffer *b, unsigned int cp) {
+  if (cp < 0x80) json_buf_append_char(b, (char)cp);
+  else if (cp < 0x800) {
+    json_buf_append_char(b, (char)(0xC0 | (cp >> 6)));
+    json_buf_append_char(b, (char)(0x80 | (cp & 0x3F)));
+  } else {
+    json_buf_append_char(b, (char)(0xE0 | (cp >> 12)));
+    json_buf_append_char(b, (char)(0x80 | ((cp >> 6) & 0x3F)));
+    json_buf_append_char(b, (char)(0x80 | (cp & 0x3F)));
   }
-  buf[len] = '\0';
-  return buf;
+  return 1;
+}
+
+static char *json_parse_string(const char **cursor) {
+  if (!cursor || !*cursor || **cursor != '"') return NULL;
+  (*cursor)++;
+  JsonBuffer b;
+  json_buf_init(&b);
+  while (**cursor && **cursor != '"') {
+    unsigned char ch = (unsigned char)*(*cursor)++;
+    if (ch != '\\') {
+      json_buf_append_char(&b, (char)ch);
+      continue;
+    }
+    ch = (unsigned char)*(*cursor)++;
+    switch (ch) {
+      case '"': json_buf_append_char(&b, '"'); break;
+      case '\\': json_buf_append_char(&b, '\\'); break;
+      case '/': json_buf_append_char(&b, '/'); break;
+      case 'b': json_buf_append_char(&b, '\b'); break;
+      case 'f': json_buf_append_char(&b, '\f'); break;
+      case 'n': json_buf_append_char(&b, '\n'); break;
+      case 'r': json_buf_append_char(&b, '\r'); break;
+      case 't': json_buf_append_char(&b, '\t'); break;
+      case 'u': {
+        unsigned int cp = 0;
+        for (int i = 0; i < 4; i++) {
+          int digit = json_hex_digit((*cursor)[i]);
+          if (digit < 0) { free(b.data); return NULL; }
+          cp = (cp << 4) | (unsigned int)digit;
+        }
+        *cursor += 4;
+        json_append_decoded(&b, cp);
+        break;
+      }
+      default: free(b.data); return NULL;
+    }
+  }
+  if (**cursor != '"') { free(b.data); return NULL; }
+  (*cursor)++;
+  return b.data;
+}
+
+static int json_skip_value(const char **cursor);
+
+static int json_skip_container(const char **cursor, char open, char close) {
+  if (**cursor != open) return 0;
+  (*cursor)++;
+  json_skip_space(cursor);
+  if (**cursor == close) { (*cursor)++; return 1; }
+  while (**cursor) {
+    if (open == '{') {
+      char *key = json_parse_string(cursor);
+      free(key);
+      if (!key) return 0;
+      json_skip_space(cursor);
+      if (**cursor != ':') return 0;
+      (*cursor)++;
+    }
+    json_skip_space(cursor);
+    if (!json_skip_value(cursor)) return 0;
+    json_skip_space(cursor);
+    if (**cursor == close) { (*cursor)++; return 1; }
+    if (**cursor != ',') return 0;
+    (*cursor)++;
+    json_skip_space(cursor);
+  }
+  return 0;
+}
+
+static int json_skip_value(const char **cursor) {
+  json_skip_space(cursor);
+  if (**cursor == '"') {
+    char *value = json_parse_string(cursor);
+    free(value);
+    return value != NULL;
+  }
+  if (**cursor == '{') return json_skip_container(cursor, '{', '}');
+  if (**cursor == '[') return json_skip_container(cursor, '[', ']');
+  if (**cursor == '\0') return 0;
+  while (**cursor && !strchr(" \t\n\r,]}", **cursor)) (*cursor)++;
+  return 1;
+}
+
+static char *json_find_string_property(const char *payload, const char *wanted_key) {
+  if (!payload || !wanted_key) return NULL;
+  const char *cursor = payload;
+  json_skip_space(&cursor);
+  if (*cursor != '{') return NULL;
+  cursor++;
+  json_skip_space(&cursor);
+  while (*cursor && *cursor != '}') {
+    char *key = json_parse_string(&cursor);
+    if (!key) return NULL;
+    json_skip_space(&cursor);
+    if (*cursor != ':') { free(key); return NULL; }
+    cursor++;
+    json_skip_space(&cursor);
+    if (strcmp(key, wanted_key) == 0 && *cursor == '"') {
+      free(key);
+      return json_parse_string(&cursor);
+    }
+    free(key);
+    if (!json_skip_value(&cursor)) return NULL;
+    json_skip_space(&cursor);
+    if (*cursor == ',') { cursor++; json_skip_space(&cursor); }
+    else if (*cursor != '}') return NULL;
+  }
+  return NULL;
+}
+
+char *protocol_extract_string_value(const char *payload, const char *key) {
+  if (!key) return NULL;
+  size_t length = strlen(key);
+  if (length >= 2 && key[0] == '"' && key[length - 1] == '"') {
+    char *plain_key = malloc(length - 1);
+    if (!plain_key) return NULL;
+    memcpy(plain_key, key + 1, length - 2);
+    plain_key[length - 2] = '\0';
+    char *value = json_find_string_property(payload, plain_key);
+    free(plain_key);
+    return value;
+  }
+  return json_find_string_property(payload, key);
 }
 
 char *protocol_extract_source_code(const char *payload) {
   if (!payload) return NULL;
-  if (strstr(payload, "\"sourceTexts\"") == NULL) {
+  char *entry_path = protocol_extract_string_value(payload, "\"entryPath\"");
+  int found_source_texts = 0;
+  const char *cursor = payload;
+  json_skip_space(&cursor);
+  if (*cursor != '{') goto raw_payload;
+  cursor++;
+  json_skip_space(&cursor);
+  while (*cursor && *cursor != '}') {
+    char *key = json_parse_string(&cursor);
+    if (!key) break;
+    json_skip_space(&cursor);
+    if (*cursor != ':') { free(key); break; }
+    cursor++;
+    json_skip_space(&cursor);
+    if (strcmp(key, "sourceTexts") == 0 && *cursor == '{') {
+      found_source_texts = 1;
+      cursor++;
+      json_skip_space(&cursor);
+      while (*cursor && *cursor != '}') {
+        char *source_path = json_parse_string(&cursor);
+        if (!source_path) break;
+        json_skip_space(&cursor);
+        if (*cursor != ':') { free(source_path); break; }
+        cursor++;
+        json_skip_space(&cursor);
+        char *source = (*cursor == '"') ? json_parse_string(&cursor) : NULL;
+        if (source && (!entry_path || strcmp(source_path, entry_path) == 0)) {
+          strncpy(g_source_path_storage, source_path, sizeof(g_source_path_storage) - 1);
+          g_source_path_storage[sizeof(g_source_path_storage) - 1] = '\0';
+          g_current_source_path = g_source_path_storage;
+          free(source_path);
+          free(entry_path);
+          return source;
+        }
+        free(source_path);
+        free(source);
+        json_skip_space(&cursor);
+        if (*cursor == ',') { cursor++; json_skip_space(&cursor); }
+        else if (*cursor != '}') break;
+      }
+      break;
+    }
+    free(key);
+    if (!json_skip_value(&cursor)) break;
+    json_skip_space(&cursor);
+    if (*cursor == ',') { cursor++; json_skip_space(&cursor); }
+    else if (*cursor != '}') break;
+  }
+  if (!found_source_texts) goto raw_payload;
+  free(entry_path);
+  return NULL;
+
+raw_payload:
+  free(entry_path);
+  {
     size_t len = strlen(payload);
     char *res = malloc(len + 1);
     if (res) memcpy(res, payload, len + 1);
     return res;
   }
-  const char *p = strstr(payload, "\"sourceTexts\"");
-  if (!p) return NULL;
-
-  p = strchr(p, '{');
-  if (!p) return NULL;
-  p++;
-
-  while (*p && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')) p++;
-  if (*p != '"') return NULL;
-  p++; /* skip opening quote of key */
-
-  /* Extract key as current_source_path */
-  size_t ki = 0;
-  while (*p && *p != '"' && ki < sizeof(g_source_path_storage) - 1) {
-    if (*p == '\\' && *(p + 1)) {
-      p++;
-      if (*p == '\\') g_source_path_storage[ki++] = '\\';
-      else if (*p == '/') g_source_path_storage[ki++] = '/';
-      else g_source_path_storage[ki++] = *p;
-      p++;
-    } else {
-      g_source_path_storage[ki++] = *p++;
-    }
-  }
-  g_source_path_storage[ki] = '\0';
-  if (*p == '"') p++;
-  g_current_source_path = g_source_path_storage;
-
-  while (*p && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')) p++;
-  if (*p != ':') return NULL;
-  p++;
-
-  while (*p && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')) p++;
-  if (*p != '"') return NULL;
-  p++;
-
-  size_t cap = 4096;
-  size_t len = 0;
-  char *buf = malloc(cap);
-  if (!buf) return NULL;
-  while (*p && *p != '"') {
-    char ch = *p++;
-    if (ch == '\\' && *p) {
-      char esc = *p++;
-      switch (esc) {
-        case 'n': ch = '\n'; break;
-        case 'r': ch = '\r'; break;
-        case 't': ch = '\t'; break;
-        case '"': ch = '"'; break;
-        case '\\': ch = '\\'; break;
-        case 'u': {
-          if (p[0] && p[1] && p[2] && p[3]) {
-            unsigned int cp = 0;
-            for (int i = 0; i < 4; i++) {
-              char hc = p[i];
-              cp <<= 4;
-              if (hc >= '0' && hc <= '9') cp |= (unsigned)(hc - '0');
-              else if (hc >= 'a' && hc <= 'f') cp |= (unsigned)(hc - 'a' + 10);
-              else if (hc >= 'A' && hc <= 'F') cp |= (unsigned)(hc - 'A' + 10);
-            }
-            p += 4;
-            char utf8[4];
-            int nb = 0;
-            if (cp < 0x80) {
-              utf8[nb++] = (char)cp;
-            } else if (cp < 0x800) {
-              utf8[nb++] = (char)(0xC0 | (cp >> 6));
-              utf8[nb++] = (char)(0x80 | (cp & 0x3F));
-            } else {
-              utf8[nb++] = (char)(0xE0 | (cp >> 12));
-              utf8[nb++] = (char)(0x80 | ((cp >> 6) & 0x3F));
-              utf8[nb++] = (char)(0x80 | (cp & 0x3F));
-            }
-            if (len + nb >= cap) {
-              cap *= 2;
-              char *nb2 = realloc(buf, cap);
-              if (!nb2) { free(buf); return NULL; }
-              buf = nb2;
-            }
-            for (int i = 0; i < nb; i++) buf[len++] = utf8[i];
-            continue;
-          }
-          ch = 'u';
-          break;
-        }
-        default: ch = esc; break;
-      }
-    }
-    if (len + 1 >= cap) {
-      cap *= 2;
-      char *nb = realloc(buf, cap);
-      if (!nb) { free(buf); return NULL; }
-      buf = nb;
-    }
-    buf[len++] = ch;
-  }
-  buf[len] = '\0';
-  return buf;
 }
 
 static void serialize_type(JsonBuffer *b, const CTypeSpec *type) {
