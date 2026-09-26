@@ -163,7 +163,7 @@ class ArabicCodeController extends TextEditingController {
     }
     if (token.role != null) {
       return switch (token.role!) {
-        SourceTokenRole.constant => AppTheme.syntaxNumber(colors),
+        SourceTokenRole.constant => colors.secondary,
         SourceTokenRole.type => AppTheme.syntaxType(colors),
         SourceTokenRole.procedure => AppTheme.syntaxDeclaration(colors),
         SourceTokenRole.parameter => AppTheme.syntaxModifier(colors),

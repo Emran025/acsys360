@@ -465,12 +465,12 @@ class _EditorShellState extends State<EditorShell> {
     final replacedText = oldText.substring(start, end);
     final nextText = '$beforeText$value${oldText.substring(end)}';
     _editGeneration++;
+    widget.controller.edit(
+      TextEdit(offset: start, before: replacedText, after: value),
+    );
     textController.value = TextEditingValue(
       text: nextText,
       selection: TextSelection.collapsed(offset: start + value.length),
-    );
-    widget.controller.edit(
-      TextEdit(offset: start, before: replacedText, after: value),
     );
   }
 
