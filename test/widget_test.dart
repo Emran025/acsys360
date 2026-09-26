@@ -135,7 +135,7 @@ void main() {
     expect(find.byTooltip('نسخ'), findsOneWidget);
     expect(
       tester.getCenter(executionStage).dx,
-      lessThan(tester.getCenter(find.text('Artifact')).dx),
+      greaterThan(tester.getCenter(find.text('Artifact')).dx),
     );
   });
 
