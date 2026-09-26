@@ -23,7 +23,7 @@ typedef struct { char **items; size_t count, capacity; } Strings;
 static char *dup(const char *s){size_t n=strlen(s?s:"");char *p=malloc(n+1);if(p)memcpy(p,s?s:"",n+1);return p;}
 static int append(char **text,size_t *len,size_t *cap,const char *fmt,...){va_list ap,copy;va_start(ap,fmt);va_copy(copy,ap);int n=vsnprintf(NULL,0,fmt,copy);va_end(copy);if(n<0){va_end(ap);return 0;}size_t need=*len+(size_t)n+1;if(need>*cap){size_t next=*cap?*cap:2048;while(next<need)next*=2;char *p=realloc(*text,next);if(!p){va_end(ap);return 0;}*text=p;*cap=next;}vsnprintf(*text+*len,*cap-*len,fmt,ap);va_end(ap);*len+=(size_t)n;return 1;}
 static void diag(CAssemblyResult *r,const CTacInstruction *i,const char *fmt,...){char b[512];va_list ap;va_start(ap,fmt);vsnprintf(b,sizeof b,fmt,ap);va_end(ap);size_t n=r->diagnostic_count;r->diagnostics=realloc(r->diagnostics,(n+1)*sizeof(*r->diagnostics));r->diagnostic_offsets=realloc(r->diagnostic_offsets,(n+1)*sizeof(*r->diagnostic_offsets));r->diagnostic_lines=realloc(r->diagnostic_lines,(n+1)*sizeof(*r->diagnostic_lines));r->diagnostic_columns=realloc(r->diagnostic_columns,(n+1)*sizeof(*r->diagnostic_columns));r->diagnostic_lengths=realloc(r->diagnostic_lengths,(n+1)*sizeof(*r->diagnostic_lengths));r->diagnostics[n]=dup(b);r->diagnostic_offsets[n]=i?i->offset:0;r->diagnostic_lines[n]=i&&i->line?i->line:1;r->diagnostic_columns[n]=i&&i->column?i->column:1;r->diagnostic_lengths[n]=1;r->diagnostic_count++;}
-static int slot(const CSemanticResult *s,const char *name){for(size_t i=0;i<s->count;i++)if(!strcmp(s->items[i].name,name))return (int)((i+1)*8);if(name&&name[0]=='t'&&name[1]>='0'&&name[1]<='9')return (int)((s->count+1+strtoul(name+1,NULL,10))*8);return 0;}
+static int slot(const CSemanticResult *s,const char *name){if(name&&name[0]=='$'&&name[1]=='t'&&name[2]>='0'&&name[2]<='9')return (int)((s->count+1+strtoul(name+2,NULL,10))*8);for(size_t i=0;i<s->count;i++)if(!strcmp(s->items[i].name,name))return (int)((i+1)*8);return 0;}
 static const char *type_of(const CSemanticResult *s,const char *name,const char *hint){if(hint&&strcmp(hint,"غير معروف")&&strcmp(hint,""))return hint;for(size_t i=0;i<s->count;i++)if(!strcmp(s->items[i].name,name))return s->items[i].type;return NULL;}
 static int quoted(const char *s){
   if (!s || !s[0]) return 0;
@@ -59,7 +59,7 @@ static int real_value(const CTacResult *t,const CSemanticResult *s,const char *v
   for (size_t i=0;i<t->count;i++) if (t->items[i].result && !strcmp(t->items[i].result,v)) return t->items[i].type && !strcmp(t->items[i].type,"حقيقي");
   return 0;
 }
-static int max_temp(const CTacResult *t){int max=-1;for(size_t i=0;i<t->count;i++)if(t->items[i].result&&t->items[i].result[0]=='t')max=max>(int)strtoul(t->items[i].result+1,NULL,10)?max:(int)strtoul(t->items[i].result+1,NULL,10);return max;}
+static int max_temp(const CTacResult *t){int max=-1;for(size_t i=0;i<t->count;i++)if(t->items[i].result&&t->items[i].result[0]=='$'&&t->items[i].result[1]=='t')max=max>(int)strtoul(t->items[i].result+2,NULL,10)?max:(int)strtoul(t->items[i].result+2,NULL,10);return max;}
 static int emit_bytes(char **text,size_t *len,size_t *cap,const char *v) {
   if (!append(text,len,cap,"db ")) return 0;
   for (size_t i=0; v && v[i]; i++) if (!append(text,len,cap,"%s%u", i ? ", " : "", (unsigned char)v[i])) return 0;

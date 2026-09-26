@@ -39,8 +39,8 @@ int main(void) {
   const int generated = c_generate_tac(program, &result);
   const char *expected[] = {
       "ALLOC x, صحيح",
-      "t0 = 1 + 2",
-      "x = t0",
+      "$t0 = 1 + 2",
+      "x = $t0",
       "PRINT x",
   };
   int success = generated && result.count == sizeof(expected) / sizeof(expected[0]);

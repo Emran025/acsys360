@@ -232,6 +232,21 @@ Future<void> main(List<String> args) async {
     'native assembly lost fmt_real',
   );
 
+  final emptyNative = await run(
+    executable,
+    requestFor('برنامج فارغ؛ { }.', target: 'dart-native', execute: false),
+  );
+  check(
+    emptyNative.$1 == 0 && emptyNative.$2['success'] == true,
+    'empty program should compile natively',
+  );
+  check(
+    (emptyNative.$2['threeAddressCode'] as List).isEmpty &&
+        (emptyNative.$2['assembly'] as String).contains('main:') &&
+        (emptyNative.$2['assembly'] as String).contains('    ret'),
+    'empty program should produce a valid Assembly entry point',
+  );
+
   final artifactDirectory = await Directory.systemTemp.createTemp(
     'arabicc-protocol-artifact-',
   );
@@ -239,7 +254,8 @@ Future<void> main(List<String> args) async {
     final artifact = await run(
       executable,
       requestFor(
-        'برنامج artifact؛ { اطبع(7)؛ }.',
+        'برنامج artifact؛ متغير t0: صحيح؛ متغير x: صحيح؛ '
+        '{ t0 = 7؛ x = 1 + 2؛ اطبع(t0)؛ }.',
         target: 'dart-native',
         rootPath: artifactDirectory.path,
         artifactDirectory:
@@ -264,7 +280,7 @@ Future<void> main(List<String> args) async {
     final artifactExecutable = (artifacts as List).last as String;
     final execution = await Process.run(artifactExecutable, const []);
     check(
-      execution.exitCode == 0,
+      execution.exitCode == 0 && execution.stdout.trim() == '7',
       'generated artifact failed: ${execution.stderr}',
     );
   } finally {

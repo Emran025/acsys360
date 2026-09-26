@@ -79,7 +79,7 @@ static char *expression(const CAstNode *node, CTacResult *out, size_t *temporary
   if (node->kind == C_AST_BINARY || node->kind == C_AST_UNARY) {
     char *left = expression(node->kind == C_AST_BINARY ? node->data.binary.left : node->data.unary.operand, out, temporary);
     char *right = node->kind == C_AST_BINARY ? expression(node->data.binary.right, out, temporary) : NULL;
-    char name[32]; snprintf(name, sizeof(name), "t%zu", (*temporary)++);
+    char name[32]; snprintf(name, sizeof(name), "$t%zu", (*temporary)++);
     int ok = add(out, node->kind == C_AST_BINARY ? C_TAC_BINARY : C_TAC_UNARY, name, left,
                  node->kind == C_AST_BINARY ? node->data.binary.operator : node->data.unary.operator,
                  right, expr_type(node), 0U, node);
@@ -120,7 +120,7 @@ static int statements(const CAstNodeList *list, CTacResult *out, size_t *temp, s
                                              step_node->data.literal.value &&
                                              step_node->data.literal.value[0] == '-'));
       const char *bound_operator = descending ? ">=" : "<=";
-      char condition_name[32]; snprintf(condition_name, sizeof(condition_name), "t%zu", (*temp)++);
+      char condition_name[32]; snprintf(condition_name, sizeof(condition_name), "$t%zu", (*temp)++);
       if (!limit || !current || !add(out, C_TAC_BINARY, condition_name, current, bound_operator, limit,
                                       "منطقي", 0U, s) ||
           !add(out, C_TAC_BRANCH, done, condition_name, NULL, head, "منطقي", 0U, s) ||
@@ -130,7 +130,7 @@ static int statements(const CAstNodeList *list, CTacResult *out, size_t *temp, s
       free(limit); free(current);
       char *step = s->data.repeat.step ? expression(s->data.repeat.step, out, temp) : dup("1");
       char *value = dup(s->data.repeat.variable);
-      char increment_name[32]; snprintf(increment_name, sizeof(increment_name), "t%zu", (*temp)++);
+      char increment_name[32]; snprintf(increment_name, sizeof(increment_name), "$t%zu", (*temp)++);
       if (!step || !value || !add(out, C_TAC_BINARY, increment_name, value, "+", step,
                                   "صحيح", 0U, s) ||
           !add(out, C_TAC_ASSIGN, s->data.repeat.variable, increment_name, NULL, NULL,

@@ -10,8 +10,8 @@ int main(void) {
   CTacResult tac = {0}; tac.capacity = 16; tac.items = calloc(tac.capacity, sizeof(*tac.items));
   tac.items[tac.count++] = ins(C_TAC_ALLOC, "x", NULL, NULL, NULL, "صحيح");
   tac.items[tac.count++] = ins(C_TAC_ASSIGN, "x", "8", NULL, NULL, "صحيح");
-  tac.items[tac.count++] = ins(C_TAC_BINARY, "t0", "x", ">", "5", "منطقي");
-  tac.items[tac.count++] = ins(C_TAC_BRANCH, "L0", "t0", NULL, "L1", "منطقي");
+  tac.items[tac.count++] = ins(C_TAC_BINARY, "$t0", "x", ">", "5", "منطقي");
+  tac.items[tac.count++] = ins(C_TAC_BRANCH, "L0", "$t0", NULL, "L1", "منطقي");
   tac.items[tac.count++] = ins(C_TAC_PRINT, NULL, "\"كبير\"", NULL, NULL, "خيط_رمزي");
   tac.items[tac.count++] = ins(C_TAC_JUMP, "L1", NULL, NULL, NULL, "");
   tac.items[tac.count++] = ins(C_TAC_LABEL, "L0", NULL, NULL, NULL, "");
@@ -25,7 +25,16 @@ int main(void) {
        strstr(assembly.text, "L0:") && strstr(assembly.text, "fmt_str") &&
        strstr(assembly.text, "cmp rax, 0");
   if (!ok) fprintf(stderr, "3AC NASM golden output is incomplete\n%s\n", assembly.text ? assembly.text : "<null>");
-  c_assembly_result_free(&assembly); c_tac_result_free(&tac);
+  CTacResult empty_tac = {0};
+  CSemanticResult empty_semantic = {0};
+  CAssemblyResult empty_assembly = {0};
+  const int empty_ok = c_generate_nasm_x86_64(&empty_tac, &empty_semantic, &empty_assembly) &&
+                       empty_assembly.text && strstr(empty_assembly.text, "main:") &&
+                       strstr(empty_assembly.text, "    ret");
+  if (!empty_ok) fprintf(stderr, "empty TAC did not produce a valid Assembly entry point\n%s\n",
+                         empty_assembly.text ? empty_assembly.text : "<null>");
+  ok = ok && empty_ok;
+  c_assembly_result_free(&empty_assembly); c_assembly_result_free(&assembly); c_tac_result_free(&tac);
   free(semantic.items[0].name); free(semantic.items[0].type); free(semantic.items);
   return ok ? 0 : 1;
 }
