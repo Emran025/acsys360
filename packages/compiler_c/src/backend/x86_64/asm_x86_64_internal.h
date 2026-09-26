@@ -22,6 +22,8 @@ int c_asm_slot_for(const CSemanticResult *semantic, const char *name);
 const char *c_asm_type_for(const CSemanticResult *semantic, const char *name);
 const CAstNode *c_asm_constant_value_for(const CAsmContext *context,
                                          const char *name);
+void c_asm_release_literals(CAsmContext *context, const char **strings,
+                            const char **real_values);
 
 int c_asm_text_index(const char **values, size_t count, const char *value);
 int c_asm_real_literal_index(const char **values, size_t count,
@@ -56,6 +58,12 @@ int c_asm_emit_real_expression(const CAsmContext *context,
                                const CSemanticResult *semantic,
                                const char **real_values, size_t real_count,
                                char **text, size_t *length, size_t *capacity);
+
+int c_asm_emit_program_statements(const CAsmContext *context,
+                                  const CSemanticResult *semantic,
+                                  CAssemblyResult *result,
+                                  size_t frame_size,
+                                  size_t *length, size_t *capacity);
 
 int c_asm_emit_native_statements(const CAsmContext *context,
                                  const CAstNodeList *statements,

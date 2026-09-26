@@ -36,7 +36,7 @@
 
 ## قواعد مهمة
 
-يجب تشغيل `arabicc` من خلال repository أو data source في التطبيق، وليس من Widget مباشرة. يجب أن تمر نتائج المترجم عبر `compiler_contracts` قبل تحويلها إلى كيانات domain. لا يجوز اعتبار النص الناتج من `asm_x86_64.c` executable binary دون assembler فعلي. كما لا يجوز اعتبار وجود `file_picker` دليلًا على اكتمال workspace؛ اكتمال workspace ناتج عن repository والكيانات والاختبارات معًا.
+يجب تشغيل `arabicc` من خلال repository أو data source في التطبيق، وليس من Widget مباشرة. يجب أن تمر نتائج المترجم عبر `compiler_contracts` قبل تحويلها إلى كيانات domain. لا يجوز اعتبار النص الناتج من `src/backend/x86_64/asm_x86_64.c` ومكوّناته executable binary دون assembler فعلي. كما لا يجوز اعتبار وجود `file_picker` دليلًا على اكتمال workspace؛ اكتمال workspace ناتج عن repository والكيانات والاختبارات معًا.
 
 ## References
 

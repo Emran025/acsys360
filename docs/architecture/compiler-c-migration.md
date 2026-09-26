@@ -30,7 +30,7 @@
 | `ProjectCompiler` | `src/protocol.c` و`src/main.c` | قراءة الطلب، source paths، entry path، وتجميع الاستجابة |
 | `ThreeAddressGenerator` | `src/protocol.c` | TAC النصي ضمن response |
 | `TypedIrProgram` | `src/protocol.c` | intermediate representation ضمن response |
-| `AssemblyGenerator` | `asm_x86_64.c/.h` | Assembly x86-64 محدد الهدف مع labels وstack layout |
+| `AssemblyGenerator` | `src/backend/x86_64/asm_x86_64.c` و`include/asm_x86_64.h` | Assembly x86-64 محدد الهدف مع labels وstack layout |
 | `Interpreter` | `runtime.c/.h` | execution output وحد أقصى للخطوات |
 | `LanguageAssist` | `src/protocol.c` و`src/main.c` | completion/help وreplace ranges |
 | protocol models | `src/protocol.c`, `include/protocol.h` | parsing وserialization للعقد دون اعتماد Flutter أو Dart |

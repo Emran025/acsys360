@@ -69,7 +69,7 @@ int c_generate_nasm_x86_64(const CAstNode *program,
               "fmt_read_char: db \"%%255s\", 0\n"
               "fmt_read_str: db \"%%255s\", 0\n"))
   {
-    free(strings);
+    c_asm_release_literals(&context, strings, real_values);
     c_assembly_result_free(result);
     return 0;
   }
@@ -77,13 +77,13 @@ int c_generate_nasm_x86_64(const CAstNode *program,
   {
     if (!c_asm_append(&result->text, &length, &capacity, "str%zu: ", i))
     {
-      free(strings);
+      c_asm_release_literals(&context, strings, real_values);
       c_assembly_result_free(result);
       return 0;
     }
     if (!c_asm_emit_nasm_string(&result->text, &length, &capacity, strings[i]))
     {
-      free(strings);
+      c_asm_release_literals(&context, strings, real_values);
       c_assembly_result_free(result);
       return 0;
     }
@@ -98,8 +98,7 @@ int c_generate_nasm_x86_64(const CAstNode *program,
         !c_asm_append(&result->text, &length, &capacity,
                 "real%zu: dq 0x%" PRIx64 "\n", i, bits))
     {
-      free(strings);
-      free(real_values);
+      c_asm_release_literals(&context, strings, real_values);
       c_assembly_result_free(result);
       return 0;
     }
@@ -109,11 +108,7 @@ int c_generate_nasm_x86_64(const CAstNode *program,
     if (!c_asm_append(&result->text, &length, &capacity, "text%zu: ", i) ||
         !c_asm_emit_nasm_string(&result->text, &length, &capacity, context.text_values[i]))
     {
-      free(strings);
-      free(real_values);
-      free(context.text_values);
-      context.text_values = NULL;
-      context.text_count = 0;
+      c_asm_release_literals(&context, strings, real_values);
       c_assembly_result_free(result);
       return 0;
     }
@@ -135,11 +130,7 @@ int c_generate_nasm_x86_64(const CAstNode *program,
                 "fmt_input_request%zu: ", request_label_index) ||
         !c_asm_emit_nasm_bytes(&result->text, &length, &capacity, request_json))
     {
-      free(strings);
-      free(real_values);
-      free(context.text_values);
-      context.text_values = NULL;
-      context.text_count = 0;
+      c_asm_release_literals(&context, strings, real_values);
       c_assembly_result_free(result);
       return 0;
     }
@@ -150,321 +141,19 @@ int c_generate_nasm_x86_64(const CAstNode *program,
   if (!c_asm_emit_prologue(&result->text, &length, &capacity, frame_size,
                            read_count))
   {
-    free(strings);
+    c_asm_release_literals(&context, strings, real_values);
     c_assembly_result_free(result);
     return 0;
   }
 
   /* Statements */
-  size_t read_index = 0U;
-  size_t boolean_print_index = 0U;
-  size_t if_label_index = 0U;
-  for (size_t index = 0U; index < program->data.program.statements.count; index++)
+  if (!c_asm_emit_program_statements(&context, semantic, result, frame_size,
+                                        &length, &capacity))
   {
-    const CAstNode *statement = program->data.program.statements.items[index];
-    if (statement->kind == C_AST_IF)
-    {
-      const size_t label = if_label_index++;
-      if (!c_asm_emit_expression(&context, statement->data.conditional.condition, semantic,
-                           &result->text, &length, &capacity) ||
-          !c_asm_append(&result->text, &length, &capacity,
-                  "    cmp rax, 0\n    je if_else%zu\n", label) ||
-          !c_asm_emit_native_statements(&context, &statement->data.conditional.then_branch,
-                                  semantic, &result->text, &length, &capacity,
-                                  &if_label_index))
-      {
-        (void)c_asm_diagnostic_at(result, statement,
-                            "تعذر تحويل الفرع الشرطي إلى NASM");
-        free(strings);
-        return 1;
-      }
-      if (!c_asm_append(&result->text, &length, &capacity,
-                  "    jmp if_done%zu\nif_else%zu:\n", label, label) ||
-          !c_asm_emit_native_statements(&context, &statement->data.conditional.else_branch,
-                                  semantic, &result->text, &length, &capacity,
-                                  &if_label_index) ||
-          !c_asm_append(&result->text, &length, &capacity, "if_done%zu:\n", label))
-      {
-        (void)c_asm_diagnostic_at(result, statement,
-                            "تعذر تحويل الفرع الشرطي إلى NASM");
-        free(strings);
-        return 1;
-      }
-      continue;
-    }
-    if (statement->kind == C_AST_ASSIGNMENT)
-    {
-      const char *target_type = c_asm_type_for(semantic, statement->data.assignment.name);
-      const int is_real = target_type && strcmp(target_type, "حقيقي") == 0;
-      const int emitted = is_real
-                              ? c_asm_emit_real_expression(&context, statement->data.assignment.expression, semantic,
-                                                     real_values, real_count, &result->text,
-                                                     &length, &capacity)
-                              : c_asm_emit_expression(&context, statement->data.assignment.expression, semantic,
-                                                &result->text, &length, &capacity);
-      if (!emitted)
-      {
-        (void)c_asm_diagnostic_at(
-            result,
-            statement,
-            "الإسناد صحيح دلالياً: «%s» من النوع «%s»، لكن مولّد NASM "
-            "native لا يدعم هذا النوع حالياً؛ الدعم الحالي محصور في "
-            "تخزين وتعبيرات integer",
-            statement->data.assignment.name,
-            c_asm_type_for(semantic, statement->data.assignment.name)
-                ? c_asm_type_for(semantic, statement->data.assignment.name)
-                : c_asm_assignment_expression_kind(statement->data.assignment.expression));
-        free(strings);
-        return 1;
-      }
-      const int slot = c_asm_slot_for(semantic, statement->data.assignment.name);
-      if (slot == 0 || !c_asm_append(&result->text, &length, &capacity,
-                               is_real ? "    movsd [rbp-%d], xmm0\n"
-                                       : "    mov [rbp-%d], rax\n",
-                               slot))
-      {
-        (void)c_asm_diagnostic_at(result, statement,
-                            "متغير الإسناد غير موجود في stack layout");
-        free(strings);
-        return 1;
-      }
-    }
-    else if (statement->kind == C_AST_READ)
-    {
-      const int slot = c_asm_slot_for(semantic, statement->data.access.name);
-      const char *type = c_asm_type_for(semantic, statement->data.access.name);
-      if (type == NULL ||
-          (strcmp(type, "صحيح") != 0 && strcmp(type, "حقيقي") != 0 &&
-           strcmp(type, "منطقي") != 0 && strcmp(type, "حرفي") != 0 &&
-           strcmp(type, "خيط_رمزي") != 0))
-      {
-        (void)c_asm_diagnostic_at(
-            result,
-            statement,
-            "نوع الإدخال native غير مدعوم؛ المتغير «%s» نوعه «%s»",
-            statement->data.access.name,
-            type ? type : "غير معروف");
-        free(strings);
-        return 1;
-      }
-      const int is_text_input =
-          strcmp(type, "حرفي") == 0 || strcmp(type, "خيط_رمزي") == 0;
-      const int buffer_slot = (int)(frame_size + 32U + read_index * 256U);
-      if (slot == 0 || !c_asm_append(&result->text, &length, &capacity,
-                               "    lea "
-#ifdef _WIN32
-                               "rcx"
-#else
-                               "rdi"
-#endif
-                               ", [rel fmt_input_request%zu]\n"
-                               "    xor eax, eax\n"
-                               "    call printf\n"
-                               "    xor "
-#ifdef _WIN32
-                               "ecx"
-#else
-                               "edi"
-#endif
-                               ", "
-#ifdef _WIN32
-                               "ecx"
-#else
-                               "edi"
-#endif
-                               "\n"
-                               "    call fflush\n"
-                               "    lea "
-#ifdef _WIN32
-                               "rdx"
-#else
-                               "rsi"
-#endif
-                               ", [rbp-%d]\n"
-                               "    lea "
-#ifdef _WIN32
-                               "rcx"
-#else
-                               "rdi"
-#endif
-                               ", [rel %s]\n"
-                               "    xor eax, eax\n"
-                               "    call scanf\n",
-                               read_index,
-                               is_text_input ? buffer_slot : slot,
-                               strcmp(type, "حقيقي") == 0
-                                   ? "fmt_read_real"
-                                   : strcmp(type, "منطقي") == 0
-                                         ? "fmt_read_bool"
-                                         : strcmp(type, "حرفي") == 0
-                                               ? "fmt_read_char"
-                                               : strcmp(type, "خيط_رمزي") == 0
-                                                     ? "fmt_read_str"
-                                                     : "fmt_read_int"))
-      {
-        (void)c_asm_diagnostic_at(result, statement, "تعذر تحويل اقرأ إلى scanf");
-        free(strings);
-        return 1;
-      }
-      if (is_text_input &&
-          !c_asm_append(&result->text, &length, &capacity,
-                  "    lea rax, [rbp-%d]\n"
-                  "    mov [rbp-%d], rax\n",
-                  buffer_slot, slot))
-      {
-        (void)c_asm_diagnostic_at(result, statement,
-                            "تعذر حفظ الإدخال النصي native");
-        free(strings);
-        return 1;
-      }
-      read_index++;
-    }
-    else if (statement->kind == C_AST_PRINT)
-    {
-      for (size_t vi = 0; vi < statement->data.print.values.count; vi++)
-      {
-        const CAstNode *val = statement->data.print.values.items[vi];
-        if (!val)
-          continue;
-        if (c_asm_expression_is_real(val, semantic))
-        {
-          if (!c_asm_emit_real_expression(&context, val, semantic, real_values, real_count,
-                                    &result->text, &length, &capacity) ||
-              !c_asm_append(&result->text, &length, &capacity,
-                      "    movq "
-#ifdef _WIN32
-                      "rdx"
-#else
-                      "rsi"
-#endif
-                      ", xmm0\n"
-                      "    lea "
-#ifdef _WIN32
-                      "rcx"
-#else
-                      "rdi"
-#endif
-                      ", [rel fmt_real]\n"
-                      "    mov eax, 1\n"
-                      "    call printf\n"))
-          {
-            (void)c_asm_diagnostic_at(result, statement,
-                                "تعذر تحويل طباعة الحقيقي إلى NASM");
-            free(strings);
-            free(real_values);
-            return 1;
-          }
-          continue;
-        }
-        if (c_asm_expression_is_boolean(val, semantic))
-        {
-          const size_t label = boolean_print_index++;
-          if (!c_asm_emit_expression(&context, val, semantic, &result->text, &length,
-                               &capacity) ||
-              !c_asm_append(&result->text, &length, &capacity,
-                      "    cmp rax, 0\n"
-                      "    jne bool_true%zu\n"
-                      "    lea "
-#ifdef _WIN32
-                      "rcx"
-#else
-                      "rdi"
-#endif
-                      ", [rel fmt_bool_false]\n"
-                      "    xor eax, eax\n"
-                      "    call printf\n"
-                      "    jmp bool_done%zu\n"
-                      "bool_true%zu:\n"
-                      "    lea "
-#ifdef _WIN32
-                      "rcx"
-#else
-                      "rdi"
-#endif
-                      ", [rel fmt_bool_true]\n"
-                      "    xor eax, eax\n"
-                      "    call printf\n"
-                      "bool_done%zu:\n",
-                      label, label, label, label))
-          {
-            (void)c_asm_diagnostic_at(result, statement,
-                                "تعذر تحويل طباعة المنطقي إلى NASM");
-            free(strings);
-            free(real_values);
-            return 1;
-          }
-          continue;
-        }
-        /* Text values and references → use fmt_str */
-        if (c_asm_expression_is_text(val, semantic))
-        {
-          if (!c_asm_emit_text_expression(&context, val, semantic, &result->text, &length,
-                                    &capacity) ||
-              !c_asm_append(&result->text, &length, &capacity,
-                      "    mov "
-#ifdef _WIN32
-                      "rdx"
-#else
-                      "rsi"
-#endif
-                      ", rax\n"
-                      "    lea "
-#ifdef _WIN32
-                      "rcx"
-#else
-                      "rdi"
-#endif
-                      ", [rel fmt_str]\n"
-                      "    xor eax, eax\n"
-                      "    call printf\n"))
-          {
-            (void)c_asm_diagnostic_at(result, statement, "تعذر تحويل print string إلى NASM");
-            free(strings);
-            free(real_values);
-            free(context.text_values);
-            context.text_values = NULL;
-            context.text_count = 0;
-            return 1;
-          }
-        }
-        else
-        {
-          /* Integer / variable / expression → use fmt_int */
-          if (!c_asm_emit_expression(&context, val, semantic, &result->text, &length, &capacity) ||
-              !c_asm_append(&result->text, &length, &capacity,
-                      "    mov "
-#ifdef _WIN32
-                      "rdx"
-#else
-                      "rsi"
-#endif
-                      ", rax\n"
-                      "    lea "
-#ifdef _WIN32
-                      "rcx"
-#else
-                      "rdi"
-#endif
-                      ", [rel fmt_int]\n"
-                      "    xor eax, eax\n"
-                      "    call printf\n"))
-          {
-            (void)c_asm_diagnostic_at(result, statement, "تعذر تحويل print integer إلى NASM");
-            free(strings);
-            return 1;
-          }
-        }
-      }
-    }
-    else if (statement->kind != C_AST_EMPTY)
-    {
-      (void)c_asm_diagnostic_at(result, statement,
-                          "تعليمة غير مدعومة في NASM backend الحالي");
-      free(strings);
-      return 1;
-    }
+    c_asm_release_literals(&context, strings, real_values);
+    return 1;
   }
-  free(strings);
+  c_asm_release_literals(&context, strings, real_values);
   if (!c_asm_emit_epilogue(&result->text, &length, &capacity))
   {
     c_assembly_result_free(result);

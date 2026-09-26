@@ -32,7 +32,7 @@ parser.y عبر Bison → AST
     ↓
 ast.c + semantic.c → AST وsymbols وdiagnostics
     ↓
-asm_x86_64.c → Assembly نصية ضمن subset المدعوم
+backend/x86_64/asm_x86_64.c ومكوّناته → Assembly نصية ضمن subset المدعوم
     ↓
 JSON response إلى Flutter
 ```

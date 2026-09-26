@@ -89,6 +89,20 @@ int c_asm_diagnostic_at(CAssemblyResult *result, const CAstNode *node,
   return 1;
 }
 
+void c_asm_release_literals(CAsmContext *context, const char **strings,
+                            const char **real_values)
+{
+  free(strings);
+  free(real_values);
+  if (context == NULL)
+    return;
+  free(context->text_values);
+  context->text_values = NULL;
+  context->text_count = 0U;
+  context->real_values = NULL;
+  context->real_count = 0U;
+}
+
 int c_asm_slot_for(const CSemanticResult *semantic, const char *name)
 {
   for (size_t index = 0U; index < semantic->count; index++)

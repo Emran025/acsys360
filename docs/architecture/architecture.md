@@ -65,7 +65,7 @@ Bison parser.y → AST + syntax diagnostics
     ↓
 ast.c + semantic.c → AST وsymbol table والتحقق الدلالي
     ↓
-asm_x86_64.c → Assembly نصية محدودة
+backend/x86_64/asm_x86_64.c ومكوّناته → Assembly نصية محدودة
     ↓
 protocol response → JSON stdout
 ```
