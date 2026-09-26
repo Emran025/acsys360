@@ -81,7 +81,7 @@ int c_generate_nasm_x86_64(const CTacResult *tac,const CSemanticResult *semantic
  size_t request_count=0; for(size_t i=0;i<tac->count;i++) if(tac->items[i].opcode==C_TAC_READ) { const char *rt=type_of(semantic,tac->items[i].result,NULL); const char *rn=tac->items[i].result?tac->items[i].result:""; char request[1024]; snprintf(request,sizeof(request),"{\"requestType\":\"input\",\"name\":\"%s\",\"type\":\"%s\"}\n",rn,rt?rt:"غير معروف"); if(!append(&result->text,&len,&cap,"fmt_input_request%zu: ",request_count++)||!emit_bytes(&result->text,&len,&cap,request))goto fail; }
  if(!append(&result->text,&len,&cap,"section .text\nmain:\n    push rbp\n    mov rbp, rsp\n    sub rsp, %zu\n",frame+32+reads*256))goto fail;
  size_t read_index=0;int ok=1;
- for(size_t i=0;i<tac->count&&ok;i++){CTacInstruction *x=&tac->items[i];int dst=slot(semantic,x->result);const char *t=type_of(semantic,x->result,x->type);
+ for(size_t i=0;i<tac->count&&ok;i++){CTacInstruction *x=&tac->items[i];int dst=slot(semantic,x->result);
   switch(x->opcode){
    case C_TAC_ALLOC: break;
    case C_TAC_LABEL: ok=append(&result->text,&len,&cap,"%s:\n",x->result);break;

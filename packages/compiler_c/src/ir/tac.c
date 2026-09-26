@@ -185,7 +185,10 @@ static int statements(const CAstNodeList *list, CTacResult *out, size_t *temp, s
   return 1;
 }
 int c_generate_tac(const CAstNode *root, CTacResult *result) {
-  if (!root || !result || root->kind != C_AST_PROGRAM) return 0; g_root = root; memset(result,0,sizeof(*result)); size_t temp=0,label=0;
+  if (!root || !result || root->kind != C_AST_PROGRAM) return 0;
+  g_root = root;
+  memset(result, 0, sizeof(*result));
+  size_t temp = 0, label = 0;
   for (size_t i=0;i<root->data.program.declarations.count;i++) { const CAstNode *d=root->data.program.declarations.items[i]; if (d->kind==C_AST_VARIABLE_DECLARATION) for(size_t j=0;j<d->data.variable.name_count;j++) if(!add(result,C_TAC_ALLOC,d->data.variable.names[j],NULL,NULL,NULL,d->data.variable.type&&d->data.variable.type->name?d->data.variable.type->name:"نوع مركب",0U,d)) { c_tac_result_free(result); return 0; } }
   if (!statements(&root->data.program.statements,result,&temp,&label)) { c_tac_result_free(result); return 0; } return 1;
 }

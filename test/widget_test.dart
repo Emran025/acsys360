@@ -195,15 +195,15 @@ void main() {
     expect(syntaxTable.headingTextStyle?.fontWeight, FontWeight.w700);
     final copyButton = find.byTooltip('نسخ');
     expect(copyButton, findsOneWidget);
-    tester
+    final copyAction = tester
         .widget<IconButton>(
           find.ancestor(
             of: find.byIcon(Icons.content_copy_rounded),
             matching: find.byType(IconButton),
           ),
         )
-        .onPressed!
-        .call();
+        .onPressed!;
+    await copyAction();
     await tester.pump();
     expect(find.text('تم نسخ المحتوى'), findsOneWidget);
     final copiedTree = await Clipboard.getData(Clipboard.kTextPlain);
