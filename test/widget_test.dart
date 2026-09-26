@@ -122,7 +122,7 @@ void main() {
 
     await tester.pumpWidget(ArabicEditorApp(controller: controller));
     await tester.pump();
-    final executionStage = find.widgetWithText(TextButton, 'التنفيذ');
+    final executionStage = find.text('التنفيذ');
     await tester.ensureVisible(executionStage);
     await tester.tap(executionStage);
     await tester.pump();

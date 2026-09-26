@@ -73,12 +73,12 @@ class _CodeMinimapState extends State<CodeMinimap> {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTapDown: (details) {
-          if (!_viewportRect(lines.length).contains(details.localPosition)) {
+          if (!_viewportRect().contains(details.localPosition)) {
             _jumpTo(details.localPosition.dy, lines.length);
           }
         },
         onVerticalDragStart: (details) {
-          final viewport = _viewportRect(lines.length);
+          final viewport = _viewportRect();
           _draggingViewport = viewport.contains(details.localPosition);
           _dragStartGlobalY = details.globalPosition.dy;
           _dragStartScrollOffset = widget.scrollController.hasClients
@@ -131,20 +131,19 @@ class _CodeMinimapState extends State<CodeMinimap> {
     );
   }
 
-  Rect _viewportRect(int lineCount) {
+  Rect _viewportRect() {
     final size = context.size;
     if (size == null || size.height <= 0) return Rect.zero;
     final position = widget.scrollController.hasClients
         ? widget.scrollController.position
         : null;
     if (position == null || !position.hasContentDimensions) return Rect.zero;
-    final contentHeight = math.min(
-      size.height,
-      lineCount * _MinimapPainter.lineHeight,
-    );
+    final contentHeight = size.height;
     final minimumViewportHeight = math.min(8.0, contentHeight).toDouble();
+    final totalContentHeight =
+        position.maxScrollExtent + position.viewportDimension;
     final viewportHeight =
-        (position.viewportDimension / contentHeight * contentHeight)
+        (position.viewportDimension / totalContentHeight * contentHeight)
             .clamp(minimumViewportHeight, contentHeight)
             .toDouble();
     final available = math.max(0.0, contentHeight - viewportHeight).toDouble();
@@ -159,13 +158,12 @@ class _CodeMinimapState extends State<CodeMinimap> {
     final height = context.size?.height ?? 0;
     if (height <= 0) return;
     final position = widget.scrollController.position;
-    final contentHeight = math.min(
-      height,
-      lineCount * _MinimapPainter.lineHeight,
-    );
-    final target = (y / height * contentHeight - position.viewportDimension / 2)
-        .clamp(0.0, position.maxScrollExtent)
-        .toDouble();
+    final totalContentHeight =
+        position.maxScrollExtent + position.viewportDimension;
+    final target =
+        (y / height * totalContentHeight - position.viewportDimension / 2)
+            .clamp(0.0, position.maxScrollExtent)
+            .toDouble();
     if ((target - position.pixels).abs() > 0.5) {
       widget.scrollController.jumpTo(target);
     }
@@ -175,7 +173,7 @@ class _CodeMinimapState extends State<CodeMinimap> {
     if (!widget.scrollController.hasClients) return;
     final size = context.size;
     if (size == null || size.height <= 0) return;
-    final viewport = _viewportRect(widget.controller.text.split('\n').length);
+    final viewport = _viewportRect();
     final available = math.max(1.0, size.height - viewport.height);
     final delta =
         deltaY / available * widget.scrollController.position.maxScrollExtent;
