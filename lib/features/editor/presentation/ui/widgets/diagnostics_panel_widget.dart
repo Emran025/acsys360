@@ -95,7 +95,7 @@ class _DiagnosticsPanelWidgetState extends State<DiagnosticsPanelWidget> {
           child: Row(
             textDirection: TextDirection.rtl,
             children: [
-              for (var index = 0; index < _stages.length; index++)
+              for (final index in [8, 0, 1, 2, 3, 4, 5, 6, 7, 9])
                 _stageTab(context, index: index, label: _stages[index]),
             ],
           ),
@@ -210,10 +210,15 @@ class _DiagnosticsPanelWidgetState extends State<DiagnosticsPanelWidget> {
     8 =>
       widget.inputNames.isNotEmpty
           ? _inputRequest()
-          : _selectable(
-              result.executionOutput.isEmpty
-                  ? 'لا يوجد خرج تنفيذ'
-                  : result.executionOutput.join('\n'),
+          : result.executionOutput.isEmpty
+          ? _selectable('لا يوجد خرج تنفيذ')
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(8),
+              child: _codeBlock(
+                title: 'خرج التنفيذ',
+                language: 'Output',
+                source: result.executionOutput.join('\n'),
+              ),
             ),
     9 => _artifacts(result),
     _ => const SizedBox.shrink(),

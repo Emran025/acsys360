@@ -109,7 +109,9 @@ void main() {
     expect(find.text('Welcome'), findsAtLeastNWidgets(1));
   });
 
-  testWidgets('renders execution output on separate lines', (tester) async {
+  testWidgets('shows execution output on the right as copyable LTR text', (
+    tester,
+  ) async {
     final controller = EditorController(
       repository: FakeWorkspaceRepository(),
       rootPath: '.',
@@ -127,8 +129,14 @@ void main() {
     await tester.tap(executionStage);
     await tester.pump();
 
-    expect(find.text('الأول\nالثاني'), findsOneWidget);
-    expect(find.text(r'الأول\nالثاني'), findsNothing);
+    final output = tester.widget<SelectableText>(find.byType(SelectableText));
+    expect(output.textDirection, TextDirection.ltr);
+    expect(output.textSpan!.toPlainText(), 'الأول\nالثاني');
+    expect(find.byTooltip('نسخ'), findsOneWidget);
+    expect(
+      tester.getCenter(executionStage).dx,
+      lessThan(tester.getCenter(find.text('Artifact')).dx),
+    );
   });
 
   testWidgets('shows syntax tree as a table and preserves its JSON', (
