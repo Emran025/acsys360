@@ -101,7 +101,13 @@ dart run tool/verify_compiler_bundle.dart --executable build/arabicc
 | `src/main.c` | نقطة التشغيل ومعالجة `--protocol` و`--assist` و`--version` و`--help` |
 | `src/ast.c` | عقد AST والتسلسل المرتبط بها |
 | `src/semantic.c` | الرموز والتحقق الدلالي المحدود |
-| `src/asm_x86_64.c` | توليد Assembly نصية ضمن subset المدعوم |
+| `src/backend/x86_64/asm_x86_64.c` | تنسيق توليد NASM والواجهة العامة مع الحفاظ على المسار AST + Semantic Result → Assembly |
+| `src/backend/x86_64/asm_x86_64_internal.h` | عقد داخلي وسياق التوليد المشترك بين وحدات backend |
+| `src/backend/x86_64/asm_x86_64_context.c` | مخزن النصوص، إدارة الذاكرة، التشخيصات، والبحث في الرموز |
+| `src/backend/x86_64/asm_x86_64_literals.c` | جمع النصوص والأعداد الحقيقية وإخراج قيم `.data` بصيغة NASM |
+| `src/backend/x86_64/asm_x86_64_expressions.c` | فحوص الأنواع وتوليد تعليمات التعبيرات integer/real/text |
+| `src/backend/x86_64/asm_x86_64_statements.c` | توليد الفروع والإسناد والطباعة ضمن الكتل المتداخلة |
+| `src/backend/x86_64/asm_x86_64_frame.c` | حساب إطار المكدس وإخراج المقدمة والخاتمة |
 | `include/*.h` | عقود البيانات وواجهات الوحدات |
 | `CMakeLists.txt` | توليد parser/scanner وبناء `arabicc` واختبارات CMake |
 

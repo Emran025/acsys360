@@ -14,7 +14,7 @@
 | Parser | `src/parser.y` عبر Bison وبناء AST | نتيجة `syntaxTree` |
 | Semantic | `src/semantic.c` ورموز وتشخيصات محدودة | `symbolTable` و`diagnostics` |
 | Protocol | `src/protocol.c` و`include/protocol.h` | `protocolVersion: 0.5.0` وJSON round-trip |
-| Assembly | `src/asm_x86_64.c`، نص NASM-like محدود | حقل `assembly` |
+| Assembly | `src/backend/x86_64/asm_x86_64.c ومكوّنات backend/x86_64 الداخلية`، نص NASM-like محدود | حقل `assembly` |
 | Assist | `--assist` في executable | طلبات المساعدة من المحرر |
 | Packaging | CMake ثم bundling في `release.yml` | Linux وWindows وmacOS smoke tests |
 

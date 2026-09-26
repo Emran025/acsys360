@@ -43,7 +43,7 @@ if exist src\lexer.l (
 )
 
 echo [3/3] Compiling C source files...
-set SOURCES=src/main.c src/protocol.c src/protocol/protocol_json.c src/protocol/protocol_request.c src/protocol/protocol_response.c src/driver/compiler_driver.c src/ir/typed_ir.c src/runtime/interpreter.c src/backend/artifact_builder.c src/backend/toolchain.c src/ast.c src/semantic.c src/ir/tac.c src/asm_x86_64.c
+set SOURCES=src/main.c src/protocol.c src/protocol/protocol_json.c src/protocol/protocol_request.c src/protocol/protocol_response.c src/driver/compiler_driver.c src/ir/typed_ir.c src/runtime/interpreter.c src/backend/artifact_builder.c src/backend/toolchain.c src/ast.c src/semantic.c src/ir/tac.c src/backend/x86_64/asm_x86_64.c src/backend/x86_64/asm_x86_64_context.c src/backend/x86_64/asm_x86_64_literals.c src/backend/x86_64/asm_x86_64_expressions.c src/backend/x86_64/asm_x86_64_statements.c src/backend/x86_64/asm_x86_64_frame.c
 if exist build\generated\parser.tab.c set SOURCES=!SOURCES! build\generated\parser.tab.c
 if exist build\generated\lexer.yy.c set SOURCES=!SOURCES! build\generated\lexer.yy.c
 

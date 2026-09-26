@@ -37,7 +37,12 @@ add_executable(arabicc
   src/ast.c
   src/semantic.c
   src/ir/tac.c
-  src/asm_x86_64.c
+  src/backend/x86_64/asm_x86_64.c
+  src/backend/x86_64/asm_x86_64_context.c
+  src/backend/x86_64/asm_x86_64_literals.c
+  src/backend/x86_64/asm_x86_64_expressions.c
+  src/backend/x86_64/asm_x86_64_statements.c
+  src/backend/x86_64/asm_x86_64_frame.c
   ${BISON_ArabicParser_OUTPUTS}
   ${FLEX_ArabicLexer_OUTPUTS}
 )
