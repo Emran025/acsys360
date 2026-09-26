@@ -131,6 +131,292 @@ void main() {
     expect(find.text(r'الأول\nالثاني'), findsNothing);
   });
 
+  testWidgets('shows syntax tree as a table and preserves its JSON', (
+    tester,
+  ) async {
+    final controller = EditorController(
+      repository: FakeWorkspaceRepository(),
+      rootPath: '.',
+    );
+    await controller.open('main.arb');
+    controller.compilation = const CompilationResult(
+      success: true,
+      syntaxTree: {
+        'kind': 'program',
+        'name': 'main',
+        'statements': [
+          {
+            'kind': 'print',
+            'values': [
+              {'kind': 'literal', 'literalKind': 'integer', 'value': '7'},
+            ],
+          },
+        ],
+      },
+    );
+
+    await tester.pumpWidget(ArabicEditorApp(controller: controller));
+    await tester.pump();
+    final syntaxTreeStage = find.text('Syntax Tree');
+    await tester.ensureVisible(syntaxTreeStage);
+    await tester.tap(syntaxTreeStage);
+    await tester.pump();
+
+    expect(find.byType(DataTable), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(DataTable),
+        matching: find.text('statements[0] · print'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(DataTable),
+        matching: find.text('values[0] · literal'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('الشجرة الأصلية (JSON)'), findsOneWidget);
+    final originalTree = tester.widget<SelectableText>(
+      find.byType(SelectableText),
+    );
+    expect(
+      originalTree.textSpan!.toPlainText(),
+      contains('"literalKind": "integer"'),
+    );
+    expect(originalTree.textDirection, TextDirection.ltr);
+    final syntaxTable = tester.widget<DataTable>(find.byType(DataTable));
+    expect(syntaxTable.border, isNotNull);
+    expect(
+      syntaxTable.headingRowColor?.resolve(const <WidgetState>{}),
+      isNotNull,
+    );
+    expect(syntaxTable.headingTextStyle?.fontWeight, FontWeight.w700);
+    final copyButton = find.byTooltip('نسخ');
+    expect(copyButton, findsOneWidget);
+    tester
+        .widget<IconButton>(
+          find.ancestor(
+            of: find.byIcon(Icons.content_copy_rounded),
+            matching: find.byType(IconButton),
+          ),
+        )
+        .onPressed!
+        .call();
+    await tester.pump();
+    expect(find.text('تم نسخ المحتوى'), findsOneWidget);
+    final copiedTree = await Clipboard.getData(Clipboard.kTextPlain);
+    expect(copiedTree?.text, contains('"literalKind": "integer"'));
+  });
+
+  testWidgets('shows symbol records in a table and preserves their JSON', (
+    tester,
+  ) async {
+    final controller = EditorController(
+      repository: FakeWorkspaceRepository(),
+      rootPath: '.',
+    );
+    await controller.open('main.arb');
+    controller.compilation = const CompilationResult(
+      success: true,
+      symbols: [
+        SymbolRecord(
+          name: 'س',
+          kind: 'variable',
+          type: 'صحيح',
+          span: SourceSpan(
+            sourcePath: r'C:\workspace\main.arb',
+            offset: 0,
+            line: 2,
+            column: 4,
+            length: 1,
+          ),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(ArabicEditorApp(controller: controller));
+    await tester.pump();
+    final symbolTableStage = find.text('Symbol Table');
+    await tester.ensureVisible(symbolTableStage);
+    await tester.tap(symbolTableStage);
+    await tester.pump();
+
+    final table = find.byType(DataTable);
+    expect(table, findsOneWidget);
+    expect(tester.widget<DataTable>(table).border, isNotNull);
+    for (final value in [
+      'الاسم',
+      'س',
+      'variable',
+      'صحيح',
+      'main.arb',
+      '2',
+      '4',
+    ]) {
+      expect(
+        find.descendant(of: table, matching: find.text(value)),
+        findsOneWidget,
+      );
+    }
+    expect(find.text('البيانات الأصلية (JSON)'), findsOneWidget);
+    final originalSymbols = tester.widget<SelectableText>(
+      find.byType(SelectableText),
+    );
+    expect(originalSymbols.textSpan!.toPlainText(), contains('"sourcePath"'));
+  });
+
+  testWidgets('shows 3AC instructions in the requested table format', (
+    tester,
+  ) async {
+    final controller = EditorController(
+      repository: FakeWorkspaceRepository(),
+      rootPath: '.',
+    );
+    await controller.open('main.arb');
+    controller.compilation = const CompilationResult(
+      success: true,
+      threeAddressCode: ['س = 10', 'ص = 20', 't1 = س + ص', 'ع = t1', 'PRINT ع'],
+    );
+
+    await tester.pumpWidget(ArabicEditorApp(controller: controller));
+    await tester.pump();
+    final tacStage = find.text('3AC');
+    await tester.ensureVisible(tacStage);
+    await tester.tap(tacStage);
+    await tester.pump();
+
+    final table = find.byType(DataTable);
+    expect(table, findsOneWidget);
+    for (final value in ['#', 'op', 'arg1', 'arg2', 'result']) {
+      expect(
+        find.descendant(of: table, matching: find.text(value)),
+        findsOneWidget,
+      );
+    }
+    for (final value in ['1', '=', '10', 'س', '2', '20', '3', '+', 'ص', 't1']) {
+      expect(
+        find.descendant(of: table, matching: find.text(value)),
+        findsAtLeastNWidgets(1),
+      );
+    }
+    expect(
+      find.descendant(of: table, matching: find.text('print')),
+      findsOneWidget,
+    );
+    expect(find.text('التعليمات الأصلية'), findsOneWidget);
+    expect(
+      tester
+          .widget<SelectableText>(find.byType(SelectableText))
+          .textSpan!
+          .toPlainText(),
+      contains('t1 = س + ص'),
+    );
+  });
+
+  testWidgets('shows Typed IR records in a table and preserves its JSON', (
+    tester,
+  ) async {
+    final controller = EditorController(
+      repository: FakeWorkspaceRepository(),
+      rootPath: '.',
+    );
+    await controller.open('main.arb');
+    controller.compilation = const CompilationResult(
+      success: true,
+      intermediateRepresentation: {
+        'unit': 'برنامج',
+        'name': 'main',
+        'target': 'x86_64',
+        'types': ['صحيح', 'حقيقي'],
+        'symbols': [
+          {'name': 'س', 'type': 'صحيح', 'offset': 8},
+        ],
+        'blocks': [
+          {'name': 'main', 'statementCount': 3},
+        ],
+      },
+    );
+
+    await tester.pumpWidget(ArabicEditorApp(controller: controller));
+    await tester.pump();
+    final irStage = find.text('Typed IR');
+    await tester.ensureVisible(irStage);
+    await tester.tap(irStage);
+    await tester.pump();
+
+    final table = find.byType(DataTable);
+    expect(table, findsOneWidget);
+    for (final value in [
+      'القسم',
+      'الاسم / الحقل',
+      'النوع / القيمة',
+      'unit',
+      'برنامج',
+      'الأنواع',
+      'صحيح',
+      'الرموز',
+      'س',
+      'x86_64',
+      'الكتل',
+      '3',
+    ]) {
+      expect(
+        find.descendant(of: table, matching: find.text(value)),
+        findsAtLeastNWidgets(1),
+      );
+    }
+    expect(find.text('البيانات الأصلية (JSON)'), findsOneWidget);
+    expect(
+      tester
+          .widget<SelectableText>(find.byType(SelectableText))
+          .textSpan!
+          .toPlainText(),
+      contains('"statementCount": 3'),
+    );
+  });
+
+  testWidgets('shows Assembly in a selectable left-to-right code block', (
+    tester,
+  ) async {
+    final controller = EditorController(
+      repository: FakeWorkspaceRepository(),
+      rootPath: '.',
+    );
+    await controller.open('main.arb');
+    controller.compilation = const CompilationResult(
+      success: true,
+      assembly: 'section .text\n_start:\n  mov rax, 1\n  ret',
+    );
+
+    await tester.pumpWidget(ArabicEditorApp(controller: controller));
+    await tester.pump();
+    final assemblyStage = find.text('Assembly');
+    await tester.ensureVisible(assemblyStage);
+    await tester.tap(assemblyStage);
+    await tester.pump();
+
+    expect(find.text('تعليمات Assembly'), findsOneWidget);
+    expect(find.byTooltip('نسخ'), findsOneWidget);
+    final code = tester.widget<SelectableText>(find.byType(SelectableText));
+    expect(code.textDirection, TextDirection.ltr);
+    expect(code.textSpan!.toPlainText(), contains('mov rax, 1'));
+    tester
+        .widget<IconButton>(
+          find.ancestor(
+            of: find.byIcon(Icons.content_copy_rounded),
+            matching: find.byType(IconButton),
+          ),
+        )
+        .onPressed!
+        .call();
+    await tester.pump();
+    final copiedAssembly = await Clipboard.getData(Clipboard.kTextPlain);
+    expect(copiedAssembly?.text, contains('mov rax, 1'));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('uses Arabic direction and right-aligns code', (tester) async {
     final textController = TextEditingController(text: 'برنامج اختبار؛ {}.');
     addTearDown(textController.dispose);

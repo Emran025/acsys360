@@ -7,7 +7,11 @@ void check(bool condition, String message) {
 
 Future<void> main(List<String> args) async {
   check(args.length == 1, 'usage: dart composite_types.dart <arabicc>');
-  final path = File(Platform.script.toFilePath()).parent.parent.parent.parent
+  final path = File(Platform.script.toFilePath())
+      .parent
+      .parent
+      .parent
+      .parent
       .uri
       .resolve('examples/manual/02_composite_types.arb')
       .toFilePath();
@@ -30,13 +34,20 @@ Future<void> main(List<String> args) async {
   check(stdout.isNotEmpty, 'compiler returned no response: $stderr');
   final response = jsonDecode(stdout) as Map<String, dynamic>;
   check(exitCode == 0, 'composite program exited with $exitCode');
-  check(response['success'] == true,
-      'composite program diagnostics: ${response['diagnostics']}');
-  check(_sameList(response['executionOutput'], ['10', 'علي', '20', 'صح']),
-      'composite execution output changed: ${response['executionOutput']}');
+  check(
+    response['success'] == true,
+    'composite program diagnostics: ${response['diagnostics']}',
+  );
+  check(
+    _sameList(response['executionOutput'], ['10', 'علي', '20', 'صح']),
+    'composite execution output changed: ${response['executionOutput']}',
+  );
 }
 
 bool _sameList(Object? actual, List<String> expected) =>
-    actual is List && actual.length == expected.length &&
-    List.generate(actual.length, (index) => actual[index] == expected[index])
-        .every((value) => value);
+    actual is List &&
+    actual.length == expected.length &&
+    List.generate(
+      actual.length,
+      (index) => actual[index] == expected[index],
+    ).every((value) => value);

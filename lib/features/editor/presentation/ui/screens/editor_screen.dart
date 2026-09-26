@@ -209,7 +209,9 @@ class _EditorShellState extends State<EditorShell> {
     };
     if (!valid) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('القيمة لا توافق النوع المطلوب: $pendingInputType')),
+        SnackBar(
+          content: Text('القيمة لا توافق النوع المطلوب: $pendingInputType'),
+        ),
       );
       return;
     }

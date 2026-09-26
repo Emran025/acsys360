@@ -55,11 +55,9 @@ Future<Map<String, dynamic>> compile(
   String executable,
   Map<String, dynamic> request,
 ) async {
-  final result = await runProcess(
-    executable,
-    const ['--protocol'],
-    input: '${jsonEncode(request)}\n',
-  );
+  final result = await runProcess(executable, const [
+    '--protocol',
+  ], input: '${jsonEncode(request)}\n');
   check(
     result.stdout.trim().isNotEmpty,
     'compiler returned no response: ${result.stderr}',
@@ -82,7 +80,9 @@ Map<String, dynamic> requestFor(
   'entryPath': '/stability/main.arb',
   'execute': execute,
   ...?target == null ? null : {'target': target},
-  ...?artifactDirectory == null ? null : {'artifactDirectory': artifactDirectory},
+  ...?artifactDirectory == null
+      ? null
+      : {'artifactDirectory': artifactDirectory},
 };
 
 String canonical(Map<String, dynamic> response) => jsonEncode(response);
@@ -110,9 +110,7 @@ Future<void> main(List<String> args) async {
     'protocolVersion': '0.5.0',
     'rootPath': '/stability',
     'sourcePaths': ['/stability/main.arb'],
-    'sourceTexts': {
-      '/stability/main.arb': 'برنامج خطأ؛ { اطبع(؛ }.',
-    },
+    'sourceTexts': {'/stability/main.arb': 'برنامج خطأ؛ { اطبع(؛ }.'},
     'mode': 'project',
     'entryPath': '/stability/main.arb',
   };
@@ -138,10 +136,15 @@ Future<void> main(List<String> args) async {
     'mode': 'project',
     'entryPath': '/stability/main.arb',
   };
-  final semanticBaseline = canonical(await compile(executable, semanticRequest));
+  final semanticBaseline = canonical(
+    await compile(executable, semanticRequest),
+  );
   for (var iteration = 0; iteration < 10; iteration++) {
     final response = await compile(executable, semanticRequest);
-    check(response['success'] == false, 'semantic error unexpectedly succeeded');
+    check(
+      response['success'] == false,
+      'semantic error unexpectedly succeeded',
+    );
     check(
       canonical(response) == semanticBaseline,
       'semantic response is not deterministic',
@@ -151,17 +154,24 @@ Future<void> main(List<String> args) async {
   const malformedPayload = '{"protocolVersion":"0.5.0","sourceTexts":';
   String? malformedBaseline;
   for (var iteration = 0; iteration < 10; iteration++) {
-    final result = await runProcess(
-      executable,
-      const ['--protocol'],
-      input: '$malformedPayload\n',
+    final result = await runProcess(executable, const [
+      '--protocol',
+    ], input: '$malformedPayload\n');
+    check(
+      result.stdout.trim().isNotEmpty,
+      'malformed request returned nothing',
     );
-    check(result.stdout.trim().isNotEmpty, 'malformed request returned nothing');
     final response = Map<String, dynamic>.from(jsonDecode(result.stdout));
-    check(response['success'] == false, 'malformed request unexpectedly succeeded');
+    check(
+      response['success'] == false,
+      'malformed request unexpectedly succeeded',
+    );
     final encoded = canonical(response);
     malformedBaseline ??= encoded;
-    check(encoded == malformedBaseline, 'malformed response is not deterministic');
+    check(
+      encoded == malformedBaseline,
+      'malformed response is not deterministic',
+    );
   }
 
   for (var iteration = 0; iteration < 4; iteration++) {
@@ -184,13 +194,21 @@ Future<void> main(List<String> args) async {
           rootPath: directory.path,
         ),
       );
-      check(response['success'] == true, 'artifact iteration $iteration failed');
+      check(
+        response['success'] == true,
+        'artifact iteration $iteration failed',
+      );
       check(!await marker.exists(), 'artifact path executed shell syntax');
       final artifacts = response['artifacts'];
-      check(artifacts is List && artifacts.length >= 2, 'artifacts are missing');
+      check(
+        artifacts is List && artifacts.length >= 2,
+        'artifacts are missing',
+      );
       for (final artifact in artifacts) {
-        check(artifact is String && await File(artifact).exists(),
-            'artifact does not exist: $artifact');
+        check(
+          artifact is String && await File(artifact).exists(),
+          'artifact does not exist: $artifact',
+        );
       }
       final executablePath = (artifacts as List).last as String;
       final execution = await runProcess(executablePath, const []);
@@ -211,5 +229,7 @@ Future<void> main(List<String> args) async {
 bool _sameList(Object? actual, List<String> expected) =>
     actual is List &&
     actual.length == expected.length &&
-    List.generate(actual.length, (index) => actual[index] == expected[index])
-        .every((value) => value);
+    List.generate(
+      actual.length,
+      (index) => actual[index] == expected[index],
+    ).every((value) => value);
