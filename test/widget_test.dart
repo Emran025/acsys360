@@ -203,7 +203,8 @@ void main() {
           ),
         )
         .onPressed!;
-    await copyAction();
+    copyAction();
+    await tester.pump();
     await tester.pump();
     expect(find.text('تم نسخ المحتوى'), findsOneWidget);
     final copiedTree = await Clipboard.getData(Clipboard.kTextPlain);

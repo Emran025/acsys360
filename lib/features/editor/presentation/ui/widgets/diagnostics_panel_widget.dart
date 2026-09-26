@@ -554,13 +554,14 @@ class _DiagnosticsPanelWidgetState extends State<DiagnosticsPanelWidget> {
 
   Future<void> _copyCode(String source) async {
     try {
-      await Clipboard.setData(ClipboardData(text: source));
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('تم نسخ المحتوى')));
+      await Clipboard.setData(ClipboardData(text: source));
     } on Object catch (exception) {
       if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('تعذر نسخ المحتوى: $exception')));
