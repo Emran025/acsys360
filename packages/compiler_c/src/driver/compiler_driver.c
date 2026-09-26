@@ -98,7 +98,7 @@ int compiler_driver_run(const char *payload) {
         const int requires_native_backend =
             backend_target && strcmp(backend_target, "dart-native") == 0;
         const int assembly_ok =
-            c_generate_nasm_x86_64(&tac, &semantic, &assembly);
+            tac.count > 0U && c_generate_nasm_x86_64(&tac, &semantic, &assembly);
         if (assembly_ok && assembly.text && assembly.diagnostic_count == 0) {
           protocol_set_assembly(&resp, assembly.text);
         }

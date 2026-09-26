@@ -91,12 +91,58 @@ static int statements(const CAstNodeList *list, CTacResult *out, size_t *temp, s
       if (!add(out,C_TAC_LABEL,head,NULL,NULL,NULL,"",0U,s)) return 0;
       char *condition=expression(s->data.loop.condition,out,temp); if (!condition || !add(out,C_TAC_BRANCH,done,condition,NULL,head,"منطقي",0U,s) || !statements(&s->data.loop.body,out,temp,label) || !add(out,C_TAC_JUMP,head,NULL,NULL,NULL,"",0U,s) || !add(out,C_TAC_LABEL,done,NULL,NULL,NULL,"",0U,s)) { free(condition); return 0; } free(condition); continue;
     }
-    if (s->kind == C_AST_REPEAT || s->kind == C_AST_REPEAT_UNTIL) { /* Lower repeat forms to their observable body/control-flow TAC. */
-      if (s->kind == C_AST_REPEAT) { char *from=expression(s->data.repeat.from,out,temp); if (!from || !add(out,C_TAC_ASSIGN,s->data.repeat.variable,from,NULL,NULL,"صحيح",0U,s)) { free(from); return 0; } free(from); }
-      char head[32], done[32]; snprintf(head,sizeof(head),"L%zu",(*label)++); snprintf(done,sizeof(done),"L%zu",(*label)++);
-      if (!add(out,C_TAC_LABEL,head,NULL,NULL,NULL,"",0U,s)) return 0;
-      char *condition = expression(s->kind == C_AST_REPEAT ? s->data.repeat.to : s->data.repeat_until.condition,out,temp);
-      if (!condition || !statements(s->kind == C_AST_REPEAT ? &s->data.repeat.body : &s->data.repeat_until.body,out,temp,label) || !add(out,C_TAC_BRANCH,done,condition,NULL,head,"منطقي",0U,s) || !add(out,C_TAC_LABEL,done,NULL,NULL,NULL,"",0U,s)) { free(condition); return 0; } free(condition); continue;
+    if (s->kind == C_AST_REPEAT) {
+      char *from = expression(s->data.repeat.from, out, temp);
+      if (!from || !add(out, C_TAC_ASSIGN, s->data.repeat.variable, from, NULL, NULL,
+                        expr_type(s->data.repeat.from), 0U, s)) { free(from); return 0; }
+      free(from);
+      char head[32], done[32];
+      snprintf(head, sizeof(head), "L%zu", (*label)++);
+      snprintf(done, sizeof(done), "L%zu", (*label)++);
+      if (!add(out, C_TAC_LABEL, head, NULL, NULL, NULL, "", 0U, s)) return 0;
+      char *limit = expression(s->data.repeat.to, out, temp);
+      char *current = dup(s->data.repeat.variable);
+      const CAstNode *step_node = s->data.repeat.step;
+      const int descending = step_node && ((step_node->kind == C_AST_UNARY &&
+                                             step_node->data.unary.operator &&
+                                             !strcmp(step_node->data.unary.operator, "-")) ||
+                                            (step_node->kind == C_AST_LITERAL &&
+                                             step_node->data.literal.value &&
+                                             step_node->data.literal.value[0] == '-'));
+      const char *bound_operator = descending ? ">=" : "<=";
+      char condition_name[32]; snprintf(condition_name, sizeof(condition_name), "t%zu", (*temp)++);
+      if (!limit || !current || !add(out, C_TAC_BINARY, condition_name, current, bound_operator, limit,
+                                      "منطقي", 0U, s) ||
+          !add(out, C_TAC_BRANCH, done, condition_name, NULL, head, "منطقي", 0U, s) ||
+          !statements(&s->data.repeat.body, out, temp, label)) {
+        free(limit); free(current); return 0;
+      }
+      free(limit); free(current);
+      char *step = s->data.repeat.step ? expression(s->data.repeat.step, out, temp) : dup("1");
+      char *value = dup(s->data.repeat.variable);
+      char increment_name[32]; snprintf(increment_name, sizeof(increment_name), "t%zu", (*temp)++);
+      if (!step || !value || !add(out, C_TAC_BINARY, increment_name, value, "+", step,
+                                  "صحيح", 0U, s) ||
+          !add(out, C_TAC_ASSIGN, s->data.repeat.variable, increment_name, NULL, NULL,
+               "صحيح", 0U, s) || !add(out, C_TAC_JUMP, head, NULL, NULL, NULL, "", 0U, s) ||
+          !add(out, C_TAC_LABEL, done, NULL, NULL, NULL, "", 0U, s)) {
+        free(step); free(value); return 0;
+      }
+      free(step); free(value); continue;
+    }
+    if (s->kind == C_AST_REPEAT_UNTIL) {
+      char head[32], done[32];
+      snprintf(head, sizeof(head), "L%zu", (*label)++);
+      snprintf(done, sizeof(done), "L%zu", (*label)++);
+      if (!add(out, C_TAC_LABEL, head, NULL, NULL, NULL, "", 0U, s) ||
+          !statements(&s->data.repeat_until.body, out, temp, label)) return 0;
+      char *condition = expression(s->data.repeat_until.condition, out, temp);
+      if (!condition || !add(out, C_TAC_BRANCH, head, condition, NULL, done,
+                             "منطقي", 0U, s) ||
+          !add(out, C_TAC_LABEL, done, NULL, NULL, NULL, "", 0U, s)) {
+        free(condition); return 0;
+      }
+      free(condition); continue;
     }
     if (s->kind == C_AST_ASSIGNMENT) { char *v=expression(s->data.assignment.expression,out,temp); if (!v || !add(out,C_TAC_ASSIGN,s->data.assignment.name,v,NULL,NULL,expr_type(s->data.assignment.expression),0U,s)) { free(v); return 0; } free(v); continue; }
     if (s->kind == C_AST_READ) { if (!add(out,C_TAC_READ,s->data.access.name,NULL,NULL,NULL,"غير معروف",0U,s)) return 0; continue; }
