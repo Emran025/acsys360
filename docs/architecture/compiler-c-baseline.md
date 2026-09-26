@@ -4,7 +4,7 @@
 
 المرجع التنفيذي الحالي هو `packages/compiler_c`. يبني هذا المجلد executable `arabicc` باستخدام Flex وBison وCMake. ويتصل التطبيق به عبر JSON Protocol الإصدار `0.5.0` من خلال `packages/compiler_contracts`.
 
-يوفر backend الحالي Lexer وParser وAST وتحليلًا دلاليًا محدودًا وتوليد Assembly نصية ضمن subset موثق. توجد اختبارات CMake للفحص التشغيلي (`--version` و`--help`)، ويغطي smoke test في `tool/verify_compiler_bundle.dart` المسار الكامل من طلب JSON إلى استجابة JSON بعد تضمين executable.
+يوفر backend الحالي Lexer وParser وAST وتحليلًا دلاليًا محدودًا وتوليد Assembly نصية من 3AC ضمن subset موثق. توجد اختبارات CMake للفحص التشغيلي (`--version` و`--help`)، ويغطي smoke test في `tool/verify_compiler_bundle.dart` المسار الكامل من طلب JSON إلى استجابة JSON بعد تضمين executable.
 
 ## المكونات الحالية
 

@@ -1,7 +1,7 @@
 #ifndef ARABICC_ASM_X86_64_H
 #define ARABICC_ASM_X86_64_H
 
-#include "ast.h"
+#include "tac.h"
 #include "semantic.h"
 
 #include <stddef.h>
@@ -17,7 +17,7 @@ typedef struct {
   size_t diagnostic_capacity;
 } CAssemblyResult;
 
-int c_generate_nasm_x86_64(const CAstNode *program,
+int c_generate_nasm_x86_64(const CTacResult *tac,
                            const CSemanticResult *semantic,
                            CAssemblyResult *result);
 void c_assembly_result_free(CAssemblyResult *result);

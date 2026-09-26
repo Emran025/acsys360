@@ -69,6 +69,8 @@ cmake --build build --parallel --config Release
 dart run tool/verify_compiler_bundle.dart --executable packages/compiler_c/build/arabicc
 ```
 
+يمر توليد Assembly الآن عبر 3AC صريح: `Parser/AST → Semantic → TAC → NASM x86_64`. لا يقرأ backend AST مباشرة؛ نفس قائمة 3AC التي تظهر في `threeAddressCode` تُترجم إلى Assembly، بما في ذلك التعبيرات typed، الإدخال، النصوص، الحقيقية، المنطقيات، والفروع المتداخلة.
+
 يتم نشر صورة بيئة التطوير تلقائيًا إلى `ghcr.io/emran025/acsys360/dev:latest` عند الدفع إلى الفرع الرئيسي.
 
 ## بناء نسخة Windows نهائية محليًا

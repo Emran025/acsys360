@@ -79,9 +79,11 @@ printf '%s\n' '{"protocolVersion":"0.5.0","rootPath":"/tmp","sourcePaths":[],"so
 ضمن `artifacts`. لا يقوم تطبيق Flutter ببناء Assembly أو إدارة NASM/GCC؛
 وظيفته تقتصر على إرسال الطلب وتشغيل artifact الذي أعاده backend.
 
-يدعم مولّد NASM الحالي في مسار `dart-native` الأنواع `صحيح` و`حقيقي`
-و`منطقي` و`حرفي` و`خيط_رمزي`، مع الإدخال والإخراج والثوابت والتعبيرات
-الحسابية الأساسية. ينتج كل بناء Windows ملف تنفيذ باسم فريد يتضمن معرّف
+يمر مسار native عبر عقد واضح: `AST → Three Address Code (3AC) → NASM x86_64`.
+يستهلك مولّد NASM قيمة `CTacResult` فقط مع معلومات الرموز الدلالية، ولا يقرأ AST مباشرة.
+يشمل 3AC الإسناد، التعبيرات الأحادية والثنائية، `READ` و`PRINT`، labels/branches/jumps
+والكتل الشرطية المتداخلة. ويدعم مولّد NASM الأنواع `صحيح` و`حقيقي` و`منطقي` و`حرفي`
+و`خيط_رمزي`، مع الإدخال والإخراج والتشخيصات المرتبطة بمواقع TAC. ينتج كل بناء Windows ملف تنفيذ باسم فريد يتضمن معرّف
 عملية المترجم، حتى لا يفشل البناء عند بقاء artifact سابق قيد التشغيل
 ومقفولاً من النظام.
 
@@ -101,13 +103,8 @@ dart run tool/verify_compiler_bundle.dart --executable build/arabicc
 | `src/main.c` | نقطة التشغيل ومعالجة `--protocol` و`--assist` و`--version` و`--help` |
 | `src/ast.c` | عقد AST والتسلسل المرتبط بها |
 | `src/semantic.c` | الرموز والتحقق الدلالي المحدود |
-| `src/backend/x86_64/asm_x86_64.c` | تنسيق توليد NASM والواجهة العامة مع الحفاظ على المسار AST + Semantic Result → Assembly |
-| `src/backend/x86_64/asm_x86_64_internal.h` | عقد داخلي وسياق التوليد المشترك بين وحدات backend |
-| `src/backend/x86_64/asm_x86_64_context.c` | مخزن النصوص، إدارة الذاكرة، التشخيصات، والبحث في الرموز |
-| `src/backend/x86_64/asm_x86_64_literals.c` | جمع النصوص والأعداد الحقيقية وإخراج قيم `.data` بصيغة NASM |
-| `src/backend/x86_64/asm_x86_64_expressions.c` | فحوص الأنواع وتوليد تعليمات التعبيرات integer/real/text |
-| `src/backend/x86_64/asm_x86_64_statements.c` | توليد الفروع والإسناد والطباعة ضمن الكتل المتداخلة |
-| `src/backend/x86_64/asm_x86_64_frame.c` | حساب إطار المكدس وإخراج المقدمة والخاتمة |
+| `src/ir/tac.c` | خفض AST إلى 3AC كامل للتعبيرات، الإدخال/الإخراج، والتحكم بالتدفق |
+| `src/backend/x86_64/asm_x86_64.c` | ترجمة `CTacResult` + `CSemanticResult` إلى NASM؛ لا يقرأ AST |
 | `include/*.h` | عقود البيانات وواجهات الوحدات |
 | `CMakeLists.txt` | توليد parser/scanner وبناء `arabicc` واختبارات CMake |
 

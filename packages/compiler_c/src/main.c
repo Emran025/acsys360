@@ -82,13 +82,17 @@ int main(int argc, char **argv) {
       if (c_analyze_semantics(g_root_ast, &semantic) && semantic.diagnostic_count == 0) {
         CAssemblyResult assembly;
         memset(&assembly, 0, sizeof(assembly));
-        if (c_generate_nasm_x86_64(g_root_ast, &semantic, &assembly) && assembly.text) {
+        CTacResult tac = {0};
+        if (c_generate_tac(g_root_ast, &tac) &&
+            c_generate_nasm_x86_64(&tac, &semantic, &assembly) && assembly.text) {
           fputs(assembly.text, stdout);
+          c_tac_result_free(&tac);
           c_assembly_result_free(&assembly);
           c_semantic_result_free(&semantic);
           free(source);
           return 0;
         }
+        c_tac_result_free(&tac);
         c_assembly_result_free(&assembly);
       }
       c_semantic_result_free(&semantic);

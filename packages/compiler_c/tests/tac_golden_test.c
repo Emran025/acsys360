@@ -41,8 +41,7 @@ int main(void) {
       "ALLOC x, صحيح",
       "t0 = 1 + 2",
       "x = t0",
-      "PARAM x",
-      "CALL print, 1",
+      "PRINT x",
   };
   int success = generated && result.count == sizeof(expected) / sizeof(expected[0]);
   if (!success) {

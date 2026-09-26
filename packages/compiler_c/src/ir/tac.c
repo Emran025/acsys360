@@ -1,181 +1,116 @@
 #include "tac.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-static char *duplicate_string(const char *value) {
+static const CAstNode *g_root;
+static const CAstNode *constant_value(const char *name) { if (!g_root || !name) return NULL; for (size_t i=0;i<g_root->data.program.declarations.count;i++){const CAstNode *d=g_root->data.program.declarations.items[i];if(d->kind==C_AST_CONSTANT_DECLARATION && d->data.constant.name && !strcmp(d->data.constant.name,name)) return d->data.constant.value;} return NULL; }
+static char *dup(const char *value) {
   const char *source = value ? value : "";
-  const size_t length = strlen(source);
-  char *copy = (char *)malloc(length + 1U);
+  size_t length = strlen(source);
+  char *copy = malloc(length + 1U);
   if (copy) memcpy(copy, source, length + 1U);
   return copy;
 }
-
 static int reserve(CTacResult *result) {
   if (result->count < result->capacity) return 1;
-  const size_t next = result->capacity == 0U ? 16U : result->capacity * 2U;
-  CTacInstruction *items = (CTacInstruction *)realloc(
-      result->items, next * sizeof(CTacInstruction));
+  size_t next = result->capacity ? result->capacity * 2U : 32U;
+  CTacInstruction *items = realloc(result->items, next * sizeof(*items));
   if (!items) return 0;
-  result->items = items;
-  result->capacity = next;
-  return 1;
+  result->items = items; result->capacity = next; return 1;
 }
-
-static int add(CTacResult *result, CTacInstruction instruction) {
+static int add(CTacResult *result, CTacOpcode opcode, const char *r,
+               const char *l, const char *op, const char *right,
+               const char *type, size_t argc, const CAstNode *node) {
   if (!reserve(result)) return 0;
-  result->items[result->count++] = instruction;
+  CTacInstruction *item = &result->items[result->count++];
+  memset(item, 0, sizeof(*item));
+  item->opcode = opcode; item->result = dup(r); item->left = dup(l);
+  item->operator = dup(op); item->right = dup(right); item->type = dup(type);
+  item->argument_count = argc;
+  item->offset = node ? node->offset : 0U; item->line = node ? node->line : 1U;
+  item->column = node ? node->column : 1U;
+  return item->result && item->left && item->operator && item->right && item->type;
+}
+static const char *expr_type(const CAstNode *n) {
+  if (!n) return "غير معروف";
+  if (n->kind == C_AST_LITERAL) {
+    switch (n->data.literal.literal_kind) {
+      case C_TOKEN_INTEGER: return "صحيح"; case C_TOKEN_REAL: return "حقيقي";
+      case C_TOKEN_BOOLEAN: return "منطقي"; case C_TOKEN_CHARACTER: return "حرفي";
+      case C_TOKEN_STRING: return "خيط_رمزي"; default: return "غير معروف";
+    }
+  }
+  if (n->kind == C_AST_BINARY) {
+    const char *l = expr_type(n->data.binary.left), *r = expr_type(n->data.binary.right);
+    const char *op = n->data.binary.operator;
+    if (!strcmp(op, "==") || !strcmp(op, "!=") || !strcmp(op, "<") || !strcmp(op, ">") || !strcmp(op, "<=") || !strcmp(op, ">=") || !strcmp(op, "&&") || !strcmp(op, "||")) return "منطقي";
+    if (!strcmp(l, "حقيقي") || !strcmp(r, "حقيقي")) return "حقيقي";
+    if (!strcmp(l, "خيط_رمزي") || !strcmp(r, "خيط_رمزي")) return "خيط_رمزي";
+    return l;
+  }
+  if (n->kind == C_AST_UNARY) return !strcmp(n->data.unary.operator, "!") ? "منطقي" : expr_type(n->data.unary.operand);
+  if (n->kind == C_AST_VARIABLE_REFERENCE) {
+    const CAstNode *constant = constant_value(n->data.reference.name);
+    if (constant) return expr_type(constant);
+    if (g_root) for (size_t i=0;i<g_root->data.program.declarations.count;i++) {
+      const CAstNode *d=g_root->data.program.declarations.items[i];
+      if (d->kind==C_AST_VARIABLE_DECLARATION && d->data.variable.type && d->data.variable.type->name)
+        for (size_t j=0;j<d->data.variable.name_count;j++) if (!strcmp(d->data.variable.names[j],n->data.reference.name)) return d->data.variable.type->name;
+    }
+    return "غير معروف";
+  }
+  return "غير معروف";
+}
+static char *expression(const CAstNode *node, CTacResult *out, size_t *temporary) {
+  if (!node) return dup("0");
+  if (node->kind == C_AST_LITERAL) return dup(node->data.literal.value);
+  if (node->kind == C_AST_VARIABLE_REFERENCE) { const CAstNode *constant = constant_value(node->data.reference.name); if (constant && constant->kind == C_AST_LITERAL) return dup(constant->data.literal.value); return dup(node->data.reference.name); }
+  if (node->kind == C_AST_BINARY || node->kind == C_AST_UNARY) {
+    char *left = expression(node->kind == C_AST_BINARY ? node->data.binary.left : node->data.unary.operand, out, temporary);
+    char *right = node->kind == C_AST_BINARY ? expression(node->data.binary.right, out, temporary) : NULL;
+    char name[32]; snprintf(name, sizeof(name), "t%zu", (*temporary)++);
+    int ok = add(out, node->kind == C_AST_BINARY ? C_TAC_BINARY : C_TAC_UNARY, name, left,
+                 node->kind == C_AST_BINARY ? node->data.binary.operator : node->data.unary.operator,
+                 right, expr_type(node), 0U, node);
+    free(left); free(right); return ok ? dup(name) : NULL;
+  }
+  return dup("0");
+}
+static int statements(const CAstNodeList *list, CTacResult *out, size_t *temp, size_t *label) {
+  for (size_t i = 0; i < list->count; i++) {
+    const CAstNode *s = list->items[i]; if (!s) continue;
+    if (s->kind == C_AST_PROGRAM) { if (!statements(&s->data.program.statements, out, temp, label)) return 0; continue; }
+    if (s->kind == C_AST_IF) {
+      char els[32], done[32]; snprintf(els,sizeof(els),"L%zu",(*label)++); snprintf(done,sizeof(done),"L%zu",(*label)++);
+      char *condition = expression(s->data.conditional.condition,out,temp);
+      if (!condition || !add(out,C_TAC_BRANCH,els,condition,NULL,done,"منطقي",0U,s) || !statements(&s->data.conditional.then_branch,out,temp,label) || !add(out,C_TAC_JUMP,done,NULL,NULL,NULL,"",0U,s) || !add(out,C_TAC_LABEL,els,NULL,NULL,NULL,"",0U,s) || !statements(&s->data.conditional.else_branch,out,temp,label) || !add(out,C_TAC_LABEL,done,NULL,NULL,NULL,"",0U,s)) { free(condition); return 0; } free(condition); continue;
+    }
+    if (s->kind == C_AST_WHILE) {
+      char head[32], done[32]; snprintf(head,sizeof(head),"L%zu",(*label)++); snprintf(done,sizeof(done),"L%zu",(*label)++);
+      if (!add(out,C_TAC_LABEL,head,NULL,NULL,NULL,"",0U,s)) return 0;
+      char *condition=expression(s->data.loop.condition,out,temp); if (!condition || !add(out,C_TAC_BRANCH,done,condition,NULL,head,"منطقي",0U,s) || !statements(&s->data.loop.body,out,temp,label) || !add(out,C_TAC_JUMP,head,NULL,NULL,NULL,"",0U,s) || !add(out,C_TAC_LABEL,done,NULL,NULL,NULL,"",0U,s)) { free(condition); return 0; } free(condition); continue;
+    }
+    if (s->kind == C_AST_REPEAT || s->kind == C_AST_REPEAT_UNTIL) { /* Lower repeat forms to their observable body/control-flow TAC. */
+      if (s->kind == C_AST_REPEAT) { char *from=expression(s->data.repeat.from,out,temp); if (!from || !add(out,C_TAC_ASSIGN,s->data.repeat.variable,from,NULL,NULL,"صحيح",0U,s)) { free(from); return 0; } free(from); }
+      char head[32], done[32]; snprintf(head,sizeof(head),"L%zu",(*label)++); snprintf(done,sizeof(done),"L%zu",(*label)++);
+      if (!add(out,C_TAC_LABEL,head,NULL,NULL,NULL,"",0U,s)) return 0;
+      char *condition = expression(s->kind == C_AST_REPEAT ? s->data.repeat.to : s->data.repeat_until.condition,out,temp);
+      if (!condition || !statements(s->kind == C_AST_REPEAT ? &s->data.repeat.body : &s->data.repeat_until.body,out,temp,label) || !add(out,C_TAC_BRANCH,done,condition,NULL,head,"منطقي",0U,s) || !add(out,C_TAC_LABEL,done,NULL,NULL,NULL,"",0U,s)) { free(condition); return 0; } free(condition); continue;
+    }
+    if (s->kind == C_AST_ASSIGNMENT) { char *v=expression(s->data.assignment.expression,out,temp); if (!v || !add(out,C_TAC_ASSIGN,s->data.assignment.name,v,NULL,NULL,expr_type(s->data.assignment.expression),0U,s)) { free(v); return 0; } free(v); continue; }
+    if (s->kind == C_AST_READ) { if (!add(out,C_TAC_READ,s->data.access.name,NULL,NULL,NULL,"غير معروف",0U,s)) return 0; continue; }
+    if (s->kind == C_AST_PRINT) { for (size_t j=0;j<s->data.print.values.count;j++) { char *v=expression(s->data.print.values.items[j],out,temp); if (!v || !add(out,C_TAC_PRINT,NULL,v,NULL,NULL,expr_type(s->data.print.values.items[j]),1U,s)) { free(v); return 0; } free(v); } continue; }
+    if (s->kind == C_AST_CALL) { for (size_t j=0;j<s->data.call.arguments.count;j++) { char *v=expression(s->data.call.arguments.items[j],out,temp); if (!v || !add(out,C_TAC_PARAM,NULL,v,NULL,NULL,expr_type(s->data.call.arguments.items[j]),1U,s)) { free(v); return 0; } free(v); } if (!add(out,C_TAC_CALL,s->data.call.name,NULL,NULL,NULL,"إجراء",s->data.call.arguments.count,s)) return 0; continue; }
+    if (s->kind != C_AST_EMPTY) return 0;
+  }
   return 1;
 }
-
-static CTacInstruction instruction(CTacOpcode opcode, const char *result,
-                                   const char *left, const char *operator,
-                                   const char *right, const char *type,
-                                   size_t argument_count) {
-  CTacInstruction item = {0};
-  item.opcode = opcode;
-  item.result = duplicate_string(result);
-  item.left = duplicate_string(left);
-  item.operator = duplicate_string(operator);
-  item.right = duplicate_string(right);
-  item.type = duplicate_string(type);
-  item.argument_count = argument_count;
-  return item;
-}
-
-static char *expression(const CAstNode *node, CTacResult *result, size_t *temporary) {
-  if (!node) return duplicate_string("0");
-  if (node->kind == C_AST_LITERAL) {
-    return duplicate_string(node->data.literal.value ? node->data.literal.value : "0");
-  }
-  if (node->kind == C_AST_VARIABLE_REFERENCE) {
-    return duplicate_string(node->data.reference.name ? node->data.reference.name : "");
-  }
-  if (node->kind == C_AST_BINARY) {
-    char *left = expression(node->data.binary.left, result, temporary);
-    char *right = expression(node->data.binary.right, result, temporary);
-    if (!left || !right) {
-      free(left);
-      free(right);
-      return NULL;
-    }
-    char name[32];
-    (void)snprintf(name, sizeof(name), "t%zu", (*temporary)++);
-    const CTacInstruction item = instruction(
-        C_TAC_BINARY, name, left,
-        node->data.binary.operator ? node->data.binary.operator : "+", right,
-        "غير معروف", 0U);
-    free(left);
-    free(right);
-    if (!add(result, item)) {
-      free(item.result); free(item.left); free(item.operator); free(item.right);
-      free(item.type);
-      return NULL;
-    }
-    return duplicate_string(name);
-  }
-  return duplicate_string("0");
-}
-
 int c_generate_tac(const CAstNode *root, CTacResult *result) {
-  if (!root || !result || root->kind != C_AST_PROGRAM) return 0;
-  memset(result, 0, sizeof(*result));
-  size_t temporary = 0U;
-  for (size_t i = 0U; i < root->data.program.declarations.count; i++) {
-    const CAstNode *declaration = root->data.program.declarations.items[i];
-    if (!declaration || declaration->kind != C_AST_VARIABLE_DECLARATION) continue;
-    for (size_t j = 0U; j < declaration->data.variable.name_count; j++) {
-      const char *type = declaration->data.variable.type &&
-                                 declaration->data.variable.type->name
-                             ? declaration->data.variable.type->name
-                             : "صحيح";
-      if (!add(result, instruction(C_TAC_ALLOC,
-                                   declaration->data.variable.names[j], NULL,
-                                   NULL, NULL, type, 0U))) {
-        c_tac_result_free(result);
-        return 0;
-      }
-    }
-  }
-  for (size_t i = 0U; i < root->data.program.statements.count; i++) {
-    const CAstNode *statement = root->data.program.statements.items[i];
-    if (!statement) continue;
-    if (statement->kind == C_AST_ASSIGNMENT && statement->data.assignment.name) {
-      char *value = expression(statement->data.assignment.expression, result, &temporary);
-      if (!value || !add(result, instruction(C_TAC_ASSIGN,
-                                              statement->data.assignment.name,
-                                              value, NULL, NULL, "غير معروف", 0U))) {
-        free(value);
-        c_tac_result_free(result);
-        return 0;
-      }
-      free(value);
-    } else if (statement->kind == C_AST_PRINT) {
-      for (size_t j = 0U; j < statement->data.print.values.count; j++) {
-        char *value = expression(statement->data.print.values.items[j], result, &temporary);
-        if (!value || !add(result, instruction(C_TAC_PARAM, NULL, value, NULL,
-                                                NULL, "غير معروف", 1U)) ||
-            !add(result, instruction(C_TAC_CALL, "print", NULL, NULL, NULL,
-                                     "إجراء", 1U))) {
-          free(value);
-          c_tac_result_free(result);
-          return 0;
-        }
-        free(value);
-      }
-    }
-  }
-  return 1;
+  if (!root || !result || root->kind != C_AST_PROGRAM) return 0; g_root = root; memset(result,0,sizeof(*result)); size_t temp=0,label=0;
+  for (size_t i=0;i<root->data.program.declarations.count;i++) { const CAstNode *d=root->data.program.declarations.items[i]; if (d->kind==C_AST_VARIABLE_DECLARATION) for(size_t j=0;j<d->data.variable.name_count;j++) if(!add(result,C_TAC_ALLOC,d->data.variable.names[j],NULL,NULL,NULL,d->data.variable.type&&d->data.variable.type->name?d->data.variable.type->name:"نوع مركب",0U,d)) { c_tac_result_free(result); return 0; } }
+  if (!statements(&root->data.program.statements,result,&temp,&label)) { c_tac_result_free(result); return 0; } return 1;
 }
-
-const char *c_tac_opcode_name(CTacOpcode opcode) {
-  switch (opcode) {
-    case C_TAC_ALLOC: return "ALLOC";
-    case C_TAC_ASSIGN: return "ASSIGN";
-    case C_TAC_BINARY: return "BINARY";
-    case C_TAC_PARAM: return "PARAM";
-    case C_TAC_CALL: return "CALL";
-    default: return "UNKNOWN";
-  }
-}
-
-char *c_tac_instruction_to_text(const CTacInstruction *item) {
-  if (!item) return NULL;
-  char buffer[512];
-  switch (item->opcode) {
-    case C_TAC_ALLOC:
-      (void)snprintf(buffer, sizeof(buffer), "ALLOC %s, %s", item->result, item->type);
-      break;
-    case C_TAC_ASSIGN:
-      (void)snprintf(buffer, sizeof(buffer), "%s = %s", item->result, item->left);
-      break;
-    case C_TAC_BINARY:
-      (void)snprintf(buffer, sizeof(buffer), "%s = %s %s %s", item->result,
-                     item->left, item->operator, item->right);
-      break;
-    case C_TAC_PARAM:
-      (void)snprintf(buffer, sizeof(buffer), "PARAM %s", item->left);
-      break;
-    case C_TAC_CALL:
-      (void)snprintf(buffer, sizeof(buffer), "CALL %s, %zu", item->result,
-                     item->argument_count);
-      break;
-    default:
-      return NULL;
-  }
-  return duplicate_string(buffer);
-}
-
-void c_tac_result_free(CTacResult *result) {
-  if (!result) return;
-  for (size_t i = 0U; i < result->count; i++) {
-    free(result->items[i].result);
-    free(result->items[i].left);
-    free(result->items[i].operator);
-    free(result->items[i].right);
-    free(result->items[i].type);
-  }
-  free(result->items);
-  memset(result, 0, sizeof(*result));
-}
+const char *c_tac_opcode_name(CTacOpcode opcode) { switch(opcode){case C_TAC_ALLOC:return "ALLOC";case C_TAC_ASSIGN:return "ASSIGN";case C_TAC_BINARY:return "BINARY";case C_TAC_UNARY:return "UNARY";case C_TAC_PARAM:return "PARAM";case C_TAC_CALL:return "CALL";case C_TAC_LABEL:return "LABEL";case C_TAC_JUMP:return "JUMP";case C_TAC_BRANCH:return "BRANCH";case C_TAC_READ:return "READ";case C_TAC_PRINT:return "PRINT";default:return "UNKNOWN";} }
+char *c_tac_instruction_to_text(const CTacInstruction *i) { if(!i)return NULL; char b[512]; switch(i->opcode){case C_TAC_ALLOC:snprintf(b,sizeof(b),"ALLOC %s, %s",i->result,i->type);break;case C_TAC_ASSIGN:snprintf(b,sizeof(b),"%s = %s",i->result,i->left);break;case C_TAC_BINARY:snprintf(b,sizeof(b),"%s = %s %s %s",i->result,i->left,i->operator,i->right);break;case C_TAC_UNARY:snprintf(b,sizeof(b),"%s = %s%s",i->result,i->operator,i->left);break;case C_TAC_PARAM:snprintf(b,sizeof(b),"PARAM %s",i->left);break;case C_TAC_CALL:snprintf(b,sizeof(b),"CALL %s, %zu",i->result,i->argument_count);break;case C_TAC_LABEL:snprintf(b,sizeof(b),"LABEL %s",i->result);break;case C_TAC_JUMP:snprintf(b,sizeof(b),"JUMP %s",i->result);break;case C_TAC_BRANCH:snprintf(b,sizeof(b),"BRANCH %s, %s, %s",i->left,i->result,i->right);break;case C_TAC_READ:snprintf(b,sizeof(b),"READ %s",i->result);break;case C_TAC_PRINT:snprintf(b,sizeof(b),"PRINT %s",i->left);break;default:return NULL;} return dup(b); }
+void c_tac_result_free(CTacResult *result){if(!result)return;for(size_t i=0;i<result->count;i++){free(result->items[i].result);free(result->items[i].left);free(result->items[i].operator);free(result->items[i].right);free(result->items[i].type);}free(result->items);memset(result,0,sizeof(*result));}

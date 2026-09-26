@@ -80,14 +80,25 @@ int compiler_driver_run(const char *payload) {
           protocol_add_symbol(&resp, semantic.items[i].name, "variable", semantic.items[i].type, span);
         }
 
-        /* 3. Assembly */
+        /* 3. Three Address Code (3AC) is the single input to native codegen. */
+        CTacResult tac = {0};
+        if (c_generate_tac(g_root_ast, &tac)) {
+          for (size_t i = 0U; i < tac.count; i++) {
+            char *text = c_tac_instruction_to_text(&tac.items[i]);
+            if (text) { protocol_add_tac(&resp, text); free(text); }
+          }
+        } else {
+          protocol_add_diagnostic(&resp, SEVERITY_ERROR, "tac", "TAC001",
+                                  "تعذر توليد Three Address Code", NULL);
+        }
+        /* 4. Assembly: consume the exact TAC exposed by the protocol. */
         CAssemblyResult assembly;
         memset(&assembly, 0, sizeof(assembly));
         char *backend_target = protocol_extract_string_value(payload, "\"target\"");
         const int requires_native_backend =
             backend_target && strcmp(backend_target, "dart-native") == 0;
         const int assembly_ok =
-            c_generate_nasm_x86_64(g_root_ast, &semantic, &assembly);
+            c_generate_nasm_x86_64(&tac, &semantic, &assembly);
         if (assembly_ok && assembly.text && assembly.diagnostic_count == 0) {
           protocol_set_assembly(&resp, assembly.text);
         }
@@ -112,6 +123,7 @@ int compiler_driver_run(const char *payload) {
         }
         free(backend_target);
         c_assembly_result_free(&assembly);
+        c_tac_result_free(&tac);
       }
 
       for (size_t i = 0; i < semantic.diagnostic_count; i++) {
@@ -134,20 +146,7 @@ int compiler_driver_run(const char *payload) {
       }
       c_semantic_result_free(&semantic);
 
-      /* 5. Three Address Code (3AC) */
-      CTacResult tac = {0};
-      if (c_generate_tac(g_root_ast, &tac)) {
-        for (size_t i = 0U; i < tac.count; i++) {
-          char *text = c_tac_instruction_to_text(&tac.items[i]);
-          if (text) {
-            protocol_add_tac(&resp, text);
-            free(text);
-          }
-        }
-      }
-      c_tac_result_free(&tac);
-
-      /* 6. Execution output. Analysis requests must not run read() with a
+      /* 5. Execution output. Analysis requests must not run read() with a
          missing value: that used to make an unprovided input look like 0. */
       if (protocol_request_executes(payload)) {
         runtime_begin(strstr(payload, "\"inputValues\""), protocol_request_interactive(payload));
@@ -161,7 +160,7 @@ int compiler_driver_run(const char *payload) {
         runtime_end();
       }
 
-      /* 7. Artifacts */
+      /* 6. Artifacts */
       char *artifact_dir = protocol_extract_string_value(payload, "\"artifactDirectory\"");
       if (artifact_dir && artifact_dir[0] != '\0') {
         char *artifact_target = protocol_extract_string_value(payload, "\"target\"");
