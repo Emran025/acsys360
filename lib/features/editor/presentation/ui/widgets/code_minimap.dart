@@ -142,9 +142,10 @@ class _CodeMinimapState extends State<CodeMinimap> {
       size.height,
       lineCount * _MinimapPainter.lineHeight,
     );
+    final minimumViewportHeight = math.min(8.0, contentHeight).toDouble();
     final viewportHeight =
         (position.viewportDimension / contentHeight * contentHeight)
-            .clamp(8.0, contentHeight)
+            .clamp(minimumViewportHeight, contentHeight)
             .toDouble();
     final available = math.max(0.0, contentHeight - viewportHeight).toDouble();
     final top = position.maxScrollExtent == 0
@@ -420,9 +421,10 @@ class _MinimapPainter extends CustomPainter {
     final contentHeight = math
         .min(size.height, lineCount * lineHeight)
         .toDouble();
+    final minimumViewportHeight = math.min(8.0, contentHeight).toDouble();
     final viewportHeight =
         (position.viewportDimension / contentHeight * contentHeight)
-            .clamp(8.0, contentHeight)
+            .clamp(minimumViewportHeight, contentHeight)
             .toDouble();
     final available = math.max(0.0, contentHeight - viewportHeight).toDouble();
     final top = position.maxScrollExtent == 0
