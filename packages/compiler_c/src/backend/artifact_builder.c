@@ -157,7 +157,7 @@ int artifact_build_native(const char *artifact_dir,
 #ifndef _WIN32
   {
     char *arguments[] = {
-      (char *)gcc, "-no-pie", object_path, "-o", artifact_path, NULL
+      (char *)gcc, "-no-pie", object_path, "-lm", "-o", artifact_path, NULL
     };
     if (toolchain_run_process(gcc, arguments) != 0) {
       snprintf(error, error_size, "فشل تشغيل GCC لربط الملف التنفيذي");

@@ -254,8 +254,10 @@ Future<void> main(List<String> args) async {
     final artifact = await run(
       executable,
       requestFor(
-        'برنامج artifact؛ متغير t0: صحيح؛ متغير x: صحيح؛ '
-        '{ t0 = 7؛ x = 1 + 2؛ اطبع(t0)؛ }.',
+        'برنامج artifact؛ متغير t0: صحيح؛ متغير x: صحيح؛ متغير n: صحيح؛ '
+        'متغير r: حقيقي؛ '
+        '{ t0 = 7؛ x = 1 + 2؛ n = 2 ^ -3؛ r = 9 ^ 0.5؛ '
+        'اطبع(t0)؛ اطبع(r)؛ اطبع(n)؛ }.',
         target: 'dart-native',
         rootPath: artifactDirectory.path,
         artifactDirectory:
@@ -280,7 +282,7 @@ Future<void> main(List<String> args) async {
     final artifactExecutable = (artifacts as List).last as String;
     final execution = await Process.run(artifactExecutable, const []);
     check(
-      execution.exitCode == 0 && execution.stdout.trim() == '7',
+      execution.exitCode == 0 && execution.stdout.trim() == '7\n3\n0',
       'generated artifact failed: ${execution.stderr}',
     );
   } finally {
