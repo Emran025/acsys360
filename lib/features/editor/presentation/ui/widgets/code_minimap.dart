@@ -379,8 +379,10 @@ class _MinimapPainter extends CustomPainter {
     }
     return switch (sourceToken.kind) {
       SourceTokenKind.comment => AppTheme.syntaxComment(colors),
-      SourceTokenKind.string || SourceTokenKind.character => AppTheme.syntaxString(colors),
-      SourceTokenKind.integer || SourceTokenKind.real => AppTheme.syntaxNumber(colors),
+      SourceTokenKind.string ||
+      SourceTokenKind.character => AppTheme.syntaxString(colors),
+      SourceTokenKind.integer ||
+      SourceTokenKind.real => AppTheme.syntaxNumber(colors),
       SourceTokenKind.boolean => AppTheme.syntaxBoolean(colors),
       SourceTokenKind.operator => AppTheme.syntaxOperator(colors),
       SourceTokenKind.punctuation => AppTheme.syntaxPunctuation(colors),

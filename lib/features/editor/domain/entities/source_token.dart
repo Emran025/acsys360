@@ -11,13 +11,7 @@ enum SourceTokenKind {
   comment,
 }
 
-enum SourceTokenGroup {
-  declaration,
-  controlFlow,
-  builtin,
-  type,
-  modifier,
-}
+enum SourceTokenGroup { declaration, controlFlow, builtin, type, modifier }
 
 enum SourceTokenRole { variable, constant, type, procedure, parameter }
 

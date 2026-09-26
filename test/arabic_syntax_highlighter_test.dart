@@ -41,34 +41,35 @@ void main() {
     expect(source.substring(symbol.start, symbol.end), 'س');
   });
 
-  test('recognizes the compiler lexer spellings and rejects invented aliases', () {
-    const source = 'إجراء اقرأ إذا وإلا أعد أضف خيط_رمزي خيط';
-    final tokens = highlighter.tokenize(source);
+  test(
+    'recognizes the compiler lexer spellings and rejects invented aliases',
+    () {
+      const source = 'إجراء اقرأ إذا وإلا أعد أضف خيط_رمزي خيط';
+      final tokens = highlighter.tokenize(source);
 
-    for (final word in <String>[
-      'إجراء',
-      'اقرأ',
-      'إذا',
-      'وإلا',
-      'أعد',
-      'أضف',
-      'خيط_رمزي',
-    ]) {
+      for (final word in <String>[
+        'إجراء',
+        'اقرأ',
+        'إذا',
+        'وإلا',
+        'أعد',
+        'أضف',
+        'خيط_رمزي',
+      ]) {
+        expect(
+          tokens.firstWhere((token) => token.lexeme == word).kind,
+          SourceTokenKind.keyword,
+        );
+      }
       expect(
-        tokens.firstWhere((token) => token.lexeme == word).kind,
-        SourceTokenKind.keyword,
+        tokens.firstWhere((token) => token.lexeme == 'خيط').kind,
+        SourceTokenKind.identifier,
       );
-    }
-    expect(
-      tokens.firstWhere((token) => token.lexeme == 'خيط').kind,
-      SourceTokenKind.identifier,
-    );
-  });
+    },
+  );
 
   test('assigns semantic groups to reserved words', () {
-    final tokens = highlighter.tokenize(
-      'برنامج إذا اطبع صحيح بالقيمة',
-    );
+    final tokens = highlighter.tokenize('برنامج إذا اطبع صحيح بالقيمة');
 
     expect(
       tokens.firstWhere((token) => token.lexeme == 'برنامج').group,

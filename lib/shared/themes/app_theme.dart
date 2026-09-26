@@ -4,65 +4,65 @@ abstract final class AppTheme {
   static const brandOrange = Color(0xFFFF9500);
   static const brandBlack = Color(0xFF0B0B0B);
   static Color syntaxDeclaration(ColorScheme colors) => _syntaxColor(
-        colors,
-        dark: const Color(0xFFFFC857),
-        light: const Color(0xFF875F00),
-      );
+    colors,
+    dark: const Color(0xFFFFC857),
+    light: const Color(0xFF875F00),
+  );
   static Color syntaxControlFlow(ColorScheme colors) => _syntaxColor(
-        colors,
-        dark: const Color(0xFFFF7AB2),
-        light: const Color(0xFFA1265A),
-      );
+    colors,
+    dark: const Color(0xFFFF7AB2),
+    light: const Color(0xFFA1265A),
+  );
   static Color syntaxBuiltin(ColorScheme colors) => _syntaxColor(
-        colors,
-        dark: const Color(0xFF63C5DA),
-        light: const Color(0xFF006D77),
-      );
+    colors,
+    dark: const Color(0xFF63C5DA),
+    light: const Color(0xFF006D77),
+  );
   static Color syntaxType(ColorScheme colors) => _syntaxColor(
-        colors,
-        dark: const Color(0xFFB39DDB),
-        light: const Color(0xFF5E3A8A),
-      );
+    colors,
+    dark: const Color(0xFFB39DDB),
+    light: const Color(0xFF5E3A8A),
+  );
   static Color syntaxModifier(ColorScheme colors) => _syntaxColor(
-        colors,
-        dark: const Color(0xFFF2A65A),
-        light: const Color(0xFF9A4F00),
-      );
+    colors,
+    dark: const Color(0xFFF2A65A),
+    light: const Color(0xFF9A4F00),
+  );
   static Color syntaxNumber(ColorScheme colors) => _syntaxColor(
-        colors,
-        dark: const Color(0xFF9CDCFE),
-        light: const Color(0xFF005A9C),
-      );
+    colors,
+    dark: const Color(0xFF9CDCFE),
+    light: const Color(0xFF005A9C),
+  );
   static Color syntaxString(ColorScheme colors) => _syntaxColor(
-        colors,
-        dark: const Color(0xFFCE9178),
-        light: const Color(0xFF9C3D1F),
-      );
+    colors,
+    dark: const Color(0xFFCE9178),
+    light: const Color(0xFF9C3D1F),
+  );
   static Color syntaxBoolean(ColorScheme colors) => _syntaxColor(
-        colors,
-        dark: const Color(0xFF569CD6),
-        light: const Color(0xFF124E96),
-      );
+    colors,
+    dark: const Color(0xFF569CD6),
+    light: const Color(0xFF124E96),
+  );
   static Color syntaxOperator(ColorScheme colors) => _syntaxColor(
-        colors,
-        dark: const Color(0xFFD4D4D4),
-        light: const Color(0xFF424242),
-      );
+    colors,
+    dark: const Color(0xFFD4D4D4),
+    light: const Color(0xFF424242),
+  );
   static Color syntaxPunctuation(ColorScheme colors) => _syntaxColor(
-        colors,
-        dark: const Color(0xFF9B9B9B),
-        light: const Color(0xFF707070),
-      );
+    colors,
+    dark: const Color(0xFF9B9B9B),
+    light: const Color(0xFF707070),
+  );
   static Color syntaxIdentifier(ColorScheme colors) => _syntaxColor(
-        colors,
-        dark: const Color(0xFFD4D4D4),
-        light: const Color(0xFF303030),
-      );
+    colors,
+    dark: const Color(0xFFD4D4D4),
+    light: const Color(0xFF303030),
+  );
   static Color syntaxComment(ColorScheme colors) => _syntaxColor(
-        colors,
-        dark: const Color(0xFF6A9955),
-        light: const Color(0xFF3F7A3F),
-      );
+    colors,
+    dark: const Color(0xFF6A9955),
+    light: const Color(0xFF3F7A3F),
+  );
 
   static Color _syntaxColor(
     ColorScheme colors, {

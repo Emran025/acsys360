@@ -158,7 +158,9 @@ class ArabicCodeController extends TextEditingController {
   }
 
   Color? _tokenColor(SourceToken token, ColorScheme colors) {
-    if (token.kind == SourceTokenKind.comment) return AppTheme.syntaxComment(colors);
+    if (token.kind == SourceTokenKind.comment) {
+      return AppTheme.syntaxComment(colors);
+    }
     if (token.role != null) {
       return switch (token.role!) {
         SourceTokenRole.constant => AppTheme.syntaxNumber(colors),
@@ -179,8 +181,10 @@ class ArabicCodeController extends TextEditingController {
     }
     return switch (token.kind) {
       SourceTokenKind.keyword => AppTheme.syntaxDeclaration(colors),
-      SourceTokenKind.string || SourceTokenKind.character => AppTheme.syntaxString(colors),
-      SourceTokenKind.integer || SourceTokenKind.real => AppTheme.syntaxNumber(colors),
+      SourceTokenKind.string ||
+      SourceTokenKind.character => AppTheme.syntaxString(colors),
+      SourceTokenKind.integer ||
+      SourceTokenKind.real => AppTheme.syntaxNumber(colors),
       SourceTokenKind.boolean => AppTheme.syntaxBoolean(colors),
       SourceTokenKind.operator => AppTheme.syntaxOperator(colors),
       SourceTokenKind.punctuation => AppTheme.syntaxPunctuation(colors),
