@@ -11,17 +11,19 @@ nasm -f elf64 "$tmp/program.asm" -o "$tmp/program.o"
 cc -no-pie "$tmp/program.o" -o "$tmp/program"
 test "$("$tmp/program")" = 'نعم'
 cat >"$tmp/input.arb" <<'SRC'
-برنامج إدخال؛ متغير س: صحيح؛ متغير معدل: حقيقي؛ متغير موافق: منطقي؛ متغير اسم: خيط_رمزي؛ { اقرأ(س)؛ اقرأ(معدل)؛ اقرأ(موافق)؛ اقرأ(اسم)؛ اطبع(س، معدل، موافق، اسم)؛ }.
+برنامج إدخال؛ متغير س: صحيح؛ متغير معدل: حقيقي؛ متغير موافق: منطقي؛ متغير اسم: خيط_رمزي؛ متغير الحرف: حرفي؛
+{ اقرأ(س)؛ اقرأ(معدل)؛ اقرأ(موافق)؛ اقرأ(اسم)؛ اقرأ(الحرف)؛ اطبع(س، معدل، موافق، اسم، الحرف)؛ }.
 SRC
 "$compiler" --asm <"$tmp/input.arb" >"$tmp/input.asm"
 nasm -f elf64 "$tmp/input.asm" -o "$tmp/input.o"
 cc -no-pie "$tmp/input.o" -o "$tmp/input"
-printf '7\n2.5\n1\nعلي\n' | "$tmp/input" >"$tmp/input.output"
-test "$(grep -c '"requestType":"input"' "$tmp/input.output")" -eq 4
-test "$(tail -4 "$tmp/input.output")" = '7
+printf '7\n2.5\nصح\nعلي\nأ\n' | "$tmp/input" >"$tmp/input.output"
+test "$(grep -c '"requestType":"input"' "$tmp/input.output")" -eq 5
+test "$(tail -5 "$tmp/input.output")" = '7
 2.5
 صح
-علي'
+علي
+أ'
 cat >"$tmp/regressions.arb" <<'SRC'
 برنامج تراجعات؛ ثابت حد = 2 + 3؛ متغير صحيح_م: صحيح؛ متغير حقيقي_م: حقيقي؛ متغير سالب: حقيقي؛ متغير i: صحيح؛ { صحيح_م = 4؛ حقيقي_م = صحيح_م + 2.5؛ سالب = -2.5؛ اطبع(حد، حقيقي_م، سالب)؛ كرر(i = 3 الى 1 أضف -1) اطبع(i)؛ }.
 SRC

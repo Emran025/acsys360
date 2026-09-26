@@ -53,11 +53,11 @@ Future<void> main(List<String> args) async {
       path,
       inputValues: name == '04_io.arb'
           ? const {
-              'الاسم': 'علي',
-              'العدد': '7',
-              'المعدل': '2.5',
+              'الاسم': 'عمران',
+              'العدد': '12',
+              'المعدل': '66.4',
               'موافق': 'صح',
-              'الحرف': 'م',
+              'الحرف': 'أ',
             }
           : const {},
     );
@@ -68,8 +68,10 @@ Future<void> main(List<String> args) async {
     if (name == '04_io.arb') {
       check(
         response['executionOutput'] is List &&
-            (response['executionOutput'] as List).contains('علي'),
-        '${path.path}: input output is missing',
+            (response['executionOutput'] as List).join('\n') ==
+                'الاسم\nعمران\nالعدد\n12\nالمعدل\n66.4\nموافق\nصح\nالحرف\nأ',
+        '${path.path}: typed input was not preserved: '
+        '${response['executionOutput']}',
       );
     }
   }
