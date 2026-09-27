@@ -32,6 +32,8 @@ int main(void) {
        strstr(assembly.text, "cmp rax, 0") &&
        strstr(assembly.text, "fmt_read_bool: db \"%255s\", 0") &&
        strstr(assembly.text, "read_bool_retry_0:") &&
+       strstr(assembly.text, "jmp read_bool_done_0\n") &&
+       strstr(assembly.text, "read_bool_done_0:\n") &&
        strstr(assembly.text, "call strcmp") &&
        strstr(assembly.text, "input_bool_true");
   if (!ok) fprintf(stderr, "3AC NASM golden output is incomplete\n%s\n", assembly.text ? assembly.text : "<null>");

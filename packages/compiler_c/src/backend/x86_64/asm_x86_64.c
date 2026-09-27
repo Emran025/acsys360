@@ -186,7 +186,7 @@ int c_generate_nasm_x86_64(const CTacResult *tac,const CSemanticResult *semantic
        "    mov eax, 1\n"
        "read_bool_done_%zu:\n",
        read_index,input_slot,fmt,input_slot,read_index,input_slot,
-       read_index,read_index,read_index);
+       read_index,read_index,read_index,read_index);
      if(ok)ok=emit_store_rax(&result->text,&len,&cap,semantic,tac,
                              current_procedure,x->result);
     } else if(ok) {
