@@ -41,7 +41,7 @@ static int diagnostic(Analyzer *analyzer, const CAstNode *node,
   item->offset = node != NULL ? node->offset : 0U;
   item->line = node != NULL ? node->line : 1U;
   item->column = node != NULL ? node->column : 1U;
-  item->length = 1U;
+  item->length = node != NULL && node->length > 0U ? node->length : 1U;
   result->diagnostic_count++;
   return 1;
 }

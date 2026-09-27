@@ -276,6 +276,7 @@ static void execute_statement(ProtocolResponse *resp,const CAstNode *s,ExecVar *
   else if(s->kind==C_AST_PRINT) execute_print(resp,s,vars,*count);
   else if(s->kind==C_AST_REPEAT){long long from=eval_ast_expr(s->data.repeat.from,vars,*count),to=eval_ast_expr(s->data.repeat.to,vars,*count),step=s->data.repeat.step?eval_ast_expr(s->data.repeat.step,vars,*count):1;if(!step)step=1;for(long long v=from;step>0?v<=to:v>=to;v+=step){set_exec_var(vars,count,s->data.repeat.variable,"صحيح",exec_number(v));execute_statements(resp,&s->data.repeat.body,vars,count);if((step>0&&v>to-step)||(step<0&&v<to-step))break;}}
   else if(s->kind==C_AST_WHILE){size_t guard=0;while(eval_ast_expr(s->data.loop.condition,vars,*count)&&guard++<100000)execute_statements(resp,&s->data.loop.body,vars,count);}
+  else if(s->kind==C_AST_REPEAT_UNTIL){size_t guard=0;do{execute_statements(resp,&s->data.repeat_until.body,vars,count);guard++;}while(!g_input_error&&!eval_ast_expr(s->data.repeat_until.condition,vars,*count)&&guard<100000);}
   else if(s->kind==C_AST_IF){const CAstNodeList *b=eval_ast_expr(s->data.conditional.condition,vars,*count)?&s->data.conditional.then_branch:&s->data.conditional.else_branch;execute_statements(resp,b,vars,count);}
 }
 static void execute_statements(ProtocolResponse *resp,const CAstNodeList *statements,ExecVar *vars,size_t *count){for(size_t i=0;i<statements->count && !g_input_error;i++)execute_statement(resp,statements->items[i],vars,count);}

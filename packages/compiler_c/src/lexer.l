@@ -27,14 +27,14 @@ static char *duplicate_string(const char *source) {
   return copy;
 }
 
-static size_t utf8_char_count(const char *s, size_t byte_len) {
-  size_t chars = 0;
+static size_t utf8_utf16_length(const char *s, size_t byte_len) {
+  size_t units = 0;
   for (size_t i = 0; i < byte_len; i++) {
-    if (((unsigned char)s[i] & 0xC0) != 0x80) {
-      chars++;
-    }
+    const unsigned char byte = (unsigned char)s[i];
+    if ((byte & 0xC0) == 0x80) continue;
+    units += byte >= 0xF0 ? 2U : 1U;
   }
-  return chars;
+  return units;
 }
 
 static void emit_token(const char *kind, const char *lexeme) {
@@ -53,7 +53,11 @@ static void emit_token(const char *kind, const char *lexeme) {
   yy_token_offset = current_offset; \
   yy_token_line = current_line; \
   yy_token_column = current_column; \
-  yy_token_length = (int)utf8_char_count(yytext, (size_t)yyleng); \
+  yy_token_length = (int)utf8_utf16_length(yytext, (size_t)yyleng); \
+  yylloc.first_line = current_line; \
+  yylloc.last_line = current_line; \
+  yylloc.first_column = current_column; \
+  yylloc.last_column = current_column + yy_token_length; \
   current_column += yy_token_length; \
   current_offset += yy_token_length;
 %}
@@ -67,6 +71,7 @@ static void emit_token(const char *kind, const char *lexeme) {
 ARABIC_CHAR   (\xD8[\x80-\x8B\x8D-\x9A\x9C-\xBF]|\xD9[\x80-\xBF]|\xDA[\x80-\xBF]|\xDB[\x80-\xBF])
 ID            ({ARABIC_CHAR}|[a-zA-Z_])({ARABIC_CHAR}|[a-zA-Z0-9_])*
 DIGIT         [0-9]
+UTF8_UNKNOWN  ([\xC2-\xDF][\x80-\xBF]|\xE0[\xA0-\xBF][\x80-\xBF]|[\xE1-\xEC\xEE-\xEF][\x80-\xBF]{2}|\xED[\x80-\x9F][\x80-\xBF]|\xF0[\x90-\xBF][\x80-\xBF]{2}|[\xF1-\xF3][\x80-\xBF]{3}|\xF4[\x80-\x8F][\x80-\xBF]{2})
 
 %%
 
@@ -189,7 +194,15 @@ DIGIT         [0-9]
 ":"           { emit_token("punctuation", yytext); return ':'; }
 "."           { emit_token("punctuation", yytext); return '.'; }
 
-.             {
+<<EOF>>       {
+  yy_token_offset = current_offset;
+  yy_token_line = current_line;
+  yy_token_column = current_column;
+  yy_token_length = 0;
+  return 0;
+}
+
+{UTF8_UNKNOWN}|. {
   if (g_protocol_response) {
     ProtocolSpan span;
     span.source_path = (g_current_source_path && g_current_source_path[0] != '\0') ? g_current_source_path : NULL;

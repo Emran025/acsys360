@@ -241,6 +241,77 @@ char *protocol_extract_string_value(const char *payload, const char *key) {
   return json_find_string_property(payload, key);
 }
 
+char **protocol_extract_string_array(const char *payload, const char *wanted_key,
+                                     size_t *count) {
+  if (count == NULL) return NULL;
+  *count = 0U;
+  if (payload == NULL || wanted_key == NULL) return NULL;
+  const char *cursor = payload;
+  json_skip_space(&cursor);
+  if (*cursor++ != '{') return NULL;
+  json_skip_space(&cursor);
+  while (*cursor != '\0' && *cursor != '}') {
+    char *key = json_parse_string(&cursor);
+    if (key == NULL) return NULL;
+    json_skip_space(&cursor);
+    if (*cursor++ != ':') {
+      free(key);
+      return NULL;
+    }
+    json_skip_space(&cursor);
+    if (strcmp(key, wanted_key) == 0 && *cursor == '[') {
+      free(key);
+      cursor++;
+      json_skip_space(&cursor);
+      char **items = NULL;
+      size_t item_count = 0U;
+      while (*cursor != '\0' && *cursor != ']') {
+        char *item = json_parse_string(&cursor);
+        if (item == NULL) {
+          for (size_t index = 0U; index < item_count; index++) free(items[index]);
+          free(items);
+          return NULL;
+        }
+        char **resized = realloc(items, (item_count + 1U) * sizeof(*items));
+        if (resized == NULL) {
+          free(item);
+          for (size_t index = 0U; index < item_count; index++) free(items[index]);
+          free(items);
+          return NULL;
+        }
+        items = resized;
+        items[item_count++] = item;
+        json_skip_space(&cursor);
+        if (*cursor == ',') {
+          cursor++;
+          json_skip_space(&cursor);
+        } else if (*cursor != ']') {
+          for (size_t index = 0U; index < item_count; index++) free(items[index]);
+          free(items);
+          return NULL;
+        }
+      }
+      if (*cursor != ']') {
+        for (size_t index = 0U; index < item_count; index++) free(items[index]);
+        free(items);
+        return NULL;
+      }
+      *count = item_count;
+      return items;
+    }
+    free(key);
+    if (!json_skip_value(&cursor)) return NULL;
+    json_skip_space(&cursor);
+    if (*cursor == ',') {
+      cursor++;
+      json_skip_space(&cursor);
+    } else if (*cursor != '}') {
+      return NULL;
+    }
+  }
+  return NULL;
+}
+
 char *protocol_extract_source_code(const char *payload) {
   if (!payload) return NULL;
   char *entry_path = protocol_extract_string_value(payload, "\"entryPath\"");

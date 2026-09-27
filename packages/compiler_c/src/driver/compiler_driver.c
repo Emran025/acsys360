@@ -18,6 +18,7 @@ extern int current_column;
 extern int current_offset;
 extern char g_source_path_storage[1024];
 extern const char *g_current_source_path;
+const char *g_current_source_text;
 
 int compiler_driver_run(const char *payload) {
   if (payload == NULL || payload[0] == '\0') {
@@ -46,6 +47,7 @@ int compiler_driver_run(const char *payload) {
 
   char *source = protocol_extract_source_code(payload);
   if (source && source[0] != '\0') {
+    g_current_source_text = source;
     g_protocol_response = &resp;
     current_line = 1;
     current_column = 1;
@@ -68,18 +70,19 @@ int compiler_driver_run(const char *payload) {
       /* 2. Semantic analysis */
       CSemanticResult semantic;
       memset(&semantic, 0, sizeof(semantic));
-      if (c_analyze_semantics(g_root_ast, &semantic)) {
-        for (size_t i = 0; i < semantic.count; i++) {
-          ProtocolSpan span = {
-            g_current_source_path[0] != '\0' ? g_current_source_path : NULL,
-            semantic.items[i].offset,
-            semantic.items[i].line,
-            semantic.items[i].column,
-            0
-          };
-          protocol_add_symbol(&resp, semantic.items[i].name, "variable", semantic.items[i].type, span);
-        }
-
+      const int semantic_ok = c_analyze_semantics(g_root_ast, &semantic);
+      for (size_t i = 0; i < semantic.count; i++) {
+        ProtocolSpan span = {
+          g_current_source_path[0] != '\0' ? g_current_source_path : NULL,
+          semantic.items[i].offset,
+          semantic.items[i].line,
+          semantic.items[i].column,
+          0
+        };
+        protocol_add_symbol(&resp, semantic.items[i].name, "variable",
+                            semantic.items[i].type, span);
+      }
+      if (semantic_ok) {
         /* 3. Three Address Code (3AC) is the single input to native codegen. */
         CTacResult tac = {0};
         if (c_generate_tac(g_root_ast, &tac)) {
@@ -229,6 +232,7 @@ int compiler_driver_run(const char *payload) {
       g_root_ast = NULL;
     }
     free(source);
+    g_current_source_text = NULL;
     if (parse_failed) {
       if (resp.diagnostic_count == 0) {
         protocol_add_diagnostic(&resp, SEVERITY_ERROR, "syntax", "S001",

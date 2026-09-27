@@ -66,14 +66,9 @@ class ArabicCodeController extends TextEditingController {
       boundaries.add(ghostOffset);
     }
     for (final diagnostic in diagnostics) {
-      var offset = diagnostic.offset;
-      var len = diagnostic.length <= 0 ? 1 : diagnostic.length;
-      if (offset >= text.length && text.isNotEmpty) {
-        offset = text.length - 1;
-        len = 1;
-      }
-      final start = offset.clamp(0, text.length).toInt();
-      final end = (start + len).clamp(start, text.length).toInt();
+      if (diagnostic.length <= 0) continue;
+      final start = diagnostic.offset.clamp(0, text.length).toInt();
+      final end = (start + diagnostic.length).clamp(start, text.length).toInt();
       boundaries.add(start);
       boundaries.add(end);
     }
@@ -132,18 +127,12 @@ class ArabicCodeController extends TextEditingController {
 
   EditorDiagnostic? _diagnosticAt(int start, int end) {
     for (final diagnostic in diagnostics) {
-      var offset = diagnostic.offset;
-      var len = diagnostic.length <= 0 ? 1 : diagnostic.length;
-      if (offset >= text.length && text.isNotEmpty) {
-        offset = text.length - 1;
-        len = 1;
-      }
-      final diagStart = offset.clamp(0, text.length).toInt();
-      final diagEnd = (diagStart + len).clamp(diagStart, text.length).toInt();
+      if (diagnostic.length <= 0) continue;
+      final diagStart = diagnostic.offset.clamp(0, text.length).toInt();
+      final diagEnd = (diagStart + diagnostic.length)
+          .clamp(diagStart, text.length)
+          .toInt();
       if (start < diagEnd && end > diagStart) return diagnostic;
-      if (diagStart == diagEnd && start <= diagStart && diagStart <= end) {
-        return diagnostic;
-      }
     }
     return null;
   }

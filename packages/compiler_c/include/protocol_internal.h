@@ -18,6 +18,8 @@ void json_buf_append_escaped(JsonBuffer *buffer, const char *text);
 void json_buf_append_span(JsonBuffer *buffer, const ProtocolSpan *span);
 char *protocol_strdup(const char *source);
 char *protocol_extract_string_value(const char *payload, const char *key);
+char **protocol_extract_string_array(const char *payload, const char *key,
+                                     size_t *count);
 char *protocol_extract_source_code(const char *payload);
 char *protocol_ast_to_json(const CAstNode *root);
 char *protocol_generate_typed_ir(const CAstNode *root, const CSemanticResult *semantic);

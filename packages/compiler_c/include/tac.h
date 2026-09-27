@@ -15,7 +15,10 @@ typedef enum {
   C_TAC_JUMP,
   C_TAC_BRANCH,
   C_TAC_READ,
-  C_TAC_PRINT
+  C_TAC_PRINT,
+  C_TAC_PROCEDURE_BEGIN,
+  C_TAC_PROCEDURE_PARAMETER,
+  C_TAC_PROCEDURE_END
 } CTacOpcode;
 
 typedef struct {

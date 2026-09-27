@@ -89,6 +89,7 @@ struct CAstNode {
   size_t offset;
   size_t line;
   size_t column;
+  size_t length;
   union {
     struct {
       char *name;

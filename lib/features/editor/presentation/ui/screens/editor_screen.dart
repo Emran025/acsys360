@@ -14,6 +14,7 @@ import '../../../domain/usecases/toggle_line_comment.dart';
 import '../../controllers/editor_controller.dart';
 import '../widgets/arabic_code_controller.dart';
 import '../widgets/collapsible_panel.dart';
+import '../widgets/completion_popover_widget.dart';
 import '../widgets/diagnostic_popover_widget.dart';
 import '../widgets/diagnostics_panel_widget.dart';
 import '../widgets/editor_breadcrumbs_widget.dart';
@@ -1281,6 +1282,24 @@ class _EditorShellState extends State<EditorShell> {
                                               _hideTransientUi();
                                             },
                                             onClose: _hideTransientUi,
+                                          ),
+                                        ),
+                                      if (controller.assistance?.action ==
+                                              AssistAction.completion &&
+                                          controller
+                                              .assistance!
+                                              .items
+                                              .isNotEmpty)
+                                        Positioned(
+                                          top: 12,
+                                          right: 12,
+                                          width: 340,
+                                          child: CompletionPopoverWidget(
+                                            items: controller.assistance!.items,
+                                            selectedIndex:
+                                                controller.assistanceIndex,
+                                            onSelect: _applyCompletion,
+                                            onClose: controller.clearAssist,
                                           ),
                                         ),
                                       if (controller.assistance?.help != null)

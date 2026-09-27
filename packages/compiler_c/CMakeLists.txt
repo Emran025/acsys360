@@ -101,6 +101,18 @@ if(DART_EXECUTABLE)
     COMMAND ${DART_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/stability.dart
             $<TARGET_FILE:arabicc>)
+  add_test(NAME arabicc_repeat_until
+    COMMAND ${DART_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/repeat_until.dart
+            $<TARGET_FILE:arabicc>)
+  add_test(NAME arabicc_procedure_abi
+    COMMAND ${DART_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/procedure_abi.dart
+            $<TARGET_FILE:arabicc>)
+  add_test(NAME arabicc_editor_protocol
+    COMMAND ${DART_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/editor_protocol_smoke.dart
+            $<TARGET_FILE:arabicc>)
 else()
   message(STATUS "Dart not found: skipping compiler Dart integration tests")
 endif()

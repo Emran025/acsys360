@@ -8,6 +8,7 @@ import 'package:acsys360/features/editor/presentation/controllers/editor_control
 import 'package:acsys360/features/editor/presentation/ui/widgets/arabic_code_controller.dart';
 import 'package:acsys360/features/editor/presentation/ui/widgets/code_minimap.dart';
 import 'package:acsys360/features/editor/presentation/ui/widgets/line_numbered_editor.dart';
+import 'package:acsys360/features/editor/presentation/ui/widgets/completion_popover_widget.dart';
 import 'package:compiler_contracts/compiler_contracts.dart';
 import 'package:acsys360/main.dart';
 import 'package:acsys360/routes/app_router.dart';
@@ -768,6 +769,33 @@ void main() {
     expect(controller.currentCompletion?.label, 'برنامج');
   });
 
+  testWidgets('shows selectable completion suggestions', (tester) async {
+    AssistCompletionItem? selected;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: CompletionPopoverWidget(
+            items: const [
+              AssistCompletionItem(
+                label: 'العدد',
+                insertText: 'العدد',
+                kind: 'symbol',
+                detail: 'رمز معرّف في البرنامج',
+              ),
+            ],
+            selectedIndex: 0,
+            onSelect: (item) => selected = item,
+            onClose: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('اقتراحات الإكمال'), findsOneWidget);
+    await tester.tap(find.text('العدد'));
+    expect(selected?.insertText, 'العدد');
+  });
+
   testWidgets('renders ghost completion without changing source text', (
     tester,
   ) async {
@@ -1213,5 +1241,47 @@ void main() {
     expect(constantSpan.style?.color, scheme.secondary);
     expect(diagnosticSpan.style?.decoration, TextDecoration.underline);
     expect(diagnosticSpan.style?.decorationStyle, TextDecorationStyle.wavy);
+  });
+
+  testWidgets('EOF diagnostics do not underline the preceding character', (
+    tester,
+  ) async {
+    final controller = ArabicCodeController(text: 'برنامج');
+    controller.setDiagnostics([
+      const EditorDiagnostic(
+        severity: EditorDiagnosticSeverity.error,
+        phase: 'syntax',
+        code: 'S001',
+        message: 'متوقع "."',
+        sourcePath: 'main.arb',
+        offset: 6,
+        length: 0,
+        line: 1,
+        column: 7,
+      ),
+    ]);
+    late TextSpan span;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) {
+            span = controller.buildTextSpan(
+              context: context,
+              style: const TextStyle(color: Colors.white),
+              withComposing: false,
+            );
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
+
+    expect(
+      span.children!.whereType<TextSpan>().every(
+        (child) => child.style?.decoration != TextDecoration.underline,
+      ),
+      isTrue,
+    );
   });
 }

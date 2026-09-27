@@ -36,53 +36,97 @@ static const KeywordDoc g_catalog[] = {
 };
 static const size_t g_catalog_count = sizeof(g_catalog) / sizeof(g_catalog[0]);
 
+static size_t utf8_sequence_length(unsigned char first) {
+  if (first < 0x80) return 1U;
+  if ((first & 0xE0) == 0xC0) return 2U;
+  if ((first & 0xF0) == 0xE0) return 3U;
+  if ((first & 0xF8) == 0xF0) return 4U;
+  return 1U;
+}
+
+static size_t utf16_length(const char *text, size_t start, size_t end) {
+  size_t length = 0U;
+  for (size_t index = start; index < end;) {
+    const size_t sequence = utf8_sequence_length((unsigned char)text[index]);
+    length += sequence == 4U ? 2U : 1U;
+    index += sequence;
+  }
+  return length;
+}
+
+static int assist_boundary(const char *text, size_t index) {
+  const unsigned char value = (unsigned char)text[index];
+  if (value < 0x80) {
+    return strchr(" \t\n\r(){}[];,:\"'=.<>+-*/%!^\\&|", value) != NULL;
+  }
+  return value == 0xD8 &&
+      ((unsigned char)text[index + 1U] == 0x8C ||
+       (unsigned char)text[index + 1U] == 0x9B ||
+       (unsigned char)text[index + 1U] == 0x9F);
+}
+
+static size_t previous_utf8_start(const char *text, size_t index) {
+  if (index == 0U) return 0U;
+  index--;
+  while (index > 0U && (((unsigned char)text[index] & 0xC0) == 0x80)) index--;
+  return index;
+}
+
+static size_t next_utf8_start(const char *text, size_t length, size_t index) {
+  size_t next = index + utf8_sequence_length((unsigned char)text[index]);
+  return next > length ? length : next;
+}
+
+static int catalog_has_label(const char *label, const char *word) {
+  for (size_t index = 0U; index < g_catalog_count; index++) {
+    if (strcmp(g_catalog[index].keyword, label) == 0 &&
+        strncmp(label, word, strlen(word)) == 0) return 1;
+  }
+  return 0;
+}
+
 int protocol_handle_assist(const char *payload) {
   int is_help = (strstr(payload, "\"action\":\"help\"") != NULL);
   char *source_text = protocol_extract_string_value(payload, "\"sourceText\"");
+  char **symbols = NULL;
+  size_t symbol_count = 0U;
+  symbols = protocol_extract_string_array(payload, "symbols", &symbol_count);
   int offset = 0;
   const char *p_off = strstr(payload, "\"offset\":");
   if (p_off) {
     p_off += 9;
     offset = atoi(p_off);
   }
+  if (offset < 0) offset = 0;
 
   char word[128] = "";
   size_t replace_start = (size_t)offset;
   size_t replace_length = 0;
 
   if (source_text && source_text[0] != '\0') {
-    size_t byte_idx = 0;
-    size_t char_count = 0;
+    size_t byte_idx = 0U;
+    size_t char_count = 0U;
     size_t slen = strlen(source_text);
     while (byte_idx < slen && char_count < (size_t)offset) {
-      if (((unsigned char)source_text[byte_idx] & 0xC0) != 0x80) {
-        char_count++;
-      }
-      byte_idx++;
+      const size_t sequence =
+          utf8_sequence_length((unsigned char)source_text[byte_idx]);
+      const size_t units = sequence == 4U ? 2U : 1U;
+      if (char_count + units > (size_t)offset) break;
+      char_count += units;
+      byte_idx += sequence;
     }
 
     size_t start_byte = byte_idx;
     while (start_byte > 0) {
-      unsigned char prev = (unsigned char)source_text[start_byte - 1];
-      if (prev == ' ' || prev == '\t' || prev == '\n' || prev == '\r' ||
-          prev == '(' || prev == ')' || prev == '{' || prev == '}' ||
-          prev == ';' || prev == ',' || prev == ':' || prev == '"' ||
-          prev == '\'' || (prev == 0xD8 && start_byte >= 2 && (unsigned char)source_text[start_byte - 2] == ';')) {
-        break;
-      }
-      start_byte--;
+      const size_t previous = previous_utf8_start(source_text, start_byte);
+      if (assist_boundary(source_text, previous)) break;
+      start_byte = previous;
     }
 
     size_t end_byte = byte_idx;
     while (end_byte < slen) {
-      unsigned char next = (unsigned char)source_text[end_byte];
-      if (next == ' ' || next == '\t' || next == '\n' || next == '\r' ||
-          next == '(' || next == ')' || next == '{' || next == '}' ||
-          next == ';' || next == ',' || next == ':' || next == '"' ||
-          next == '\'') {
-        break;
-      }
-      end_byte++;
+      if (assist_boundary(source_text, end_byte)) break;
+      end_byte = next_utf8_start(source_text, slen, end_byte);
     }
 
     size_t wlen = end_byte - start_byte;
@@ -91,14 +135,8 @@ int protocol_handle_assist(const char *payload) {
       word[wlen] = '\0';
     }
 
-    size_t start_char = 0;
-    for (size_t i = 0; i < start_byte; i++) {
-      if (((unsigned char)source_text[i] & 0xC0) != 0x80) start_char++;
-    }
-    size_t word_chars = 0;
-    for (size_t i = start_byte; i < end_byte; i++) {
-      if (((unsigned char)source_text[i] & 0xC0) != 0x80) word_chars++;
-    }
+    const size_t start_char = utf16_length(source_text, 0U, start_byte);
+    const size_t word_chars = utf16_length(source_text, start_byte, end_byte);
     replace_start = start_char;
     replace_length = word_chars;
   }
@@ -167,6 +205,19 @@ int protocol_handle_assist(const char *payload) {
         matched_count++;
       }
     }
+    for (size_t i = 0U; i < symbol_count; i++) {
+      const char *symbol = symbols[i];
+      if (symbol[0] == '\0' ||
+          (word[0] != '\0' && strncmp(symbol, word, strlen(word)) != 0) ||
+          catalog_has_label(symbol, word)) continue;
+      if (matched_count > 0U) json_buf_append_char(&b, ',');
+      json_buf_append(&b, "{\"label\":");
+      json_buf_append_escaped(&b, symbol);
+      json_buf_append(&b, ",\"insertText\":");
+      json_buf_append_escaped(&b, symbol);
+      json_buf_append(&b, ",\"kind\":\"symbol\",\"detail\":\"رمز معرّف في البرنامج\"}");
+      matched_count++;
+    }
     json_buf_append(&b, "]}");
   }
 
@@ -174,6 +225,8 @@ int protocol_handle_assist(const char *payload) {
   fputs(b.data, stdout);
   free(b.data);
   if (source_text) free(source_text);
+  for (size_t i = 0U; i < symbol_count; i++) free(symbols[i]);
+  free(symbols);
   return 0;
 }
 

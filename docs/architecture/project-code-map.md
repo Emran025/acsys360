@@ -312,7 +312,7 @@ acsys360/
 | highlighting | `test/arabic_syntax_highlighter_test.dart` |
 | البحث والاستبدال والتنسيق والتعليق | `test/find_replace_test.dart`, `test/format_arabic_source_test.dart`, `test/toggle_line_comment_test.dart` |
 | protocol Dart models | `packages/compiler_contracts/test/` |
-| C compiler | `packages/compiler_c/tests/` وCTest |
+| C compiler | `packages/compiler_c/tests/` وCTest، بما فيها `arabicc_repeat_until` الذي يختبر الجسم المفرد والكتلة والجسم الفارغ والتنفيذ |
 | end-to-end bundle | `tool/verify_compiler_bundle.dart`، ويستدعى من workflow release بعد bundling |
 
 توجد فجوة معروفة بين وجود وظيفة explorer وبين التغطية المرئية لها: عمليات repository مغطاة، لكن اختبارات widget لا تغطي كل قوائم السياق ومحاذاة أسماء الملفات في الشجرة. يجب ذكر هذا الفرق عند وصف نسبة الاختبار.

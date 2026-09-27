@@ -71,7 +71,11 @@ class EditorLanguageServer {
     }
 
     final diagnostics = diagnosticsService
-        .enrichDiagnostics(rawDiagnostics, active.text)
+        .enrichDiagnostics(
+          rawDiagnostics,
+          active.text,
+          symbolNames: compilation.symbols.map((symbol) => symbol.name),
+        )
         .where((diagnostic) => matchesPath(diagnostic.sourcePath, sourcePath))
         .toList();
     return LanguageAnalysis(compilation: compilation, diagnostics: diagnostics);
