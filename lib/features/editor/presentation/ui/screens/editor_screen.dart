@@ -57,6 +57,7 @@ class _EditorShellState extends State<EditorShell> {
   final replaceController = TextEditingController();
   String? boundPath;
   bool showFindReplace = false;
+  bool replaceExpanded = false;
   bool isRefreshing = false;
   bool resultsExpanded = true;
   double resultsHeight = 160;
@@ -301,6 +302,10 @@ class _EditorShellState extends State<EditorShell> {
     final key = event.logicalKey;
     final hardware = HardwareKeyboard.instance;
     final hasCompletion = widget.controller.currentCompletion != null;
+    if (key == LogicalKeyboardKey.escape && showFindReplace) {
+      _closeFindReplace();
+      return KeyEventResult.handled;
+    }
     if ((key == LogicalKeyboardKey.arrowLeft ||
             key == LogicalKeyboardKey.arrowRight) &&
         !hardware.isControlPressed &&
@@ -853,14 +858,24 @@ class _EditorShellState extends State<EditorShell> {
     widget.controller.closeTab(index, discard: document.isDirty);
   }
 
-  void _toggleFindReplace() {
-    setState(() => showFindReplace = !showFindReplace);
-    if (showFindReplace) {
-      findController.selection = TextSelection(
-        baseOffset: 0,
-        extentOffset: findController.text.length,
-      );
-    }
+  void _openFindReplace({required bool showReplace}) {
+    setState(() {
+      showFindReplace = true;
+      replaceExpanded = showReplace;
+    });
+    findController.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: findController.text.length,
+    );
+  }
+
+  void _toggleReplaceVisibility() {
+    setState(() => replaceExpanded = !replaceExpanded);
+  }
+
+  void _closeFindReplace() {
+    setState(() => showFindReplace = false);
+    editorFocusNode.requestFocus();
   }
 
   void _search(String value) {
@@ -876,11 +891,6 @@ class _EditorShellState extends State<EditorShell> {
       extentOffset: match.offset + match.length,
     );
     editorFocusNode.requestFocus();
-  }
-
-  void _firstMatch() {
-    widget.controller.firstMatch();
-    _selectCurrentMatch();
   }
 
   void _previousMatch() {
@@ -992,6 +1002,9 @@ class _EditorShellState extends State<EditorShell> {
             BuildArtifactIntent(),
         SingleActivator(LogicalKeyboardKey.keyF, control: true): FindIntent(),
         SingleActivator(LogicalKeyboardKey.keyF, meta: true): FindIntent(),
+        SingleActivator(LogicalKeyboardKey.keyH, control: true):
+            ReplaceIntent(),
+        SingleActivator(LogicalKeyboardKey.keyH, meta: true): ReplaceIntent(),
         SingleActivator(LogicalKeyboardKey.keyN, control: true):
             NewFileIntent(),
         SingleActivator(LogicalKeyboardKey.keyN, meta: true): NewFileIntent(),
@@ -1092,7 +1105,10 @@ class _EditorShellState extends State<EditorShell> {
             onInvoke: (_) => controller.buildNative(),
           ),
           FindIntent: CallbackAction<FindIntent>(
-            onInvoke: (_) => _toggleFindReplace(),
+            onInvoke: (_) => _openFindReplace(showReplace: false),
+          ),
+          ReplaceIntent: CallbackAction<ReplaceIntent>(
+            onInvoke: (_) => _openFindReplace(showReplace: true),
           ),
           NewFileIntent: CallbackAction<NewFileIntent>(
             onInvoke: (_) => _newFileFromWelcome(),
@@ -1219,20 +1235,6 @@ class _EditorShellState extends State<EditorShell> {
                                     rootPath: controller.workspace.rootPath,
                                     activePath: active?.path,
                                   ),
-                                if (showFindReplace)
-                                  FindReplaceBar(
-                                    findController: findController,
-                                    replaceController: replaceController,
-                                    matches: controller.searchMatches.length,
-                                    currentMatch: controller.currentMatchIndex,
-                                    onSearch: _search,
-                                    onFirst: _firstMatch,
-                                    onPrevious: _previousMatch,
-                                    onNext: _nextMatch,
-                                    onReplaceCurrent: _replaceCurrent,
-                                    onReplaceAll: _replaceAll,
-                                    onClose: _toggleFindReplace,
-                                  ),
                                 Expanded(
                                   child: Stack(
                                     children: [
@@ -1310,6 +1312,41 @@ class _EditorShellState extends State<EditorShell> {
                                           child: HelpPopoverWidget(
                                             help: controller.assistance!.help!,
                                             onClose: controller.clearAssist,
+                                          ),
+                                        ),
+                                      if (showFindReplace)
+                                        Positioned(
+                                          top: 8,
+                                          left: 8,
+                                          right: 8,
+                                          child: Align(
+                                            alignment: Alignment.topRight,
+                                            child: ConstrainedBox(
+                                              constraints: const BoxConstraints(
+                                                maxWidth: 360,
+                                              ),
+                                              child: FindReplaceBar(
+                                                findController: findController,
+                                                replaceController:
+                                                    replaceController,
+                                                replaceExpanded:
+                                                    replaceExpanded,
+                                                matches: controller
+                                                    .searchMatches
+                                                    .length,
+                                                currentMatch: controller
+                                                    .currentMatchIndex,
+                                                onSearch: _search,
+                                                onToggleReplace:
+                                                    _toggleReplaceVisibility,
+                                                onPrevious: _previousMatch,
+                                                onNext: _nextMatch,
+                                                onReplaceCurrent:
+                                                    _replaceCurrent,
+                                                onReplaceAll: _replaceAll,
+                                                onClose: _closeFindReplace,
+                                              ),
+                                            ),
                                           ),
                                         ),
                                     ],

@@ -739,6 +739,50 @@ void main() {
     expect(controller.currentMatch?.offset, 0);
   });
 
+  testWidgets('find and replace shortcuts open a compact floating panel', (
+    tester,
+  ) async {
+    final controller = EditorController(
+      repository: FakeWorkspaceRepository(),
+      rootPath: '.',
+    );
+    await controller.open('main.arb');
+
+    await tester.pumpWidget(ArabicEditorApp(controller: controller));
+    await tester.pumpAndSettle();
+
+    final editor = find.byKey(const ValueKey('code-editor-field'));
+    final editorBounds = tester.getRect(editor);
+    await tester.tap(editor);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('find-replace-overlay')), findsOneWidget);
+    expect(find.byKey(const ValueKey('find-query')), findsOneWidget);
+    expect(find.byKey(const ValueKey('replace-query')), findsNothing);
+    expect(tester.getRect(editor), editorBounds);
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyH);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('replace-query')), findsOneWidget);
+    expect(tester.getRect(editor), editorBounds);
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('replace-query')), findsNothing);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('find-replace-overlay')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   test('cycles through inline completion items', () {
     final controller = EditorController(
       repository: FakeWorkspaceRepository(),

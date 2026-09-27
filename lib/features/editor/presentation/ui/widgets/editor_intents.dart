@@ -30,6 +30,10 @@ class FindIntent extends Intent {
   const FindIntent();
 }
 
+class ReplaceIntent extends Intent {
+  const ReplaceIntent();
+}
+
 class NewFileIntent extends Intent {
   const NewFileIntent();
 }
