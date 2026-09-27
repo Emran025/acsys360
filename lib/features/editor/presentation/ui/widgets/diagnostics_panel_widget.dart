@@ -802,31 +802,45 @@ class _SelectableCodeBlock extends StatelessWidget {
           ),
           Divider(height: 1, color: colors.outlineVariant),
           LayoutBuilder(
-            builder: (context, constraints) => Directionality(
-              textDirection: TextDirection.ltr,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.all(12),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minWidth: constraints.maxWidth - 24,
-                  ),
-                  child: SelectableText.rich(
-                    TextSpan(
-                      style: TextStyle(
-                        color: colors.onSurface,
-                        fontFamily: 'monospace',
-                        fontSize: 12,
-                        height: 1.5,
+            builder: (context, constraints) {
+              // Keep large compiler outputs bounded even when this card is
+              // placed inside another vertical scroll view. Without a finite
+              // height, SelectableText lays out the complete Assembly/JSON
+              // document and the enclosing Column overflows.
+              final height = constraints.hasBoundedHeight
+                  ? constraints.maxHeight
+                  : 420.0;
+              return SizedBox(
+                height: height,
+                child: Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(12),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minWidth: constraints.maxWidth - 24,
+                        ),
+                        child: SelectableText.rich(
+                          TextSpan(
+                            style: TextStyle(
+                              color: colors.onSurface,
+                              fontFamily: 'monospace',
+                              fontSize: 12,
+                              height: 1.5,
+                            ),
+                            children: _highlightCode(source, language, colors),
+                          ),
+                          textAlign: TextAlign.left,
+                          textDirection: TextDirection.ltr,
+                        ),
                       ),
-                      children: _highlightCode(source, language, colors),
                     ),
-                    textAlign: TextAlign.left,
-                    textDirection: TextDirection.ltr,
                   ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ],
       ),

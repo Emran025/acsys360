@@ -123,7 +123,7 @@ jobs:
       - name: Smoke test bundled compiler (Windows)
         if: matrix.target == 'windows'
         shell: pwsh
-        run: dart run tool/verify_compiler_bundle.dart --executable build/windows/x64/runner/Release/compiler/arabicc.exe
+        run: dart run tool/verify_compiler_bundle.dart --executable build/windows/x64/runner/Release/compiler/arabicc.exe --native
 
       - name: Build Linux DEB and RPM installers
         if: matrix.target == 'linux'

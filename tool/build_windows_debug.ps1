@@ -53,6 +53,30 @@ try {
     Copy-Item $Compiler $CompilerDestination -Force
     Write-Host "[OK] Compiler: $CompilerDestination" -ForegroundColor Green
 
+    # Keep debug runs relocatable too. The Flutter app resolves this directory
+    # relative to its executable, so it must be beside the Debug bundle rather
+    # than relying on C:\msys64 or the developer's PATH at runtime.
+    $ToolchainRoot = "C:\msys64\ucrt64"
+    $ToolchainBin = Join-Path $ToolchainRoot "bin"
+    foreach ($Tool in @("gcc.exe", "nasm.exe")) {
+        $ToolPath = Join-Path $ToolchainBin $Tool
+        if (-not (Test-Path $ToolPath)) {
+            throw "Bundled tool missing: $ToolPath. Install GCC and NASM in MSYS2 UCRT64."
+        }
+    }
+    $BundledToolchain = Join-Path $WindowsBuild "toolchain\windows"
+    if (Test-Path $BundledToolchain) {
+        Remove-Item $BundledToolchain -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $BundledToolchain -Force | Out-Null
+    foreach ($Directory in @("bin", "include", "lib", "libexec", "share")) {
+        $Source = Join-Path $ToolchainRoot $Directory
+        if (Test-Path $Source) {
+            Copy-Item $Source $BundledToolchain -Recurse -Force
+        }
+    }
+    Write-Host "[OK] Toolchain: $BundledToolchain" -ForegroundColor Green
+
     if ($Run) {
         flutter run -d windows
     }

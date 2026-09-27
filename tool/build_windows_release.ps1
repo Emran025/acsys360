@@ -127,7 +127,7 @@ try {
     }
 
     Invoke-Step "Run bundled compiler smoke test" {
-        & dart run tool/verify_compiler_bundle.dart --executable $BundleCompiler
+        & dart run tool/verify_compiler_bundle.dart --executable $BundleCompiler --native
     }
 
     if (-not $SkipInstaller) {
