@@ -45,6 +45,7 @@ Future<void> main(List<String> args) async {
   بلا_وسائط()؛
   اطبع_بالمرجع(المعدل)؛
   اطبع(الناتج)؛
+  اطبع("done")؛
 }.
 ''',
       },
@@ -96,6 +97,12 @@ Future<void> main(List<String> args) async {
       'NASM procedure labels are missing',
     );
     check(
+      assembly.indexOf('section .bss\n') <
+              assembly.lastIndexOf('section .data\n') &&
+          assembly.lastIndexOf('section .data\n') < assembly.indexOf('text0:'),
+      'string data must be emitted in the data section, not BSS',
+    );
+    check(
       assembly.contains('call proc_0') &&
           assembly.contains('call proc_1') &&
           assembly.contains('call proc_2') &&
@@ -120,14 +127,14 @@ Future<void> main(List<String> args) async {
     );
     final artifacts = (response['artifacts'] as List).cast<String>();
     final executables = artifacts
-        .where((path) => path.endsWith('.exe'))
+        .where((path) => !path.endsWith('.asm'))
         .toList();
-    check(executables.isNotEmpty, 'native procedure executable was not built');
+    check(executables.length == 1, 'native procedure executable was not built');
     final nativeRun = await Process.run(executables.single, const []);
     check(
       nativeRun.exitCode == 0 &&
           (nativeRun.stdout as String).trim().split('\r\n').join('\n') ==
-              '5\n9\n1.5\n5',
+              '5\n9\n1.5\n5\ndone',
       'native procedure output was incorrect: ${nativeRun.stdout}; '
       '${nativeRun.stderr}',
     );

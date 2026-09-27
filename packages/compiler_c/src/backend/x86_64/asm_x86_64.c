@@ -112,6 +112,7 @@ int c_generate_nasm_x86_64(const CTacResult *tac,const CSemanticResult *semantic
       !strcmp(symbol->type,"اجراء") || is_any_parameter(tac,symbol->name)) continue;
    if(!append(&result->text,&len,&cap,"global_%zu: resq 1\n",i))goto fail;
  }
+ if(!append(&result->text,&len,&cap,"section .data\n"))goto fail;
  for(size_t i=0;i<strings.count;i++){if(!append(&result->text,&len,&cap,"text%zu: ",i)||!emit_string(&result->text,&len,&cap,strings.items[i]))goto fail;}
  size_t request_count=0; for(size_t i=0;i<tac->count;i++) if(tac->items[i].opcode==C_TAC_READ) { const char *rt=type_of(semantic,tac->items[i].result,NULL); const char *rn=tac->items[i].result?tac->items[i].result:""; char request[1024]; snprintf(request,sizeof(request),"{\"requestType\":\"input\",\"name\":\"%s\",\"type\":\"%s\"}\n",rn,rt?rt:"غير معروف"); if(!append(&result->text,&len,&cap,"fmt_input_request%zu: ",request_count++)||!emit_bytes(&result->text,&len,&cap,request))goto fail; }
  if(!append(&result->text,&len,&cap,"section .text\nmain:\n    push rbp\n    mov rbp, rsp\n    sub rsp, %zu\n",frame+32+reads*256))goto fail;

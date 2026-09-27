@@ -293,8 +293,9 @@ Future<void> main(List<String> args) async {
     }
     final artifactExecutable = (artifacts as List).last as String;
     final execution = await Process.run(artifactExecutable, const []);
+    final output = (execution.stdout as String).replaceAll('\r\n', '\n').trim();
     check(
-      execution.exitCode == 0 && execution.stdout.trim() == '7\n3\n0.125',
+      execution.exitCode == 0 && output == '7\n3\n0.125',
       'generated artifact failed: exit=${execution.exitCode}, '
       'stdout=${execution.stdout}, stderr=${execution.stderr}',
     );

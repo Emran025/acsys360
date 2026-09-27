@@ -47,20 +47,24 @@ void main() {
     const service = ArabicLanguageService();
     const source = 'متغير العدد: صحيح؛ العد = 1؛';
     final offset = source.indexOf('العد');
-    final diagnostics = service.enrichDiagnostics([
-      {
-        'severity': 'error',
-        'phase': 'semantic',
-        'code': 'SEM001',
-        'message': 'رمز غير معرف: العد',
-        'span': {
-          'offset': offset,
-          'line': 1,
-          'column': offset + 1,
-          'length': 'العد'.length,
+    final diagnostics = service.enrichDiagnostics(
+      [
+        {
+          'severity': 'error',
+          'phase': 'semantic',
+          'code': 'SEM001',
+          'message': 'رمز غير معرف: العد',
+          'span': {
+            'offset': offset,
+            'line': 1,
+            'column': offset + 1,
+            'length': 'العد'.length,
+          },
         },
-      },
-    ], source, symbolNames: const ['العدد']);
+      ],
+      source,
+      symbolNames: const ['العدد'],
+    );
 
     expect(diagnostics.single.actions, hasLength(1));
     expect(diagnostics.single.actions.single.replacement, 'العدد');

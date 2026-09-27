@@ -94,8 +94,9 @@ void main() {
 }
 
 String _validProgram(String name, String value) =>
-    '''برنامج اختبار؛ {
-  متغير $name: صحيح;
+    '''برنامج اختبار؛
+متغير $name: صحيح؛
+{
   $name = $value;
   اطبع($name);
 }.''';
