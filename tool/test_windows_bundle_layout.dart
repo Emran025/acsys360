@@ -5,8 +5,11 @@ void main() {
   try {
     final app = Directory('${root.path}${Platform.pathSeparator}acsys360')
       ..createSync(recursive: true);
+    final compilerDirectory = Directory(
+      '${app.path}${Platform.pathSeparator}compiler',
+    )..createSync(recursive: true);
     final compiler = File(
-      '${app.path}${Platform.pathSeparator}compiler${Platform.pathSeparator}arabicc.exe',
+      '${compilerDirectory.path}${Platform.pathSeparator}arabicc.exe',
     )..writeAsStringSync('fake compiler');
     final bin = Directory(
       '${app.path}${Platform.pathSeparator}toolchain${Platform.pathSeparator}windows${Platform.pathSeparator}bin',
