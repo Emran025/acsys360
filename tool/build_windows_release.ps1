@@ -122,9 +122,10 @@ try {
     $MsysBash = "C:\msys64\usr\bin\bash.exe"
     $env:MSYSTEM = "UCRT64"
     foreach ($Tool in @("gcc", "nasm")) {
-        $MsysPath = ([string](& $MsysBash -lc "command -v $Tool" 2>$null | Select-Object -Last 1)).Trim()
+        $MsysPath = ([string](& $MsysBash -c "command -v $Tool" 2>$null | Select-Object -Last 1)).Trim()
         if (-not $MsysPath) { Fail "MSYS2 command was not found: $Tool" }
-        $Source = Join-Path "C:\msys64" ($MsysPath.TrimStart('/') -replace '/', '\')
+        $Source = ([string](& $MsysBash -c "cygpath -w $MsysPath" 2>$null | Select-Object -Last 1)).Trim()
+        if (-not $Source) { Fail "MSYS2 path conversion failed: $MsysPath" }
         if (-not (Test-Path $Source)) { Fail "MSYS2 command path is missing: $Source" }
         Copy-Item -LiteralPath $Source -Destination (Join-Path $BundledToolchain "bin\$Tool.exe") -Force
     }
