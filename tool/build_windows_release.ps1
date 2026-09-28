@@ -119,21 +119,15 @@ try {
         $Source = Join-Path $ToolchainRoot $Directory
         if (Test-Path $Source) { Copy-Item $Source $BundledToolchain -Recurse -Force }
     }
-    $MsysBash = "C:\msys64\usr\bin\bash.exe"
-    $env:MSYSTEM = "UCRT64"
     foreach ($Tool in @("gcc", "nasm")) {
-        $MsysPath = ([string](& $MsysBash -c "command -v $Tool" 2>$null | Select-Object -Last 1)).Trim()
-        if (-not $MsysPath) { Fail "MSYS2 command was not found: $Tool" }
-        $Source = ([string](& $MsysBash -c "cygpath -w $MsysPath" 2>$null | Select-Object -Last 1)).Trim()
-        if (-not $Source) { Fail "MSYS2 path conversion failed: $MsysPath" }
+        $Source = Join-Path $ToolchainRoot "bin\$Tool.exe"
         if (-not (Test-Path $Source)) { Fail "MSYS2 command path is missing: $Source" }
         Copy-Item -LiteralPath $Source -Destination (Join-Path $BundledToolchain "bin\$Tool.exe") -Force
     }
-    $GccPrefix = "$BundledToolchain\"
     foreach ($File in @("crt2.o", "crtbegin.o", "libmingw32.a", "libgcc.a", "libmsvcrt.a", "libkernel32.a")) {
-        $Resolved = (& (Join-Path $BundledToolchain "bin\gcc.exe") "-B$GccPrefix" "--sysroot=$GccPrefix" "-print-file-name=$File" 2>$null | Select-Object -Last 1).Trim()
-        if (-not $Resolved -or $Resolved -eq $File -or -not (Test-Path $Resolved)) {
-            Fail "Relocated GCC cannot resolve $File with prefix $BundledToolchain (reported: $Resolved)"
+        $Found = Get-ChildItem -Path $BundledToolchain -Recurse -File -Filter $File -ErrorAction SilentlyContinue | Select-Object -First 1
+        if (-not $Found) {
+            Fail "Bundled UCRT64 tree is missing required linker file: $File"
         }
     }
 

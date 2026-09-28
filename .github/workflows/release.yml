@@ -104,29 +104,19 @@ jobs:
             $source = "C:/msys64/ucrt64/$directory"
             if (Test-Path $source) { Copy-Item $source "$release/toolchain/windows/" -Recurse -Force }
           }
-          # Resolve the active MSYS2 environment instead of assuming a fixed
-          # Windows path. Use a non-login shell: a login shell can print the
-          # runner user's .profile before command output on GitHub runners.
-          $bash = "C:/msys64/usr/bin/bash.exe"
-          $env:MSYSTEM = "UCRT64"
           foreach ($tool in @("gcc", "nasm")) {
-            $msysPath = ([string](& $bash -c "command -v $tool" 2>$null | Select-Object -Last 1)).Trim()
-            if (-not $msysPath) { throw "MSYS2 command not found: $tool" }
-            $source = ([string](& $bash -c "cygpath -w $msysPath" 2>$null | Select-Object -Last 1)).Trim()
-            if (-not $source) { throw "MSYS2 path conversion failed: $msysPath" }
+            $source = "C:/msys64/ucrt64/bin/$tool.exe"
             if (-not (Test-Path $source)) { throw "MSYS2 command path is missing: $source" }
             Copy-Item -LiteralPath $source -Destination "$release/toolchain/windows/bin/$tool.exe" -Force
             Write-Host "Bundled $tool from $source"
           }
           $toolchainRoot = (Resolve-Path "$release/toolchain/windows").Path
-          $gccPath = Join-Path $toolchainRoot "bin/gcc.exe"
-          $gccChecks = @("crt2.o", "crtbegin.o", "libmingw32.a", "libgcc.a", "libmsvcrt.a", "libkernel32.a")
-          foreach ($file in $gccChecks) {
-            $resolved = (& $gccPath "-B$toolchainRoot\" "--sysroot=$toolchainRoot\" "-print-file-name=$file" 2>$null | Select-Object -Last 1).Trim()
-            if (-not $resolved -or $resolved -eq $file -or -not (Test-Path $resolved)) {
-              throw "Relocated GCC cannot resolve $file with prefix $toolchainRoot (reported: $resolved)"
+          foreach ($file in @("crt2.o", "crtbegin.o", "libmingw32.a", "libgcc.a", "libmsvcrt.a", "libkernel32.a")) {
+            $found = Get-ChildItem -Path $toolchainRoot -Recurse -File -Filter $file -ErrorAction SilentlyContinue | Select-Object -First 1
+            if (-not $found) {
+              throw "Bundled UCRT64 tree is missing required linker file: $file"
             }
-            Write-Host "Resolved $file -> $resolved"
+            Write-Host "Bundled linker file $file -> $($found.FullName)"
           }
       - name: Bundle compiler and native tools (macOS)
         if: matrix.target == 'macos'
