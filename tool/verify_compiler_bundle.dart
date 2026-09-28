@@ -16,6 +16,19 @@ Future<void> main(List<String> arguments) async {
   final artifactDirectory = Directory.current.createTempSync(
     'acsys360-bundle-smoke-',
   );
+  final environment = <String, String>{...Platform.environment};
+  if (native && Platform.isWindows) {
+    final bundleRoot = File(executable).absolute.parent.parent.path;
+    final toolchainDirectory = Directory(
+      '$bundleRoot${Platform.pathSeparator}toolchain${Platform.pathSeparator}windows${Platform.pathSeparator}bin',
+    ).absolute.path;
+    environment['ACSYS360_TOOLCHAIN_DIR'] = toolchainDirectory;
+    environment['ACSYS360_TOOLCHAIN_ONLY'] = '1';
+    environment['PATH'] = [
+      toolchainDirectory,
+      environment['PATH'] ?? '',
+    ].join(';');
+  }
   final request = {
     'protocolVersion': '0.5.0',
     'rootPath': Directory.current.path,
@@ -30,7 +43,7 @@ Future<void> main(List<String> arguments) async {
   try {
     final process = await Process.start(executable, const [
       '--protocol',
-    ], workingDirectory: Directory.current.path);
+    ], workingDirectory: Directory.current.path, environment: environment);
     process.stdin.writeln(jsonEncode(request));
     await process.stdin.close();
     final output = await process.stdout.transform(utf8.decoder).join();
@@ -51,6 +64,9 @@ Future<void> main(List<String> arguments) async {
         artifacts is! List ||
         response['intermediateRepresentation'] is! Map ||
         (native && artifacts.isEmpty)) {
+      if (response is Map && response['diagnostics'] is List) {
+        stderr.writeln('Compiler diagnostics: ${response['diagnostics']}');
+      }
       stderr.writeln(
         native
             ? 'Bundled compiler native smoke test failed; GCC/NASM may be missing.'
