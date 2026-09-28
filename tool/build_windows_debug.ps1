@@ -57,13 +57,6 @@ try {
     # relative to its executable, so it must be beside the Debug bundle rather
     # than relying on C:\msys64 or the developer's PATH at runtime.
     $ToolchainRoot = "C:\msys64\ucrt64"
-    $ToolchainBin = Join-Path $ToolchainRoot "bin"
-    foreach ($Tool in @("gcc.exe", "nasm.exe")) {
-        $ToolPath = Join-Path $ToolchainBin $Tool
-        if (-not (Test-Path $ToolPath)) {
-            throw "Bundled tool missing: $ToolPath. Install GCC and NASM in MSYS2 UCRT64."
-        }
-    }
     $BundledToolchain = Join-Path $WindowsBuild "toolchain\windows"
     if (Test-Path $BundledToolchain) {
         Remove-Item $BundledToolchain -Recurse -Force
@@ -75,17 +68,14 @@ try {
             Copy-Item $Source $BundledToolchain -Recurse -Force
         }
     }
-    foreach ($Tool in @("gcc.exe", "nasm.exe")) {
-        $Source = Join-Path $ToolchainBin $Tool
-        if (-not (Test-Path $Source)) {
-            $Source = (Get-ChildItem "C:\msys64" -Filter $Tool -Recurse -File -ErrorAction SilentlyContinue |
-                Where-Object { $_.FullName -match "\\(ucrt64|mingw64)\\bin\\" } |
-                Select-Object -First 1).FullName
-        }
-        if (-not $Source -or -not (Test-Path $Source)) {
-            throw "MSYS2 tool was not found: $Tool"
-        }
-        Copy-Item -LiteralPath $Source -Destination (Join-Path $BundledToolchain "bin\$Tool") -Force
+    $MsysBash = "C:\msys64\usr\bin\bash.exe"
+    $env:MSYSTEM = "UCRT64"
+    foreach ($Tool in @("gcc", "nasm")) {
+        $MsysPath = ([string](& $MsysBash -lc "command -v $Tool" 2>$null | Select-Object -Last 1)).Trim()
+        if (-not $MsysPath) { throw "MSYS2 command was not found: $Tool" }
+        $Source = Join-Path "C:\msys64" ($MsysPath.TrimStart('/') -replace '/', '\')
+        if (-not (Test-Path $Source)) { throw "MSYS2 command path is missing: $Source" }
+        Copy-Item -LiteralPath $Source -Destination (Join-Path $BundledToolchain "bin\$Tool.exe") -Force
     }
     Write-Host "[OK] Toolchain: $BundledToolchain" -ForegroundColor Green
 

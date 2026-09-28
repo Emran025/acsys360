@@ -104,19 +104,25 @@ jobs:
             $source = "C:/msys64/ucrt64/$directory"
             if (Test-Path $source) { Copy-Item $source "$release/toolchain/windows/" -Recurse -Force }
           }
-          # Copy these two entry points explicitly. MSYS2 may expose them as
-          # links, and a wildcard directory copy can omit the runnable .exe.
-          foreach ($tool in @("gcc.exe", "nasm.exe")) {
-            $source = "C:/msys64/ucrt64/bin/$tool"
-            if (-not (Test-Path $source)) {
-              $source = (Get-ChildItem C:/msys64 -Filter $tool -Recurse -File -ErrorAction SilentlyContinue |
-                Where-Object { $_.FullName -match "\\(ucrt64|mingw64)\\bin\\" } |
-                Select-Object -First 1).FullName
-            }
-            if (-not $source -or -not (Test-Path $source)) { throw "MSYS2 tool not found: $tool" }
-            Copy-Item -LiteralPath $source -Destination "$release/toolchain/windows/bin/$tool" -Force
+          # Resolve the active MSYS2 environment instead of assuming a fixed
+          # Windows path; setup-msys2 can expose UCRT64 tools through a
+          # translated MSYS path and may not create gcc.exe in the guessed bin.
+          $bash = "C:/msys64/usr/bin/bash.exe"
+          $env:MSYSTEM = "UCRT64"
+          $nativeBin = $null
+          foreach ($tool in @("gcc", "nasm")) {
+            $msysPath = ([string](& $bash -lc "command -v $tool" 2>$null | Select-Object -Last 1)).Trim()
+            if (-not $msysPath) { throw "MSYS2 command not found: $tool" }
+            $relative = $msysPath.TrimStart('/') -replace '/', '\\'
+            $source = Join-Path "C:/msys64" $relative
+            if (-not (Test-Path $source)) { throw "MSYS2 command path is missing: $source" }
+            if (-not $nativeBin) { $nativeBin = Split-Path $source -Parent }
+            Copy-Item -LiteralPath $source -Destination "$release/toolchain/windows/bin/$tool.exe" -Force
             Write-Host "Bundled $tool from $source"
           }
+          # Copy the runtime DLLs and linker support files from the same
+          # environment that resolved gcc/nasm.
+          Copy-Item "$nativeBin/*" "$release/toolchain/windows/bin/" -Recurse -Force
       - name: Bundle compiler and native tools (macOS)
         if: matrix.target == 'macos'
         shell: bash

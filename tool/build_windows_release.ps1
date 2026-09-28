@@ -112,12 +112,6 @@ try {
     New-Item -ItemType Directory -Path $CompilerDestination -Force | Out-Null
     Copy-Item $CompilerExe $BundleCompiler -Force
 
-    $ToolchainBin = Join-Path $ToolchainRoot "bin"
-    foreach ($Tool in @("gcc.exe", "nasm.exe")) {
-        if (-not (Test-Path (Join-Path $ToolchainBin $Tool))) {
-            Fail "Bundled release tool missing: $(Join-Path $ToolchainBin $Tool). Install GCC and NASM in MSYS2 UCRT64."
-        }
-    }
     $BundledToolchain = Join-Path $FlutterRelease "toolchain\windows"
     if (Test-Path $BundledToolchain) { Remove-Item $BundledToolchain -Recurse -Force }
     New-Item -ItemType Directory -Path $BundledToolchain -Force | Out-Null
@@ -125,17 +119,14 @@ try {
         $Source = Join-Path $ToolchainRoot $Directory
         if (Test-Path $Source) { Copy-Item $Source $BundledToolchain -Recurse -Force }
     }
-    foreach ($Tool in @("gcc.exe", "nasm.exe")) {
-        $Source = Join-Path $ToolchainBin $Tool
-        if (-not (Test-Path $Source)) {
-            $Source = (Get-ChildItem "C:\msys64" -Filter $Tool -Recurse -File -ErrorAction SilentlyContinue |
-                Where-Object { $_.FullName -match "\\(ucrt64|mingw64)\\bin\\" } |
-                Select-Object -First 1).FullName
-        }
-        if (-not $Source -or -not (Test-Path $Source)) {
-            Fail "MSYS2 tool was not found: $Tool"
-        }
-        Copy-Item -LiteralPath $Source -Destination (Join-Path $BundledToolchain "bin\$Tool") -Force
+    $MsysBash = "C:\msys64\usr\bin\bash.exe"
+    $env:MSYSTEM = "UCRT64"
+    foreach ($Tool in @("gcc", "nasm")) {
+        $MsysPath = ([string](& $MsysBash -lc "command -v $Tool" 2>$null | Select-Object -Last 1)).Trim()
+        if (-not $MsysPath) { Fail "MSYS2 command was not found: $Tool" }
+        $Source = Join-Path "C:\msys64" ($MsysPath.TrimStart('/') -replace '/', '\')
+        if (-not (Test-Path $Source)) { Fail "MSYS2 command path is missing: $Source" }
+        Copy-Item -LiteralPath $Source -Destination (Join-Path $BundledToolchain "bin\$Tool.exe") -Force
     }
 
     Invoke-Step "Run bundled compiler smoke test" {
