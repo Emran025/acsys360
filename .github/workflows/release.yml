@@ -99,18 +99,22 @@ jobs:
           New-Item -ItemType Directory -Force "$release/compiler", "$release/toolchain/windows/bin" | Out-Null
           $exe = if (Test-Path packages/compiler_c/build/Release/arabicc.exe) { "packages/compiler_c/build/Release/arabicc.exe" } else { "packages/compiler_c/build/arabicc.exe" }
           Copy-Item $exe "$release/compiler/arabicc.exe"
-          Copy-Item C:/msys64/ucrt64/bin/* "$release/toolchain/windows/bin/" -Recurse -Force
-          foreach ($directory in @("include", "lib", "libexec", "share", "x86_64-w64-mingw32")) {
-            $source = "C:/msys64/ucrt64/$directory"
-            if (Test-Path $source) { Copy-Item $source "$release/toolchain/windows/" -Recurse -Force }
-          }
-          foreach ($tool in @("gcc", "nasm")) {
-            $source = "C:/msys64/ucrt64/bin/$tool.exe"
-            if (-not (Test-Path $source)) { throw "MSYS2 command path is missing: $source" }
-            Copy-Item -LiteralPath $source -Destination "$release/toolchain/windows/bin/$tool.exe" -Force
-            Write-Host "Bundled $tool from $source"
-          }
           $toolchainRoot = (Resolve-Path "$release/toolchain/windows").Path
+          $gccCommand = @(Get-Command gcc.exe -All -ErrorAction SilentlyContinue | Where-Object { $_.Source -and $_.Source -notmatch "[\\/]Strawberry[\\/]" } | Select-Object -First 1)
+          if (-not $gccCommand) {
+            throw "GCC was not found. PATH reports: $((where.exe gcc 2>$null) -join ', ')"
+          }
+          $gccBin = Split-Path -Parent $gccCommand.Source
+          $gccRoot = Split-Path -Parent $gccBin
+          Write-Host "Discovered GCC: $($gccCommand.Source)"
+          Write-Host "Discovered GCC root: $gccRoot"
+          Copy-Item "$gccRoot\*" $toolchainRoot -Recurse -Force
+          $nasmCommand = @(Get-Command nasm.exe -All -ErrorAction SilentlyContinue | Select-Object -First 1)
+          if (-not $nasmCommand) {
+            throw "NASM was not found. PATH reports: $((where.exe nasm 2>$null) -join ', ')"
+          }
+          Copy-Item -LiteralPath $nasmCommand.Source -Destination "$toolchainRoot/bin/nasm.exe" -Force
+          Write-Host "Bundled NASM: $($nasmCommand.Source)"
           foreach ($file in @("crt2.o", "crtbegin.o", "libmingw32.a", "libgcc.a", "libmsvcrt.a", "libkernel32.a")) {
             $found = Get-ChildItem -Path $toolchainRoot -Recurse -File -Filter $file -ErrorAction SilentlyContinue | Select-Object -First 1
             if (-not $found) {

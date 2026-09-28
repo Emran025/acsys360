@@ -14,7 +14,7 @@ $CompilerRoot = Join-Path $ProjectRoot "packages\compiler_c"
 $CompilerBuild = Join-Path $CompilerRoot "build"
 $FlutterRelease = Join-Path $ProjectRoot "build\windows\x64\runner\Release"
 $BundleCompiler = Join-Path $FlutterRelease "compiler\arabicc.exe"
-$ToolchainRoot = "C:\msys64\ucrt64"
+$ToolchainRoot = $null
 $OutputRoot = Join-Path $ProjectRoot $OutputDirectory
 $InstallerScript = Join-Path $ProjectRoot "tool\packaging\acsys360-windows.iss"
 
@@ -115,15 +115,17 @@ try {
     $BundledToolchain = Join-Path $FlutterRelease "toolchain\windows"
     if (Test-Path $BundledToolchain) { Remove-Item $BundledToolchain -Recurse -Force }
     New-Item -ItemType Directory -Path $BundledToolchain -Force | Out-Null
-    foreach ($Directory in @("bin", "include", "lib", "libexec", "share", "x86_64-w64-mingw32")) {
-        $Source = Join-Path $ToolchainRoot $Directory
-        if (Test-Path $Source) { Copy-Item $Source $BundledToolchain -Recurse -Force }
-    }
-    foreach ($Tool in @("gcc", "nasm")) {
-        $Source = Join-Path $ToolchainRoot "bin\$Tool.exe"
-        if (-not (Test-Path $Source)) { Fail "MSYS2 command path is missing: $Source" }
-        Copy-Item -LiteralPath $Source -Destination (Join-Path $BundledToolchain "bin\$Tool.exe") -Force
-    }
+    $GccCommand = @(Get-Command gcc.exe -All -ErrorAction SilentlyContinue | Where-Object { $_.Source -and $_.Source -notmatch "[\\/]Strawberry[\\/]" } | Select-Object -First 1)
+    if (-not $GccCommand) { Fail "GCC was not found in PATH." }
+    $GccBin = Split-Path -Parent $GccCommand.Source
+    $ToolchainRoot = Split-Path -Parent $GccBin
+    Write-Host "Discovered GCC: $($GccCommand.Source)"
+    Write-Host "Discovered GCC root: $ToolchainRoot"
+    Copy-Item (Join-Path $ToolchainRoot "*") $BundledToolchain -Recurse -Force
+    $NasmCommand = @(Get-Command nasm.exe -All -ErrorAction SilentlyContinue | Select-Object -First 1)
+    if (-not $NasmCommand) { Fail "NASM was not found in PATH." }
+    Copy-Item -LiteralPath $NasmCommand.Source -Destination (Join-Path $BundledToolchain "bin\nasm.exe") -Force
+    Write-Host "Bundled NASM: $($NasmCommand.Source)"
     foreach ($File in @("crt2.o", "crtbegin.o", "libmingw32.a", "libgcc.a", "libmsvcrt.a", "libkernel32.a")) {
         $Found = Get-ChildItem -Path $BundledToolchain -Recurse -File -Filter $File -ErrorAction SilentlyContinue | Select-Object -First 1
         if (-not $Found) {
