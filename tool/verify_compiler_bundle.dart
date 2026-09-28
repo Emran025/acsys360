@@ -25,9 +25,10 @@ Future<void> main(List<String> arguments) async {
     ).absolute.path;
     environment['ACSYS360_TOOLCHAIN_DIR'] = toolchainDirectory;
     environment['ACSYS360_TOOLCHAIN_ONLY'] = '1';
-    environment['PATH'] = [
+    final pathKey = environment.containsKey('Path') ? 'Path' : 'PATH';
+    environment[pathKey] = [
       toolchainDirectory,
-      environment['PATH'] ?? '',
+      environment[pathKey] ?? '',
     ].join(';');
   }
   final request = {
@@ -43,9 +44,12 @@ Future<void> main(List<String> arguments) async {
     },
   };
   try {
-    final process = await Process.start(executable, const [
-      '--protocol',
-    ], workingDirectory: Directory.current.path, environment: environment);
+    final process = await Process.start(
+      executable,
+      const ['--protocol'],
+      workingDirectory: Directory.current.path,
+      environment: environment,
+    );
     process.stdin.writeln(jsonEncode(request));
     await process.stdin.close();
     final outputFuture = process.stdout.transform(utf8.decoder).join();
@@ -73,7 +77,9 @@ Future<void> main(List<String> arguments) async {
       return;
     }
     if (result != 0) {
-      stderr.writeln(errorOutput);
+      stderr.writeln('Bundled compiler exited with code $result.');
+      if (output.isNotEmpty) stderr.writeln('stdout: $output');
+      if (errorOutput.isNotEmpty) stderr.writeln('stderr: $errorOutput');
       exitCode = result;
       return;
     }
