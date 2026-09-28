@@ -171,11 +171,7 @@ class _DiagnosticsPanelWidgetState extends State<DiagnosticsPanelWidget> {
 
   Widget _stageBody(CompilationResult result) => switch (_stage) {
     0 => _diagnostics(result),
-    1 => _codeBlock(
-      title: 'Tokens',
-      language: 'JSON',
-      source: prettyJson(result.tokens),
-    ),
+    1 => _tokensTable(result.tokens),
     2 =>
       result.syntaxTree == null
           ? _selectable('لا توجد شجرة تحليل')
@@ -232,6 +228,70 @@ class _DiagnosticsPanelWidgetState extends State<DiagnosticsPanelWidget> {
     }
     return _selectable(
       ['تم التحقق من artifact الناتج:', ...result.artifacts].join('\n'),
+    );
+  }
+
+  Widget _tokensTable(List<ProtocolToken> tokens) {
+    if (tokens.isEmpty) return _selectable('لا توجد Tokens');
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('جدول Tokens', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 4),
+          // The outer scroll view owns vertical scrolling for all token rows;
+          // the inner one handles long lexemes and source paths horizontally.
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              headingRowHeight: 36,
+              dataRowMinHeight: 32,
+              dataRowMaxHeight: 56,
+              columnSpacing: 20,
+              border: _tableBorder(context),
+              headingRowColor: _tableHeaderColor(context),
+              headingTextStyle: _tableHeaderTextStyle(context),
+              columns: const [
+                DataColumn(label: Text('#')),
+                DataColumn(label: Text('النوع')),
+                DataColumn(label: Text('النص')),
+                DataColumn(label: Text('السطر')),
+                DataColumn(label: Text('العمود')),
+                DataColumn(label: Text('الطول')),
+                DataColumn(label: Text('الملف')),
+              ],
+              rows: [
+                for (var index = 0; index < tokens.length; index++)
+                  DataRow(
+                    cells: [
+                      DataCell(Text('${index + 1}')),
+                      DataCell(Text(tokens[index].kind)),
+                      DataCell(
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 360),
+                          child: SelectableText(tokens[index].lexeme),
+                        ),
+                      ),
+                      DataCell(Text('${tokens[index].span.line}')),
+                      DataCell(Text('${tokens[index].span.column}')),
+                      DataCell(Text('${tokens[index].span.length}')),
+                      DataCell(
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 260),
+                          child: Text(
+                            tokens[index].span.sourcePath,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
