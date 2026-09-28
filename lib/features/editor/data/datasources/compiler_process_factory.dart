@@ -20,9 +20,9 @@ ProcessCompilerRepository createCompilerRepository() {
     'ACSYS360_TOOLCHAIN_DIR': toolchainDirectory,
   };
   toolchainEnvironment[pathKey] = [
-      toolchainDirectory,
-      inheritedPath,
-    ].where((path) => path.isNotEmpty).join(Platform.isWindows ? ';' : ':');
+    toolchainDirectory,
+    inheritedPath,
+  ].where((path) => path.isNotEmpty).join(Platform.isWindows ? ';' : ':');
   final roots = <String>[];
 
   void addRoot(String path) {
