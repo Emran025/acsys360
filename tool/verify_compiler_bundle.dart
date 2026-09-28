@@ -64,6 +64,7 @@ Future<void> main(List<String> arguments) async {
         artifacts is! List ||
         response['intermediateRepresentation'] is! Map ||
         (native && artifacts.isEmpty)) {
+      stderr.writeln('Bundled compiler response: $output');
       if (response is Map && response['diagnostics'] is List) {
         stderr.writeln('Compiler diagnostics: ${response['diagnostics']}');
       }
