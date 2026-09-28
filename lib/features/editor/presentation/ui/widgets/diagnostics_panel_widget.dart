@@ -811,16 +811,24 @@ class _SelectableCodeBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.surfaceContainerHighest.withValues(alpha: .55),
-        border: Border.all(color: colors.outlineVariant),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // The content height must exclude the 32px header and its divider.
+        // Previously the content received the whole available height, so the
+        // header + content exceeded a short diagnostics panel by 25+ pixels.
+        final contentHeight = constraints.hasBoundedHeight
+            ? (constraints.maxHeight - 33).clamp(0.0, double.infinity).toDouble()
+            : 420.0;
+        return Container(
+          decoration: BoxDecoration(
+            color: colors.surfaceContainerHighest.withValues(alpha: .55),
+            border: Border.all(color: colors.outlineVariant),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
           Container(
             color: colors.surfaceContainerHighest,
             padding: const EdgeInsetsDirectional.only(start: 10, end: 4),
@@ -861,17 +869,12 @@ class _SelectableCodeBlock extends StatelessWidget {
             ),
           ),
           Divider(height: 1, color: colors.outlineVariant),
-          LayoutBuilder(
-            builder: (context, constraints) {
               // Keep large compiler outputs bounded even when this card is
               // placed inside another vertical scroll view. Without a finite
               // height, SelectableText lays out the complete Assembly/JSON
               // document and the enclosing Column overflows.
-              final height = constraints.hasBoundedHeight
-                  ? constraints.maxHeight
-                  : 420.0;
-              return SizedBox(
-                height: height,
+              SizedBox(
+                height: contentHeight,
                 child: Directionality(
                   textDirection: TextDirection.ltr,
                   child: SingleChildScrollView(
@@ -880,7 +883,12 @@ class _SelectableCodeBlock extends StatelessWidget {
                       scrollDirection: Axis.horizontal,
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
-                          minWidth: constraints.maxWidth - 24,
+                          minWidth: constraints.maxWidth.isFinite
+                              ? (constraints.maxWidth - 24).clamp(
+                                  0.0,
+                                  double.infinity,
+                                ).toDouble()
+                              : 0.0,
                         ),
                         child: SelectableText.rich(
                           TextSpan(
@@ -899,11 +907,11 @@ class _SelectableCodeBlock extends StatelessWidget {
                     ),
                   ),
                 ),
-              );
-            },
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
