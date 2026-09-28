@@ -143,7 +143,9 @@ int artifact_build_native(const char *artifact_dir,
 #ifdef _WIN32
   {
     const char *arguments[] = {
-      gcc, object_path, "-o", artifact_path, NULL
+      /* This is a single NASM object; LTO is unnecessary. Disabling the
+         optional plugin keeps a relocated MSYS2 GCC self-contained. */
+      gcc, "-fno-use-linker-plugin", object_path, "-o", artifact_path, NULL
     };
     const int exit_code = _spawnv(_P_WAIT, gcc, arguments);
     if (exit_code != 0) {
