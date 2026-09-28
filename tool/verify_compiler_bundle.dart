@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -35,6 +36,7 @@ Future<void> main(List<String> arguments) async {
     'sourcePaths': ['smoke.arb'],
     'sourceTexts': {'smoke.arb': 'برنامج اختبار؛ { اطبع(2)؛ }.'},
     'mode': 'project',
+    if (native) 'execute': false,
     if (native) ...{
       'target': 'dart-native',
       'artifactDirectory': artifactDirectory.path,
@@ -46,9 +48,30 @@ Future<void> main(List<String> arguments) async {
     ], workingDirectory: Directory.current.path, environment: environment);
     process.stdin.writeln(jsonEncode(request));
     await process.stdin.close();
-    final output = await process.stdout.transform(utf8.decoder).join();
-    final errorOutput = await process.stderr.transform(utf8.decoder).join();
-    final result = await process.exitCode;
+    final outputFuture = process.stdout.transform(utf8.decoder).join();
+    final errorOutputFuture = process.stderr.transform(utf8.decoder).join();
+    final exitCodeFuture = process.exitCode;
+    late final String output;
+    late final String errorOutput;
+    late final int result;
+    try {
+      await Future.wait<Object>([
+        outputFuture,
+        errorOutputFuture,
+        exitCodeFuture,
+      ]).timeout(const Duration(seconds: 90));
+      output = await outputFuture;
+      errorOutput = await errorOutputFuture;
+      result = await exitCodeFuture;
+    } on TimeoutException {
+      process.kill(ProcessSignal.sigterm);
+      stderr.writeln(
+        'Bundled compiler smoke test timed out after 90 seconds; '
+        'native toolchain execution was terminated.',
+      );
+      exitCode = 124;
+      return;
+    }
     if (result != 0) {
       stderr.writeln(errorOutput);
       exitCode = result;
