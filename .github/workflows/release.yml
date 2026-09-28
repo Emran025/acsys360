@@ -104,6 +104,19 @@ jobs:
             $source = "C:/msys64/ucrt64/$directory"
             if (Test-Path $source) { Copy-Item $source "$release/toolchain/windows/" -Recurse -Force }
           }
+          # Copy these two entry points explicitly. MSYS2 may expose them as
+          # links, and a wildcard directory copy can omit the runnable .exe.
+          foreach ($tool in @("gcc.exe", "nasm.exe")) {
+            $source = "C:/msys64/ucrt64/bin/$tool"
+            if (-not (Test-Path $source)) {
+              $source = (Get-ChildItem C:/msys64 -Filter $tool -Recurse -File -ErrorAction SilentlyContinue |
+                Where-Object { $_.FullName -match "\\(ucrt64|mingw64)\\bin\\" } |
+                Select-Object -First 1).FullName
+            }
+            if (-not $source -or -not (Test-Path $source)) { throw "MSYS2 tool not found: $tool" }
+            Copy-Item -LiteralPath $source -Destination "$release/toolchain/windows/bin/$tool" -Force
+            Write-Host "Bundled $tool from $source"
+          }
       - name: Bundle compiler and native tools (macOS)
         if: matrix.target == 'macos'
         shell: bash

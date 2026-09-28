@@ -75,6 +75,18 @@ try {
             Copy-Item $Source $BundledToolchain -Recurse -Force
         }
     }
+    foreach ($Tool in @("gcc.exe", "nasm.exe")) {
+        $Source = Join-Path $ToolchainBin $Tool
+        if (-not (Test-Path $Source)) {
+            $Source = (Get-ChildItem "C:\msys64" -Filter $Tool -Recurse -File -ErrorAction SilentlyContinue |
+                Where-Object { $_.FullName -match "\\(ucrt64|mingw64)\\bin\\" } |
+                Select-Object -First 1).FullName
+        }
+        if (-not $Source -or -not (Test-Path $Source)) {
+            throw "MSYS2 tool was not found: $Tool"
+        }
+        Copy-Item -LiteralPath $Source -Destination (Join-Path $BundledToolchain "bin\$Tool") -Force
+    }
     Write-Host "[OK] Toolchain: $BundledToolchain" -ForegroundColor Green
 
     if ($Run) {

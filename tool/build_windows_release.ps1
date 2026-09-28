@@ -125,6 +125,18 @@ try {
         $Source = Join-Path $ToolchainRoot $Directory
         if (Test-Path $Source) { Copy-Item $Source $BundledToolchain -Recurse -Force }
     }
+    foreach ($Tool in @("gcc.exe", "nasm.exe")) {
+        $Source = Join-Path $ToolchainBin $Tool
+        if (-not (Test-Path $Source)) {
+            $Source = (Get-ChildItem "C:\msys64" -Filter $Tool -Recurse -File -ErrorAction SilentlyContinue |
+                Where-Object { $_.FullName -match "\\(ucrt64|mingw64)\\bin\\" } |
+                Select-Object -First 1).FullName
+        }
+        if (-not $Source -or -not (Test-Path $Source)) {
+            Fail "MSYS2 tool was not found: $Tool"
+        }
+        Copy-Item -LiteralPath $Source -Destination (Join-Path $BundledToolchain "bin\$Tool") -Force
+    }
 
     Invoke-Step "Run bundled compiler smoke test" {
         & dart run tool/verify_compiler_bundle.dart --executable $BundleCompiler --native
