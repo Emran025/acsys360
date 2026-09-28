@@ -93,6 +93,30 @@ const char *toolchain_path(const char *tool) {
   return NULL;
 }
 
+const char *toolchain_gcc_prefix(void) {
+#ifdef _WIN32
+  static char prefix[1024];
+  const char *bundled_dir = getenv("ACSYS360_TOOLCHAIN_DIR");
+  size_t length;
+  if (!bundled_dir || bundled_dir[0] == '\0') return NULL;
+  length = strlen(bundled_dir);
+  if (length < 4U || length + 2U >= sizeof(prefix)) return NULL;
+  memcpy(prefix, bundled_dir, length + 1U);
+  while (length > 0U && (prefix[length - 1U] == '\\' || prefix[length - 1U] == '/')) {
+    prefix[--length] = '\0';
+  }
+  /* ACSYS360_TOOLCHAIN_DIR points at .../toolchain/windows/bin. */
+  while (length > 0U && prefix[length - 1U] != '\\' && prefix[length - 1U] != '/') {
+    prefix[--length] = '\0';
+  }
+  if (length == 0U) return NULL;
+  prefix[length] = '\0';
+  return prefix;
+#else
+  return NULL;
+#endif
+}
+
 #ifndef _WIN32
 int toolchain_run_process(const char *executable, char *const arguments[]) {
   pid_t child = fork();

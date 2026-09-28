@@ -118,6 +118,16 @@ jobs:
             Copy-Item -LiteralPath $source -Destination "$release/toolchain/windows/bin/$tool.exe" -Force
             Write-Host "Bundled $tool from $source"
           }
+          $toolchainRoot = (Resolve-Path "$release/toolchain/windows").Path
+          $gccPath = Join-Path $toolchainRoot "bin/gcc.exe"
+          $gccChecks = @("crt2.o", "crtbegin.o", "libmingw32.a", "libgcc.a", "libmsvcrt.a", "libkernel32.a")
+          foreach ($file in $gccChecks) {
+            $resolved = (& $gccPath "-B$toolchainRoot\" "--sysroot=$toolchainRoot\" "-print-file-name=$file" 2>$null | Select-Object -Last 1).Trim()
+            if (-not $resolved -or $resolved -eq $file -or -not (Test-Path $resolved)) {
+              throw "Relocated GCC cannot resolve $file with prefix $toolchainRoot (reported: $resolved)"
+            }
+            Write-Host "Resolved $file -> $resolved"
+          }
       - name: Bundle compiler and native tools (macOS)
         if: matrix.target == 'macos'
         shell: bash

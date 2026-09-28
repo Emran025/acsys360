@@ -142,10 +142,23 @@ int artifact_build_native(const char *artifact_dir,
 #endif
 #ifdef _WIN32
   {
+    const char *gcc_prefix = toolchain_gcc_prefix();
+    char gcc_prefix_option[1100];
+    if (!gcc_prefix) {
+      snprintf(error, error_size,
+               "تعذر تحديد جذر GCC المحمول من ACSYS360_TOOLCHAIN_DIR");
+      return 0;
+    }
+    snprintf(gcc_prefix_option, sizeof(gcc_prefix_option), "-B%s", gcc_prefix);
+    char gcc_sysroot_option[1100];
+    snprintf(gcc_sysroot_option, sizeof(gcc_sysroot_option), "--sysroot=%s", gcc_prefix);
     const char *arguments[] = {
       /* This is a single NASM object; LTO is unnecessary. Disabling the
-         optional plugin keeps a relocated MSYS2 GCC self-contained. */
-      gcc, "-fno-use-linker-plugin", object_path, "-o", artifact_path, NULL
+         optional plugin keeps a relocated MSYS2 GCC self-contained. -B is
+         required because MSYS2 GCC otherwise retains its install-time prefix
+         after being copied into the app bundle. */
+      gcc, gcc_prefix_option, gcc_sysroot_option, "-fno-use-linker-plugin", object_path,
+      "-o", artifact_path, NULL
     };
     const int exit_code = _spawnv(_P_WAIT, gcc, arguments);
     if (exit_code != 0) {

@@ -129,6 +129,13 @@ try {
         if (-not (Test-Path $Source)) { Fail "MSYS2 command path is missing: $Source" }
         Copy-Item -LiteralPath $Source -Destination (Join-Path $BundledToolchain "bin\$Tool.exe") -Force
     }
+    $GccPrefix = "$BundledToolchain\"
+    foreach ($File in @("crt2.o", "crtbegin.o", "libmingw32.a", "libgcc.a", "libmsvcrt.a", "libkernel32.a")) {
+        $Resolved = (& (Join-Path $BundledToolchain "bin\gcc.exe") "-B$GccPrefix" "--sysroot=$GccPrefix" "-print-file-name=$File" 2>$null | Select-Object -Last 1).Trim()
+        if (-not $Resolved -or $Resolved -eq $File -or -not (Test-Path $Resolved)) {
+            Fail "Relocated GCC cannot resolve $File with prefix $BundledToolchain (reported: $Resolved)"
+        }
+    }
 
     Invoke-Step "Run bundled compiler smoke test" {
         & dart run tool/verify_compiler_bundle.dart --executable $BundleCompiler --native
