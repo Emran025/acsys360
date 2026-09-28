@@ -126,7 +126,7 @@ int artifact_build_native(const char *artifact_dir,
 #ifdef _WIN32
   {
     char *arguments[] = {
-      (char *)nasm, "-f", "win64", (char *)assembly_path,
+      "nasm.exe", "-f", "win64", (char *)assembly_path,
       "-o", object_path, NULL
     };
     char stderr_output[2048];
@@ -174,7 +174,7 @@ int artifact_build_native(const char *artifact_dir,
          optional plugin keeps a relocated MSYS2 GCC self-contained. -B is
          required because MSYS2 GCC otherwise retains its install-time prefix
          after being copied into the app bundle. */
-      gcc, gcc_prefix_option, gcc_sysroot_option, "-fno-use-linker-plugin", object_path,
+      "gcc.exe", gcc_prefix_option, gcc_sysroot_option, "-fno-use-linker-plugin", object_path,
       "-o", artifact_path, NULL
     };
     char stderr_output[2048];

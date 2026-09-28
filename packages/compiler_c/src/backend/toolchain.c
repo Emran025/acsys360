@@ -143,15 +143,12 @@ int toolchain_run_process_capture(const char *executable,
 #ifdef _WIN32
   /* _spawnv does not expose stderr. Redirect only the inherited descriptor
      while the child runs, then restore it so the desktop app stays intact.
-     The CRT's _spawnv already receives the executable separately; passing
-     argv[0] again makes it a real child argument. NASM then interprets its
-     own executable path as a second input file. Keep argv[0] for execv
-     compatibility on Unix, but omit it from the Windows _spawnv call. */
+     Keep argv[0] as a short program name (for example, nasm.exe) rather
+     than the absolute path: the MS CRT builds a command line from argv and
+     an absolute argv[0] containing spaces is otherwise parsed as an input
+     argument by tools such as NASM. The executable path remains the separate
+     _spawnv executable parameter. */
   char *const *spawn_arguments = arguments;
-  if (arguments && arguments[0] && executable &&
-      strcmp(arguments[0], executable) == 0) {
-    spawn_arguments = arguments + 1;
-  }
   FILE *capture = tmpfile();
   if (!capture) {
     return _spawnv(_P_WAIT, executable, (const char *const *)spawn_arguments);
