@@ -6,6 +6,7 @@
 
 #ifdef _WIN32
 #include <direct.h>
+#include <io.h>
 #include <process.h>
 #else
 #include <sys/stat.h>
@@ -133,3 +134,38 @@ int toolchain_run_process(const char *executable, char *const arguments[]) {
   return WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
 }
 #endif
+
+int toolchain_run_process_capture(const char *executable,
+                                  char *const arguments[],
+                                  char *stderr_output,
+                                  size_t stderr_output_size) {
+  if (stderr_output && stderr_output_size > 0U) stderr_output[0] = '\0';
+#ifdef _WIN32
+  /* _spawnv does not expose stderr. Redirect only the inherited descriptor
+     while the child runs, then restore it so the desktop app stays intact. */
+  FILE *capture = tmpfile();
+  if (!capture) {
+    return _spawnv(_P_WAIT, executable, (const char *const *)arguments);
+  }
+  const int saved_stderr = _dup(_fileno(stderr));
+  if (saved_stderr < 0 || _dup2(_fileno(capture), _fileno(stderr)) != 0) {
+    if (saved_stderr >= 0) _close(saved_stderr);
+    fclose(capture);
+    return _spawnv(_P_WAIT, executable, (const char *const *)arguments);
+  }
+  const int exit_code = _spawnv(_P_WAIT, executable,
+                                (const char *const *)arguments);
+  fflush(stderr);
+  (void)_dup2(saved_stderr, _fileno(stderr));
+  _close(saved_stderr);
+  if (stderr_output && stderr_output_size > 0U) {
+    rewind(capture);
+    (void)fread(stderr_output, 1U, stderr_output_size - 1U, capture);
+    stderr_output[stderr_output_size - 1U] = '\0';
+  }
+  fclose(capture);
+  return exit_code;
+#else
+  return toolchain_run_process(executable, arguments);
+#endif
+}

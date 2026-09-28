@@ -197,7 +197,8 @@ int compiler_driver_run(const char *payload) {
             if (artifact_target &&
                 strcmp(artifact_target, "dart-native") == 0) {
               char native_path[2048];
-              char build_error[256];
+              /* Preserve tool paths and stderr for relocated Windows bundles. */
+              char build_error[4096];
               if (artifact_build_native(
                       artifact_dir,
                       asm_path,

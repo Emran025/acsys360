@@ -13,13 +13,16 @@ ProcessCompilerRepository createCompilerRepository() {
     Platform.isWindows ? 'windows' : (Platform.isMacOS ? 'macos' : 'linux'),
     'bin',
   ]);
-  final toolchainEnvironment = {
+  final pathKey = Platform.environment.containsKey('Path') ? 'Path' : 'PATH';
+  final inheritedPath = Platform.environment[pathKey] ?? '';
+  final toolchainEnvironment = <String, String>{
+    ...Platform.environment,
     'ACSYS360_TOOLCHAIN_DIR': toolchainDirectory,
-    'PATH': [
-      toolchainDirectory,
-      Platform.environment['PATH'] ?? '',
-    ].join(Platform.isWindows ? ';' : ':'),
   };
+  toolchainEnvironment[pathKey] = [
+      toolchainDirectory,
+      inheritedPath,
+    ].where((path) => path.isNotEmpty).join(Platform.isWindows ? ';' : ':');
   final roots = <String>[];
 
   void addRoot(String path) {

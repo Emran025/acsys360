@@ -94,7 +94,12 @@ int artifact_build_native(const char *artifact_dir,
   if (!artifact_dir || !assembly_path || !artifact_path ||
       !error || artifact_path_size == 0U || error_size == 0U) return 0;
   if (!nasm || !gcc) {
-    snprintf(error, error_size, "تعذر العثور على أدوات NASM وGCC في مسارات موثوقة");
+    snprintf(error, error_size,
+             "تعذر العثور على أدوات البناء: nasm=%s، gcc=%s، ACSYS360_TOOLCHAIN_DIR=%s، ACSYS360_TOOLCHAIN_ONLY=%s",
+             nasm ? nasm : "<missing>",
+             gcc ? gcc : "<missing>",
+             getenv("ACSYS360_TOOLCHAIN_DIR") ? getenv("ACSYS360_TOOLCHAIN_DIR") : "<unset>",
+             getenv("ACSYS360_TOOLCHAIN_ONLY") ? getenv("ACSYS360_TOOLCHAIN_ONLY") : "<unset>");
     return 0;
   }
   snprintf(object_path, sizeof(object_path), "%s%carabicc.obj",
@@ -120,11 +125,17 @@ int artifact_build_native(const char *artifact_dir,
   toolchain_ensure_directory(artifact_dir);
 #ifdef _WIN32
   {
-    const char *arguments[] = {
-      nasm, "-f", "win64", assembly_path, "-o", object_path, NULL
+    char *arguments[] = {
+      (char *)nasm, "-f", "win64", (char *)assembly_path,
+      "-o", object_path, NULL
     };
-    if (_spawnv(_P_WAIT, nasm, arguments) != 0) {
-      snprintf(error, error_size, "فشل تشغيل NASM لبناء الملف التنفيذي");
+    char stderr_output[2048];
+    const int exit_code = toolchain_run_process_capture(
+        nasm, arguments, stderr_output, sizeof(stderr_output));
+    if (exit_code != 0) {
+      snprintf(error, error_size,
+               "فشل تشغيل NASM (exit=%d)\ncommand: %s -f win64 %s -o %s\nstderr: %.*s",
+               exit_code, nasm, assembly_path, object_path, 1500, stderr_output);
       return 0;
     }
   }
@@ -149,10 +160,16 @@ int artifact_build_native(const char *artifact_dir,
                "تعذر تحديد جذر GCC المحمول من ACSYS360_TOOLCHAIN_DIR");
       return 0;
     }
-    snprintf(gcc_prefix_option, sizeof(gcc_prefix_option), "-B%s", gcc_prefix);
+    const char *gcc_bin = getenv("ACSYS360_TOOLCHAIN_DIR");
+    if (!gcc_bin || gcc_bin[0] == '\0') {
+      snprintf(error, error_size,
+               "تعذر تحديد مجلد bin لـGCC من ACSYS360_TOOLCHAIN_DIR");
+      return 0;
+    }
+    snprintf(gcc_prefix_option, sizeof(gcc_prefix_option), "-B%s\\", gcc_bin);
     char gcc_sysroot_option[1100];
     snprintf(gcc_sysroot_option, sizeof(gcc_sysroot_option), "--sysroot=%s", gcc_prefix);
-    const char *arguments[] = {
+    char *arguments[] = {
       /* This is a single NASM object; LTO is unnecessary. Disabling the
          optional plugin keeps a relocated MSYS2 GCC self-contained. -B is
          required because MSYS2 GCC otherwise retains its install-time prefix
@@ -160,11 +177,14 @@ int artifact_build_native(const char *artifact_dir,
       gcc, gcc_prefix_option, gcc_sysroot_option, "-fno-use-linker-plugin", object_path,
       "-o", artifact_path, NULL
     };
-    const int exit_code = _spawnv(_P_WAIT, gcc, arguments);
+    char stderr_output[2048];
+    const int exit_code = toolchain_run_process_capture(
+        gcc, arguments, stderr_output, sizeof(stderr_output));
     if (exit_code != 0) {
       snprintf(error, error_size,
-               "فشل تشغيل GCC لربط الملف التنفيذي (exit=%d، object=%.*s)",
-               exit_code, 150, object_path);
+               "فشل تشغيل GCC لربط الملف التنفيذي (exit=%d، gcc=%s، prefix=%s، sysroot=%s، object=%.*s)\nstderr: %.*s",
+               exit_code, gcc, gcc_prefix, gcc_prefix, 150, object_path,
+               1500, stderr_output);
       return 0;
     }
   }
