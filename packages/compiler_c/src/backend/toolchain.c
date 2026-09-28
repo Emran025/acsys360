@@ -142,19 +142,28 @@ int toolchain_run_process_capture(const char *executable,
   if (stderr_output && stderr_output_size > 0U) stderr_output[0] = '\0';
 #ifdef _WIN32
   /* _spawnv does not expose stderr. Redirect only the inherited descriptor
-     while the child runs, then restore it so the desktop app stays intact. */
+     while the child runs, then restore it so the desktop app stays intact.
+     The CRT's _spawnv already receives the executable separately; passing
+     argv[0] again makes it a real child argument. NASM then interprets its
+     own executable path as a second input file. Keep argv[0] for execv
+     compatibility on Unix, but omit it from the Windows _spawnv call. */
+  char *const *spawn_arguments = arguments;
+  if (arguments && arguments[0] && executable &&
+      strcmp(arguments[0], executable) == 0) {
+    spawn_arguments = arguments + 1;
+  }
   FILE *capture = tmpfile();
   if (!capture) {
-    return _spawnv(_P_WAIT, executable, (const char *const *)arguments);
+    return _spawnv(_P_WAIT, executable, (const char *const *)spawn_arguments);
   }
   const int saved_stderr = _dup(_fileno(stderr));
   if (saved_stderr < 0 || _dup2(_fileno(capture), _fileno(stderr)) != 0) {
     if (saved_stderr >= 0) _close(saved_stderr);
     fclose(capture);
-    return _spawnv(_P_WAIT, executable, (const char *const *)arguments);
+    return _spawnv(_P_WAIT, executable, (const char *const *)spawn_arguments);
   }
   const int exit_code = _spawnv(_P_WAIT, executable,
-                                (const char *const *)arguments);
+                                (const char *const *)spawn_arguments);
   fflush(stderr);
   (void)_dup2(saved_stderr, _fileno(stderr));
   _close(saved_stderr);
