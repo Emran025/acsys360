@@ -817,7 +817,9 @@ class _SelectableCodeBlock extends StatelessWidget {
         // Previously the content received the whole available height, so the
         // header + content exceeded a short diagnostics panel by 25+ pixels.
         final contentHeight = constraints.hasBoundedHeight
-            ? (constraints.maxHeight - 33).clamp(0.0, double.infinity).toDouble()
+            ? (constraints.maxHeight - 33)
+                  .clamp(0.0, double.infinity)
+                  .toDouble()
             : 420.0;
         return Container(
           decoration: BoxDecoration(
@@ -829,46 +831,46 @@ class _SelectableCodeBlock extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-          Container(
-            color: colors.surfaceContainerHighest,
-            padding: const EdgeInsetsDirectional.only(start: 10, end: 4),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: Theme.of(context).textTheme.labelMedium,
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 7,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colors.primary.withValues(alpha: .10),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    language,
-                    style: TextStyle(
-                      color: colors.primary,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
+              Container(
+                color: colors.surfaceContainerHighest,
+                padding: const EdgeInsetsDirectional.only(start: 10, end: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: Theme.of(context).textTheme.labelMedium,
+                      ),
                     ),
-                  ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colors.primary.withValues(alpha: .10),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        language,
+                        style: TextStyle(
+                          color: colors.primary,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'نسخ',
+                      visualDensity: VisualDensity.compact,
+                      iconSize: 18,
+                      onPressed: onCopy,
+                      icon: const Icon(Icons.content_copy_rounded),
+                    ),
+                  ],
                 ),
-                IconButton(
-                  tooltip: 'نسخ',
-                  visualDensity: VisualDensity.compact,
-                  iconSize: 18,
-                  onPressed: onCopy,
-                  icon: const Icon(Icons.content_copy_rounded),
-                ),
-              ],
-            ),
-          ),
-          Divider(height: 1, color: colors.outlineVariant),
+              ),
+              Divider(height: 1, color: colors.outlineVariant),
               // Keep large compiler outputs bounded even when this card is
               // placed inside another vertical scroll view. Without a finite
               // height, SelectableText lays out the complete Assembly/JSON
@@ -884,10 +886,9 @@ class _SelectableCodeBlock extends StatelessWidget {
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
                           minWidth: constraints.maxWidth.isFinite
-                              ? (constraints.maxWidth - 24).clamp(
-                                  0.0,
-                                  double.infinity,
-                                ).toDouble()
+                              ? (constraints.maxWidth - 24)
+                                    .clamp(0.0, double.infinity)
+                                    .toDouble()
                               : 0.0,
                         ),
                         child: SelectableText.rich(
