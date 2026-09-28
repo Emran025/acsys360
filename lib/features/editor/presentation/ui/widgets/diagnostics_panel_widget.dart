@@ -813,11 +813,11 @@ class _SelectableCodeBlock extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     return LayoutBuilder(
       builder: (context, constraints) {
-        // The content height must exclude the 32px header and its divider.
-        // Previously the content received the whole available height, so the
-        // header + content exceeded a short diagnostics panel by 25+ pixels.
+        // The content height must exclude the 32px header, its divider, and
+        // the 1px border on each side. The border was previously omitted,
+        // leaving a 2px RenderFlex overflow in short Semantic panels.
         final contentHeight = constraints.hasBoundedHeight
-            ? (constraints.maxHeight - 33)
+            ? (constraints.maxHeight - 35)
                   .clamp(0.0, double.infinity)
                   .toDouble()
             : 420.0;
