@@ -360,7 +360,9 @@ Future<void> main(List<String> args) async {
             (item) =>
                 item is Map &&
                 item['code'] == 'A002' &&
-                (item['message'] as String).contains('NASM'),
+                (item['message'] as String).contains('nasm=') &&
+                (item['message'] as String).contains('gcc=') &&
+                (item['message'] as String).contains('ACSYS360_TOOLCHAIN_DIR'),
           ),
       'missing tool diagnostic is missing',
     );
