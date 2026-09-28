@@ -115,7 +115,7 @@ try {
     $BundledToolchain = Join-Path $FlutterRelease "toolchain\windows"
     if (Test-Path $BundledToolchain) { Remove-Item $BundledToolchain -Recurse -Force }
     New-Item -ItemType Directory -Path $BundledToolchain -Force | Out-Null
-    foreach ($Directory in @("bin", "include", "lib", "libexec", "share")) {
+    foreach ($Directory in @("bin", "include", "lib", "libexec", "share", "x86_64-w64-mingw32")) {
         $Source = Join-Path $ToolchainRoot $Directory
         if (Test-Path $Source) { Copy-Item $Source $BundledToolchain -Recurse -Force }
     }

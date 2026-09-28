@@ -100,7 +100,7 @@ jobs:
           $exe = if (Test-Path packages/compiler_c/build/Release/arabicc.exe) { "packages/compiler_c/build/Release/arabicc.exe" } else { "packages/compiler_c/build/arabicc.exe" }
           Copy-Item $exe "$release/compiler/arabicc.exe"
           Copy-Item C:/msys64/ucrt64/bin/* "$release/toolchain/windows/bin/" -Recurse -Force
-          foreach ($directory in @("include", "lib", "libexec", "share")) {
+          foreach ($directory in @("include", "lib", "libexec", "share", "x86_64-w64-mingw32")) {
             $source = "C:/msys64/ucrt64/$directory"
             if (Test-Path $source) { Copy-Item $source "$release/toolchain/windows/" -Recurse -Force }
           }
