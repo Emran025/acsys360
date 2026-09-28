@@ -22,11 +22,13 @@ Write-Host "GCC:                         $gcc"
 Write-Host "NASM:                        $nasm"
 
 $missing = @(
-    @{ Name = "application"; Path = $Executable },
-    @{ Name = "compiler"; Path = $compiler },
-    @{ Name = "gcc"; Path = $gcc },
-    @{ Name = "nasm"; Path = $nasm }
-) | Where-Object { -not (Test-Path -LiteralPath $_.Path -PathType Leaf) }
+    @(
+        @{ Name = "application"; Path = $Executable },
+        @{ Name = "compiler"; Path = $compiler },
+        @{ Name = "gcc"; Path = $gcc },
+        @{ Name = "nasm"; Path = $nasm }
+    ) | Where-Object { -not (Test-Path -LiteralPath $_.Path -PathType Leaf) }
+)
 
 if ($missing.Count -gt 0) {
     foreach ($item in $missing) {
