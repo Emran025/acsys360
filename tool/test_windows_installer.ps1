@@ -64,8 +64,13 @@ finally {
         # The uninstaller may already have removed individual toolchain files.
         # Ignore stale per-file misses and retry while Windows releases handles.
         $cleanupAttempt = 0
+        $cleanupError = $null
         while ((Test-Path -LiteralPath $installRoot) -and $cleanupAttempt -lt 3) {
-            Remove-Item -LiteralPath $installRoot -Recurse -Force -ErrorAction SilentlyContinue
+            try {
+                Remove-Item -LiteralPath $installRoot -Recurse -Force -ErrorAction Stop
+            } catch {
+                $cleanupError = $_.Exception.Message
+            }
             $cleanupAttempt++
             if (Test-Path -LiteralPath $installRoot) {
                 Start-Sleep -Seconds 2
@@ -77,7 +82,7 @@ finally {
                     Select-Object -First 20 -ExpandProperty FullName
             )
             $remainingText = $remainingItems -join [Environment]::NewLine
-            throw "Failed to remove installer test directory: $installRoot`nRemaining items:`n$remainingText"
+            throw "Failed to remove installer test directory: $installRoot`nLast cleanup error: $cleanupError`nRemaining items:`n$remainingText"
         }
     }
     if (Test-Path -LiteralPath $installerLog) {
