@@ -25,9 +25,10 @@ int main(void) {
   char temporary_directory[MAX_PATH];
   char unique_path[MAX_PATH];
   char root[MAX_PATH];
-  char gcc_path[MAX_PATH];
-  char nasm_path[MAX_PATH];
-  char path_environment[MAX_PATH + 3];
+  char decoy[MAX_PATH];
+  char gcc_path[MAX_PATH + 16];
+  char nasm_path[MAX_PATH + 16];
+  char path_environment[(MAX_PATH * 2) + 8];
   const DWORD temporary_length =
       GetTempPathA((DWORD)sizeof(temporary_directory), temporary_directory);
   if (temporary_length == 0 || temporary_length >= sizeof(temporary_directory) ||
@@ -36,15 +37,21 @@ int main(void) {
   }
   if (_unlink(unique_path) != 0) return 1;
   const int root_length = snprintf(root, sizeof(root), "%s path", unique_path);
-  if (root_length <= 0 || (size_t)root_length >= sizeof(root)) return 1;
-  const int path_length = snprintf(path_environment, sizeof(path_environment),
-                                   "\"%s\"", root);
-  if (path_length <= 0 || (size_t)path_length >= sizeof(path_environment) ||
-      _mkdir(root) != 0) {
+  const int decoy_length = snprintf(decoy, sizeof(decoy), "%s empty", unique_path);
+  if (root_length <= 0 || (size_t)root_length >= sizeof(root) ||
+      decoy_length <= 0 || (size_t)decoy_length >= sizeof(decoy) ||
+      _mkdir(decoy) != 0 || _mkdir(root) != 0) {
     return 1;
   }
-  snprintf(gcc_path, sizeof(gcc_path), "%s\\gcc.exe", root);
-  snprintf(nasm_path, sizeof(nasm_path), "%s\\nasm.exe", root);
+  const int gcc_path_length = snprintf(gcc_path, sizeof(gcc_path), "%s\\GCC.EXE", root);
+  const int nasm_path_length = snprintf(nasm_path, sizeof(nasm_path), "%s\\NASM.EXE", root);
+  const int path_length = snprintf(path_environment, sizeof(path_environment),
+                                   "\"%s\";\"%s\"", decoy, root);
+  if (gcc_path_length <= 0 || (size_t)gcc_path_length >= sizeof(gcc_path) ||
+      nasm_path_length <= 0 || (size_t)nasm_path_length >= sizeof(nasm_path) ||
+      path_length <= 0 || (size_t)path_length >= sizeof(path_environment)) {
+    return 1;
+  }
   FILE *gcc_file = fopen(gcc_path, "wb");
   FILE *nasm_file = fopen(nasm_path, "wb");
   if (!gcc_file || !nasm_file) {
@@ -57,7 +64,7 @@ int main(void) {
 
   if (_putenv_s("ACSYS360_TOOLCHAIN_DIR", "") != 0 ||
       _putenv_s("ACSYS360_TOOLCHAIN_ONLY", "") != 0 ||
-      _putenv_s("PATH", path_environment) != 0) {
+      _putenv_s("Path", path_environment) != 0) {
     return 1;
   }
   const char *resolved_gcc = toolchain_path("gcc");
@@ -69,6 +76,7 @@ int main(void) {
   _unlink(gcc_path);
   _unlink(nasm_path);
   _rmdir(root);
+  _rmdir(decoy);
   if (!path_lookup_passed) {
     fprintf(stderr, "Windows toolchain PATH lookup failed: gcc=%s nasm=%s\n",
             resolved_gcc ? resolved_gcc : "<missing>",
