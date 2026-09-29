@@ -62,10 +62,22 @@ finally {
     }
     if (Test-Path -LiteralPath $installRoot) {
         # The uninstaller may already have removed individual toolchain files.
-        # Ignore stale per-file misses, but fail if the install root remains.
-        Remove-Item -LiteralPath $installRoot -Recurse -Force -ErrorAction SilentlyContinue
+        # Ignore stale per-file misses and retry while Windows releases handles.
+        $cleanupAttempt = 0
+        while ((Test-Path -LiteralPath $installRoot) -and $cleanupAttempt -lt 3) {
+            Remove-Item -LiteralPath $installRoot -Recurse -Force -ErrorAction SilentlyContinue
+            $cleanupAttempt++
+            if (Test-Path -LiteralPath $installRoot) {
+                Start-Sleep -Seconds 2
+            }
+        }
         if (Test-Path -LiteralPath $installRoot) {
-            throw "Failed to remove installer test directory: $installRoot"
+            $remainingItems = @(
+                Get-ChildItem -LiteralPath $installRoot -Force -ErrorAction SilentlyContinue |
+                    Select-Object -First 20 -ExpandProperty FullName
+            )
+            $remainingText = $remainingItems -join [Environment]::NewLine
+            throw "Failed to remove installer test directory: $installRoot`nRemaining items:`n$remainingText"
         }
     }
     if (Test-Path -LiteralPath $installerLog) {
