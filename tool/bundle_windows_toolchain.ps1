@@ -37,8 +37,10 @@ if (-not [string]::IsNullOrWhiteSpace($NasmPath)) {
         $nasm = Resolve-ToolPath "nasm.exe" ""
     }
 }
-$target = (& $gcc -dumpmachine | Select-Object -First 1).Trim()
-if ($LASTEXITCODE -ne 0 -or $target -notmatch '^x86_64-w64-mingw32') {
+$targetOutput = & $gcc -dumpmachine
+$gccTargetSucceeded = $?
+$target = ($targetOutput | Select-Object -First 1).Trim()
+if (-not $gccTargetSucceeded -or $target -notmatch '^x86_64-w64-mingw32') {
     throw "GCC must target x86_64-w64-mingw32; found '$target' at $gcc."
 }
 
@@ -73,14 +75,18 @@ foreach ($file in @("crt2.o", "crtbegin.o", "libmingw32.a", "libgcc.a", "libmsvc
     }
 }
 
+$gccVersionOutput = & $gcc --version
+$gccVersionSucceeded = $?
+$nasmVersionOutput = & $nasm -v
+$nasmVersionSucceeded = $?
+if (-not $gccVersionSucceeded) { throw "GCC could not run: $gcc" }
+if (-not $nasmVersionSucceeded) { throw "NASM could not run: $nasm" }
+
 $manifest = [ordered]@{
     gccTarget = $target
-    gccVersion = ((& $gcc --version | Select-Object -First 1) -join "").Trim()
-    nasmVersion = ((& $nasm -v | Select-Object -First 1) -join "").Trim()
+    gccVersion = (($gccVersionOutput | Select-Object -First 1) -join "").Trim()
+    nasmVersion = (($nasmVersionOutput | Select-Object -First 1) -join "").Trim()
     bundledAtUtc = [DateTime]::UtcNow.ToString("o")
-}
-if ($LASTEXITCODE -ne 0) {
-    throw "NASM could not run: $nasm"
 }
 $manifest | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $DestinationDirectory "acsys360-toolchain-manifest.json") -Encoding UTF8
 Write-Host "Bundled GCC $target and NASM into $DestinationDirectory"
