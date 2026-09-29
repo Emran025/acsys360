@@ -116,6 +116,17 @@ jobs:
           install: >-
             mingw-w64-ucrt-x86_64-gcc
             mingw-w64-ucrt-x86_64-nasm
+      - name: Export MSYS2 toolchain for CTest
+        shell: pwsh
+        run: |
+          $gcc = Get-Command gcc.exe -ErrorAction Stop
+          $nasm = Get-Command nasm.exe -ErrorAction Stop
+          $toolchainDirectory = Split-Path -Parent $gcc.Source
+          if ((Split-Path -Parent $nasm.Source) -ne $toolchainDirectory) {
+            throw "GCC and NASM must come from the same MSYS2 bin directory."
+          }
+          "ACSYS360_TOOLCHAIN_DIR=$toolchainDirectory" | Add-Content -Path $env:GITHUB_ENV -Encoding utf8
+          Write-Host "CTest native toolchain: $toolchainDirectory"
       - run: flutter config --enable-windows-desktop
       - name: Configure and build C compiler
         shell: pwsh

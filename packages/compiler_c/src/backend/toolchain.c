@@ -48,12 +48,50 @@ void toolchain_ensure_directory(const char *path) {
 #endif
 }
 
+#ifdef _WIN32
+static const char *toolchain_find_on_path(const char *tool, char *result,
+                                          size_t result_size) {
+  const char *search_path = getenv("PATH");
+  char executable[32];
+  const int executable_length =
+      snprintf(executable, sizeof(executable), "%s.exe", tool);
+  if (!search_path || executable_length <= 0 ||
+      (size_t)executable_length >= sizeof(executable)) {
+    return NULL;
+  }
+
+  const char *directory = search_path;
+  while (*directory != '\0') {
+    const char *separator = strchr(directory, ';');
+    size_t directory_length = separator ? (size_t)(separator - directory)
+                                        : strlen(directory);
+    size_t start = 0U;
+    while (start < directory_length && directory[start] == '"') start++;
+    if (directory_length > start && directory[directory_length - 1U] == '"') {
+      directory_length--;
+    }
+    if (directory_length > start) {
+      const int candidate_length = snprintf(
+          result, result_size, "%.*s\\%s", (int)(directory_length - start),
+          directory + start, executable);
+      if (candidate_length > 0 && (size_t)candidate_length < result_size &&
+          toolchain_file_exists(result)) {
+        return result;
+      }
+    }
+    if (!separator) break;
+    directory = separator + 1;
+  }
+  return NULL;
+}
+#endif
+
 const char *toolchain_path(const char *tool) {
   const char *bundled_dir = getenv("ACSYS360_TOOLCHAIN_DIR");
   const char *toolchain_only = getenv("ACSYS360_TOOLCHAIN_ONLY");
 #ifdef _WIN32
   static char bundled_paths[2][1024];
-  static char paths[2][260];
+  static char paths[2][1024];
   const size_t index = tool[0] == 'n' ? 0U : 1U;
   char *path = paths[index];
   if (bundled_dir && bundled_dir[0] != '\0') {
@@ -61,6 +99,8 @@ const char *toolchain_path(const char *tool) {
     if (toolchain_file_exists(bundled_paths[index])) return bundled_paths[index];
   }
   if (toolchain_only && strcmp(toolchain_only, "1") == 0) return NULL;
+  const char *path_match = toolchain_find_on_path(tool, path, sizeof(paths[index]));
+  if (path_match) return path_match;
   const char *directories[] = {
     "C:\\msys64\\ucrt64\\bin",
     "C:\\msys64\\usr\\bin",
