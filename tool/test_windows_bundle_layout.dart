@@ -43,10 +43,14 @@ void main() {
     final ci = File('.github/workflows/ci.yml').readAsStringSync();
     if (!ci.contains('windows-build:') ||
         !ci.contains('Export MSYS2 toolchain for CTest') ||
+        !ci.contains("steps.setup_msys2.outputs['msys2-location']") ||
+        !ci.contains('GITHUB_PATH') ||
         !ci.contains('test_windows_installer.ps1') ||
         !ci.contains('bundle_windows_toolchain.ps1') ||
         !ci.contains('bundle_windows_vc_runtime.ps1') ||
         !release.contains('Export MSYS2 toolchain for CTest') ||
+        !release.contains("steps.setup_msys2.outputs['msys2-location']") ||
+        !release.contains('GITHUB_PATH') ||
         !release.contains('ctest --test-dir build -C Release') ||
         !release.contains('bundle_windows_toolchain.ps1') ||
         !release.contains('bundle_windows_vc_runtime.ps1') ||

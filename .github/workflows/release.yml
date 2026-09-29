@@ -54,6 +54,7 @@ jobs:
       - if: matrix.target == 'windows'
         name: Install bundled Windows toolchain
         uses: msys2/setup-msys2@v2
+        id: setup_msys2
         with:
           msystem: UCRT64
           update: true
@@ -64,14 +65,21 @@ jobs:
         name: Export MSYS2 toolchain for CTest
         shell: pwsh
         run: |
-          $gcc = Get-Command gcc.exe -ErrorAction Stop
-          $toolchainDirectory = Split-Path -Parent $gcc.Source
+          $msys2Location = "${{ steps.setup_msys2.outputs['msys2-location'] }}"
+          if ([string]::IsNullOrWhiteSpace($msys2Location)) { throw "setup-msys2 did not return its installation path." }
+          $toolchainDirectory = Join-Path $msys2Location "ucrt64\bin"
+          $gcc = Join-Path $toolchainDirectory "gcc.exe"
           $nasm = Join-Path $toolchainDirectory "nasm.exe"
+          if (-not (Test-Path -LiteralPath $gcc -PathType Leaf)) {
+            throw "MSYS2 UCRT64 GCC was not found: $gcc"
+          }
           if (-not (Test-Path -LiteralPath $nasm -PathType Leaf)) {
             throw "MSYS2 NASM was not found beside GCC: $nasm"
           }
           "ACSYS360_TOOLCHAIN_DIR=$toolchainDirectory" | Add-Content -Path $env:GITHUB_ENV -Encoding utf8
-          Write-Host "CTest GCC: $($gcc.Source)"
+          $toolchainDirectory | Add-Content -Path $env:GITHUB_PATH -Encoding utf8
+          Write-Host "MSYS2 root: $msys2Location"
+          Write-Host "CTest GCC: $gcc"
           Write-Host "CTest NASM: $nasm"
       - if: matrix.target == 'macos'
         name: Install macOS build tools
