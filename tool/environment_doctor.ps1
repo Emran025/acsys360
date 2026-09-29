@@ -40,7 +40,14 @@ $ctest = Find-Command @("ctest.exe", "ctest")
 $flex = Find-Command @("win_flex.exe", "flex.exe", "win_flex", "flex")
 $bison = Find-Command @("win_bison.exe", "bison.exe", "win_bison", "bison")
 $gcc = Find-Command @("gcc.exe", "gcc")
-$nasm = Find-Command @("nasm.exe", "nasm")
+$nasm = "missing"
+if ($gcc -ne "missing") {
+    $nasmBesideGcc = Join-Path (Split-Path -Parent $gcc) "nasm.exe"
+    if (Test-Path -LiteralPath $nasmBesideGcc -PathType Leaf) {
+        $nasm = (Resolve-Path -LiteralPath $nasmBesideGcc).Path
+    }
+}
+if ($nasm -eq "missing") { $nasm = Find-Command @("nasm.exe", "nasm") }
 $iscc = Find-Command @("ISCC.exe")
 
 $flutterVersion = if ($flutter -ne "missing") { ((& $flutter --version 2>$null | Select-Object -First 1) -join "").Trim() } else { "missing" }

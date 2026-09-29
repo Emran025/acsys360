@@ -26,13 +26,22 @@ function Resolve-ToolPath([string]$Name, [string]$ExplicitPath) {
 }
 
 $gcc = Resolve-ToolPath "gcc.exe" $GccPath
-$nasm = Resolve-ToolPath "nasm.exe" $NasmPath
+$gccBin = Split-Path -Parent $gcc
+if (-not [string]::IsNullOrWhiteSpace($NasmPath)) {
+    $nasm = Resolve-ToolPath "nasm.exe" $NasmPath
+} else {
+    $nasmBesideGcc = Join-Path $gccBin "nasm.exe"
+    if (Test-Path -LiteralPath $nasmBesideGcc -PathType Leaf) {
+        $nasm = (Resolve-Path -LiteralPath $nasmBesideGcc).Path
+    } else {
+        $nasm = Resolve-ToolPath "nasm.exe" ""
+    }
+}
 $target = (& $gcc -dumpmachine | Select-Object -First 1).Trim()
 if ($LASTEXITCODE -ne 0 -or $target -notmatch '^x86_64-w64-mingw32') {
     throw "GCC must target x86_64-w64-mingw32; found '$target' at $gcc."
 }
 
-$gccBin = Split-Path -Parent $gcc
 $gccRoot = Split-Path -Parent $gccBin
 foreach ($requiredDirectory in @("bin", "include", "lib")) {
     $path = Join-Path $gccRoot $requiredDirectory

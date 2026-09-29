@@ -120,13 +120,14 @@ jobs:
         shell: pwsh
         run: |
           $gcc = Get-Command gcc.exe -ErrorAction Stop
-          $nasm = Get-Command nasm.exe -ErrorAction Stop
           $toolchainDirectory = Split-Path -Parent $gcc.Source
-          if ((Split-Path -Parent $nasm.Source) -ne $toolchainDirectory) {
-            throw "GCC and NASM must come from the same MSYS2 bin directory."
+          $nasm = Join-Path $toolchainDirectory "nasm.exe"
+          if (-not (Test-Path -LiteralPath $nasm -PathType Leaf)) {
+            throw "MSYS2 NASM was not found beside GCC: $nasm"
           }
           "ACSYS360_TOOLCHAIN_DIR=$toolchainDirectory" | Add-Content -Path $env:GITHUB_ENV -Encoding utf8
-          Write-Host "CTest native toolchain: $toolchainDirectory"
+          Write-Host "CTest GCC: $($gcc.Source)"
+          Write-Host "CTest NASM: $nasm"
       - run: flutter config --enable-windows-desktop
       - name: Configure and build C compiler
         shell: pwsh

@@ -70,7 +70,12 @@ if (-not $BisonCommand) {
 }
 $GccCommand = @(Get-Command gcc.exe -All -ErrorAction SilentlyContinue | Where-Object { $_.Source -and $_.Source -notmatch "[\\/]Strawberry[\\/]" } | Select-Object -First 1)
 if (-not $GccCommand) { Fail "GCC was not found in PATH. Install the MSYS2 UCRT64 x86_64 GCC toolchain." }
-$NasmCommand = @(Get-Command nasm.exe -All -ErrorAction SilentlyContinue | Select-Object -First 1)
+$NasmBesideGcc = Join-Path (Split-Path -Parent $GccCommand.Source) "nasm.exe"
+if (Test-Path -LiteralPath $NasmBesideGcc -PathType Leaf) {
+    $NasmCommand = @([PSCustomObject]@{ Source = (Resolve-Path -LiteralPath $NasmBesideGcc).Path })
+} else {
+    $NasmCommand = @(Get-Command nasm.exe -All -ErrorAction SilentlyContinue | Select-Object -First 1)
+}
 if (-not $NasmCommand) { Fail "NASM was not found in PATH. Install the MSYS2 UCRT64 NASM package." }
 
 $GccTarget = (& $GccCommand.Source -dumpmachine | Select-Object -First 1).Trim()
