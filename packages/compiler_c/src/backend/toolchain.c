@@ -55,7 +55,13 @@ static char *toolchain_quote_windows_argument(const char *argument) {
     *output++ = *cursor;
     backslashes = 0U;
   }
-  while (backslashes-- > 0U) *output++ = '\\';
+  /* A trailing backslash must be doubled so it cannot escape the closing
+     quote when the Windows CRT parses the child command line. */
+  while (backslashes > 0U) {
+    *output++ = '\\';
+    *output++ = '\\';
+    backslashes--;
+  }
   *output++ = '"';
   *output = '\0';
   return quoted;
