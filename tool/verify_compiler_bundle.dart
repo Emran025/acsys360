@@ -26,9 +26,11 @@ Future<void> main(List<String> arguments) async {
     environment['ACSYS360_TOOLCHAIN_DIR'] = toolchainDirectory;
     environment['ACSYS360_TOOLCHAIN_ONLY'] = '1';
     final pathKey = environment.containsKey('Path') ? 'Path' : 'PATH';
+    final systemRoot = environment['SystemRoot'] ?? r'C:\Windows';
     environment[pathKey] = [
       toolchainDirectory,
-      environment[pathKey] ?? '',
+      '$systemRoot${Platform.pathSeparator}System32',
+      systemRoot,
     ].join(';');
   }
   final request = {
@@ -49,6 +51,7 @@ Future<void> main(List<String> arguments) async {
       const ['--protocol'],
       workingDirectory: Directory.current.path,
       environment: environment,
+      includeParentEnvironment: false,
     );
     process.stdin.writeln(jsonEncode(request));
     await process.stdin.close();
@@ -105,8 +108,58 @@ Future<void> main(List<String> arguments) async {
       exitCode = 1;
       return;
     }
+    if (native) {
+      if (artifacts.any((artifact) => artifact is! String)) {
+        stderr.writeln('Compiler returned a non-string artifact path.');
+        exitCode = 1;
+        return;
+      }
+      final artifactPaths = artifacts.cast<String>();
+      for (final artifact in artifactPaths) {
+        if (!File(artifact).existsSync()) {
+          stderr.writeln('Compiler reported a missing artifact: $artifact');
+          exitCode = 1;
+          return;
+        }
+      }
+      final executablePath = artifactPaths.last;
+      final nativeProcess = await Process.start(
+        executablePath,
+        const [],
+        workingDirectory: artifactDirectory.path,
+        environment: environment,
+        includeParentEnvironment: false,
+        runInShell: false,
+      );
+      final nativeStdout = nativeProcess.stdout.transform(utf8.decoder).join();
+      final nativeStderr = nativeProcess.stderr.transform(utf8.decoder).join();
+      final nativeExitCode = nativeProcess.exitCode;
+      try {
+        await Future.wait<Object>([
+          nativeStdout,
+          nativeStderr,
+          nativeExitCode,
+        ]).timeout(const Duration(seconds: 30));
+      } on TimeoutException {
+        nativeProcess.kill(ProcessSignal.sigterm);
+        stderr.writeln('Generated native artifact timed out after 30 seconds.');
+        exitCode = 124;
+        return;
+      }
+      final output = (await nativeStdout).replaceAll('\r\n', '\n').trim();
+      final errorOutput = await nativeStderr;
+      final result = await nativeExitCode;
+      if (result != 0 || output != '2') {
+        stderr.writeln(
+          'Generated native artifact failed: exit=$result, '
+          'stdout=$output, stderr=$errorOutput',
+        );
+        exitCode = 1;
+        return;
+      }
+    }
     stdout.writeln(
-      'Bundled compiler ${native ? 'native ' : ''}smoke test passed: $executable',
+      'Bundled compiler ${native ? 'native build-and-run ' : ''}smoke test passed: $executable',
     );
   } finally {
     if (artifactDirectory.existsSync()) {

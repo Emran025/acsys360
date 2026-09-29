@@ -96,12 +96,25 @@ class NativeArtifactRunner implements ProgramRunner {
   Map<String, String> _runtimeEnvironment() {
     final environment = Map<String, String>.from(Platform.environment);
     if (Platform.isWindows) {
+      final pathKey = environment.keys.firstWhere(
+        (key) => key.toLowerCase() == 'path',
+        orElse: () => 'Path',
+      );
+      final inheritedPaths = (environment[pathKey] ?? '').split(';');
       final paths = [
+        ...inheritedPaths,
         r'C:\msys64\ucrt64\bin',
         r'C:\msys64\mingw64\bin',
-        environment['Path'] ?? '',
-      ];
-      environment['Path'] = paths.where((path) => path.isNotEmpty).join(';');
+      ].where((path) => path.isNotEmpty).toList();
+      final uniquePaths = <String>[];
+      for (final path in paths) {
+        if (!uniquePaths.any(
+          (existing) => existing.toLowerCase() == path.toLowerCase(),
+        )) {
+          uniquePaths.add(path);
+        }
+      }
+      environment[pathKey] = uniquePaths.join(';');
     }
     return environment;
   }

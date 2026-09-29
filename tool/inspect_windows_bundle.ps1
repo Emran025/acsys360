@@ -26,7 +26,11 @@ $missing = @(
         @{ Name = "application"; Path = $Executable },
         @{ Name = "compiler"; Path = $compiler },
         @{ Name = "gcc"; Path = $gcc },
-        @{ Name = "nasm"; Path = $nasm }
+        @{ Name = "nasm"; Path = $nasm },
+        @{ Name = "Visual C++ runtime"; Path = (Join-Path $appRoot "vcruntime140.dll") },
+        @{ Name = "Visual C++ runtime"; Path = (Join-Path $appRoot "msvcp140.dll") },
+        @{ Name = "Compiler Visual C++ runtime"; Path = (Join-Path (Split-Path -Parent $compiler) "vcruntime140.dll") },
+        @{ Name = "Compiler Visual C++ runtime"; Path = (Join-Path (Split-Path -Parent $compiler) "msvcp140.dll") }
     ) | Where-Object { -not (Test-Path -LiteralPath $_.Path -PathType Leaf) }
 )
 

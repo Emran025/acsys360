@@ -69,7 +69,6 @@ jobs:
 
       - run: flutter config --enable-${{ matrix.target }}-desktop
       - run: flutter build ${{ matrix.target }} --release
-
       - name: Build C compiler (Unix)
         if: matrix.target != 'windows'
         shell: bash
@@ -82,8 +81,16 @@ jobs:
         shell: pwsh
         run: |
           cd packages/compiler_c
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          $flex = Get-Command win_flex.exe, flex.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          $bison = Get-Command win_bison.exe, bison.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $flex) { throw "Flex/win_flex was not found on PATH." }
+          if (-not $bison) { throw "Bison/win_bison was not found on PATH." }
+          cmake -S . -B build "-DFLEX_EXECUTABLE:FILEPATH=$($flex.Source)" "-DBISON_EXECUTABLE:FILEPATH=$($bison.Source)"
+          if ($LASTEXITCODE -ne 0) { throw "CMake configuration failed." }
           cmake --build build --parallel --config Release
+          if ($LASTEXITCODE -ne 0) { throw "C compiler build failed." }
+          ctest --test-dir build -C Release --output-on-failure
+          if ($LASTEXITCODE -ne 0) { throw "C compiler tests failed." }
 
       - name: Bundle compiler and native tools (Linux)
         if: matrix.target == 'linux'
@@ -98,33 +105,15 @@ jobs:
         shell: pwsh
         run: |
           $release = "build/windows/x64/runner/Release"
-          New-Item -ItemType Directory -Force "$release/compiler", "$release/toolchain/windows/bin" | Out-Null
+          New-Item -ItemType Directory -Force "$release/compiler" | Out-Null
           $exe = if (Test-Path packages/compiler_c/build/Release/arabicc.exe) { "packages/compiler_c/build/Release/arabicc.exe" } else { "packages/compiler_c/build/arabicc.exe" }
           Copy-Item $exe "$release/compiler/arabicc.exe"
-          $toolchainRoot = (Resolve-Path "$release/toolchain/windows").Path
-          $gccCommand = @(Get-Command gcc.exe -All -ErrorAction SilentlyContinue | Where-Object { $_.Source -and $_.Source -notmatch "[\\/]Strawberry[\\/]" } | Select-Object -First 1)
-          if (-not $gccCommand) {
-            throw "GCC was not found. PATH reports: $((where.exe gcc 2>$null) -join ', ')"
-          }
-          $gccBin = Split-Path -Parent $gccCommand.Source
-          $gccRoot = Split-Path -Parent $gccBin
-          Write-Host "Discovered GCC: $($gccCommand.Source)"
-          Write-Host "Discovered GCC root: $gccRoot"
-          Copy-Item "$gccRoot\*" $toolchainRoot -Recurse -Force
-          $nasmCommand = @(Get-Command nasm.exe -All -ErrorAction SilentlyContinue | Select-Object -First 1)
-          if (-not $nasmCommand) {
-            throw "NASM was not found. PATH reports: $((where.exe nasm 2>$null) -join ', ')"
-          }
-          Copy-Item -LiteralPath $nasmCommand.Source -Destination "$toolchainRoot/bin/nasm.exe" -Force
-          Write-Host "Bundled NASM: $($nasmCommand.Source)"
-          foreach ($file in @("crt2.o", "crtbegin.o", "libmingw32.a", "libgcc.a", "libmsvcrt.a", "libkernel32.a")) {
-            $found = Get-ChildItem -Path $toolchainRoot -Recurse -File -Filter $file -ErrorAction SilentlyContinue | Select-Object -First 1
-            if (-not $found) {
-              throw "Bundled UCRT64 tree is missing required linker file: $file"
-            }
-            Write-Host "Bundled linker file $file -> $($found.FullName)"
-          }
+          & pwsh -NoProfile -ExecutionPolicy Bypass -File tool/bundle_windows_toolchain.ps1 -DestinationDirectory "$release/toolchain/windows"
+          if ($LASTEXITCODE -ne 0) { throw "GCC/NASM toolchain bundling failed." }
+          & pwsh -NoProfile -ExecutionPolicy Bypass -File tool/bundle_windows_vc_runtime.ps1 -DestinationDirectory $release
+          if ($LASTEXITCODE -ne 0) { throw "Visual C++ runtime bundling failed." }
           & pwsh -File tool/inspect_windows_bundle.ps1 -Executable "$release\acsys360.exe"
+          if ($LASTEXITCODE -ne 0) { throw "Windows bundle inspection failed." }
       - name: Bundle compiler and native tools (macOS)
         if: matrix.target == 'macos'
         shell: bash
@@ -193,7 +182,9 @@ jobs:
           $outputDir = (New-Item -ItemType Directory -Force dist).FullName
           & "C:/Program Files (x86)/Inno Setup 6/ISCC.exe" "/DAppVersion=$version" "/DSourceDir=$sourceDir" "/DOutputDir=$outputDir" tool/packaging/acsys360-windows.iss
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
-          if (-not (Test-Path (Join-Path $outputDir "acsys360-windows-$version-setup-x64.exe"))) { throw "Windows setup installer was not created in $outputDir" }
+          $installer = (Resolve-Path (Join-Path $outputDir "acsys360-windows-$version-setup-x64.exe")).Path
+          & pwsh -NoProfile -ExecutionPolicy Bypass -File tool/test_windows_installer.ps1 -InstallerPath $installer
+          if ($LASTEXITCODE -ne 0) { throw "Installed Windows package smoke test failed." }
       - name: Build macOS package installer
         if: matrix.target == 'macos'
         shell: bash

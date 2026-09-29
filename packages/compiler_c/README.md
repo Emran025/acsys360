@@ -8,13 +8,19 @@
 
 ### Windows
 
-يعمل البناء الرسمي باستخدام Visual Studio و`winflexbison3`:
+يعمل بناء compiler الرسمي باستخدام Visual Studio C++ و`winflexbison3` لتوليد `arabicc.exe`، ثم يستخدم التطبيق MSYS2 UCRT64 (GCC وNASM) عند إنشاء native artifacts:
 
 ```powershell
 choco install winflexbison3 --yes
 ```
 
-يمكن استخدام MSYS2 أو MinGW عند الحاجة إلى أدوات C إضافية، لكن workflow الرسمي يستخدم MSVC على `windows-latest`.
+من طرفية MSYS2 UCRT64:
+
+```sh
+pacman -S --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-nasm
+```
+
+مرّر المسارات المكتشفة لأدوات Flex/Bison إلى CMake (`FLEX_EXECUTABLE` و`BISON_EXECUTABLE`) عند استخدام أسماء `win_flex.exe` و`win_bison.exe`. يتطلب GCC هدف `x86_64-w64-mingw32`. ينسخ إصدار التطبيق UCRT64 وNASM إلى حزمته، لذلك لا يحتاج المستخدم النهائي إلى تثبيت MSYS2.
 
 ### Linux
 

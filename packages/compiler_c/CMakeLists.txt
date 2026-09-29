@@ -71,7 +71,10 @@ add_executable(arabicc_asm_3ac_golden_test
 )
 target_include_directories(arabicc_asm_3ac_golden_test PRIVATE include)
 add_test(NAME arabicc_asm_3ac_golden COMMAND arabicc_asm_3ac_golden_test)
-add_test(NAME arabicc_native_3ac_smoke COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/native_3ac_smoke.sh $<TARGET_FILE:arabicc>)
+if(UNIX)
+  add_test(NAME arabicc_native_3ac_smoke
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/native_3ac_smoke.sh $<TARGET_FILE:arabicc>)
+endif()
 add_executable(arabicc_artifact_security_test
   tests/artifact_security_test.c
   src/backend/artifact_builder.c

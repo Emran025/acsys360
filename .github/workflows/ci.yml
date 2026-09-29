@@ -87,3 +87,76 @@ jobs:
         with:
           name: acsys360-linux
           path: build/linux/x64/release/bundle
+
+  windows-build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.44.5
+          cache: true
+      - run: flutter pub get
+      - name: Verify Windows bundle layout contract
+        run: dart run tool/test_windows_bundle_layout.dart
+      - run: >-
+          dart format --output=none --set-exit-if-changed
+          lib test
+          packages/compiler_contracts/lib packages/compiler_contracts/test
+      - run: flutter analyze
+      - run: flutter test
+      - name: Install Flex and Bison
+        shell: pwsh
+        run: choco install winflexbison3 innosetup --yes --no-progress
+      - name: Install MSYS2 UCRT64 GCC and NASM
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-nasm
+      - run: flutter config --enable-windows-desktop
+      - name: Configure and build C compiler
+        shell: pwsh
+        run: |
+          cd packages/compiler_c
+          $flex = Get-Command win_flex.exe, flex.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          $bison = Get-Command win_bison.exe, bison.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $flex) { throw "Flex/win_flex was not found on PATH." }
+          if (-not $bison) { throw "Bison/win_bison was not found on PATH." }
+          cmake -S . -B build "-DFLEX_EXECUTABLE:FILEPATH=$($flex.Source)" "-DBISON_EXECUTABLE:FILEPATH=$($bison.Source)"
+          if ($LASTEXITCODE -ne 0) { throw "CMake configuration failed." }
+          cmake --build build --parallel --config Release
+          if ($LASTEXITCODE -ne 0) { throw "C compiler build failed." }
+          ctest --test-dir build -C Release --output-on-failure
+          if ($LASTEXITCODE -ne 0) { throw "C compiler tests failed." }
+      - run: flutter build windows --release
+      - name: Bundle compiler and native tools
+        shell: pwsh
+        run: |
+          $release = "build/windows/x64/runner/Release"
+          New-Item -ItemType Directory -Force "$release/compiler" | Out-Null
+          $exe = if (Test-Path packages/compiler_c/build/Release/arabicc.exe) { "packages/compiler_c/build/Release/arabicc.exe" } else { "packages/compiler_c/build/arabicc.exe" }
+          Copy-Item $exe "$release/compiler/arabicc.exe"
+          & pwsh -NoProfile -ExecutionPolicy Bypass -File tool/bundle_windows_toolchain.ps1 -DestinationDirectory "$release/toolchain/windows"
+          if ($LASTEXITCODE -ne 0) { throw "GCC/NASM toolchain bundling failed." }
+          & pwsh -NoProfile -ExecutionPolicy Bypass -File tool/bundle_windows_vc_runtime.ps1 -DestinationDirectory $release
+          if ($LASTEXITCODE -ne 0) { throw "Visual C++ runtime bundling failed." }
+          & pwsh -NoProfile -ExecutionPolicy Bypass -File tool/inspect_windows_bundle.ps1 -Executable "$release\acsys360.exe"
+          if ($LASTEXITCODE -ne 0) { throw "Windows bundle inspection failed." }
+          $env:ACSYS360_TOOLCHAIN_DIR = (Resolve-Path "$release/toolchain/windows/bin").Path
+          $env:ACSYS360_TOOLCHAIN_ONLY = "1"
+          dart run tool/verify_compiler_bundle.dart --executable "$release/compiler/arabicc.exe" --native
+          if ($LASTEXITCODE -ne 0) { throw "Bundled compiler build-and-run smoke test failed." }
+      - name: Build and test installed Windows setup
+        shell: pwsh
+        run: |
+          $version = (Select-String '^version: ([0-9.]+)' pubspec.yaml).Matches.Groups[1].Value
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $release = (Resolve-Path "build/windows/x64/runner/Release").Path
+          & "C:/Program Files (x86)/Inno Setup 6/ISCC.exe" "/DAppVersion=$version" "/DSourceDir=$release" "/DOutputDir=dist" tool/packaging/acsys360-windows.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
+          $installer = (Resolve-Path "dist/acsys360-windows-$version-setup-x64.exe").Path
+          & pwsh -NoProfile -ExecutionPolicy Bypass -File tool/test_windows_installer.ps1 -InstallerPath $installer
+          if ($LASTEXITCODE -ne 0) { throw "Installed Windows package smoke test failed." }

@@ -80,10 +80,18 @@ dart run tool/verify_compiler_bundle.dart --executable packages/compiler_c/build
 
 ## بناء نسخة Windows نهائية محليًا
 
-يمكن بناء نسخة Windows كاملة من جذر المشروع باستخدام PowerShell. يتطلب السكربت Flutter وDart وCMake وVisual Studio مع أدوات C وInno Setup 6، إضافة إلى Flex وBison. كما يتطلب MSYS2 UCRT64 المثبّت فيه GCC وNASM لتضمينهما في المُثبّت النهائي. يمكن تثبيت Flex وBison عبر Chocolatey:
+يمكن بناء نسخة Windows كاملة من جذر المشروع باستخدام PowerShell. المتطلبات هي Flutter `3.44.5`، وDart، وCMake/CTest، وVisual Studio 2022 مع مكوّن Desktop development with C++، وFlex/Bison، وMSYS2 UCRT64 مع GCC/NASM، وInno Setup 6. يفحص `tool/environment_doctor.ps1` المسارات والإصدارات ومعمارية GCC قبل بدء البناء. تثبيت Flex/Bison وInno Setup:
 
 ```powershell
-choco install winflexbison3 --yes
+choco install winflexbison3 innosetup --yes
+```
+
+ثبّت MSYS2، ثم من UCRT64 شغّل `pacman -S --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-nasm`، وأضف `C:\msys64\ucrt64\bin` إلى `PATH`. يجب أن يعيد `gcc -dumpmachine` القيمة `x86_64-w64-mingw32`. Flutter وVisual Studio/C++ tools مطلوبان لبناء واجهة التطبيق نفسها.
+
+تحقق من البيئة قبل البناء:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tool\environment_doctor.ps1
 ```
 
 بعدها شغّل:
@@ -92,7 +100,7 @@ choco install winflexbison3 --yes
 powershell -ExecutionPolicy Bypass -File .\tool\build_windows_release.ps1
 ```
 
-ينفذ السكربت `flutter pub get` و`dart format` و`flutter analyze` و`flutter test`، ثم يبني `arabicc.exe` عبر CMake، ويبني المحرر بـ `flutter build windows --release`، ويضمّن المترجم ومجلد MSYS2 UCRT64 داخل التطبيق. بعد ذلك يشغّل smoke test للبروتوكول وينشئ مُثبّت Windows تنفيذيًا:
+ينفذ السكربت `flutter pub get` و`dart format` و`flutter analyze` و`flutter test`، ثم يبني `arabicc.exe` عبر CMake ويشغّل CTest على Windows، ويبني المحرر بـ `flutter build windows --release`. يضمّن GCC/NASM وشجرة UCRT64 وVisual C++ runtime بجوار كل executable يحتاجها. بعدها ينفّذ فحصًا معزولًا للحزمة يترجم برنامجًا native ويشغّل executable الناتج، ثم ينشئ مُثبّت Windows:
 
 ```text
 dist\acsys360-windows-<version>-setup-x64.exe
