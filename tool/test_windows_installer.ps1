@@ -10,44 +10,32 @@ Set-StrictMode -Version Latest
 
 $installer = (Resolve-Path -LiteralPath $InstallerPath).Path
 $programFiles = if ($env:ProgramFiles) { $env:ProgramFiles } else { throw "ProgramFiles environment variable is missing." }
-$programFilesRoots = @(
-    $programFiles,
-    ${env:ProgramFiles(x86)}
-) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
 $installRoot = Join-Path $programFiles "acsys360"
-foreach ($root in $programFilesRoots) {
-    $existingInstall = Join-Path $root "acsys360"
-    if (Test-Path -LiteralPath $existingInstall) {
-        throw "Refusing to overwrite an existing installer test directory: $existingInstall"
-    }
+$installerLog = Join-Path ([System.IO.Path]::GetTempPath()) "acsys360-installer-smoke-$PID.log"
+if (Test-Path -LiteralPath $installRoot) {
+    throw "Refusing to overwrite an existing installer test directory: $installRoot"
 }
 
 try {
-    Write-Host "Installing $installer into temporary directory $installRoot"
-    $LASTEXITCODE = 0
-    & $installer /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-
-    $installerExitCode = $LASTEXITCODE
-    if ($installerExitCode -ne 0) {
-        throw "Silent installer exited with code $installerExitCode"
+    Write-Host "Installing $installer into $installRoot"
+    $installerArguments = @(
+        "/VERYSILENT",
+        "/SUPPRESSMSGBOXES",
+        "/NORESTART",
+        "/SP-",
+        "/DIR=`"$installRoot`"",
+        "/LOG=`"$installerLog`""
+    ) -join ' '
+    $installerProcess = Start-Process -FilePath $installer -ArgumentList $installerArguments -Wait -PassThru
+    if ($installerProcess.ExitCode -ne 0) {
+        throw "Silent installer exited with code $($installerProcess.ExitCode). Log: $installerLog"
     }
-
-    $installedRoots = @(
-        foreach ($root in $programFilesRoots) {
-            $candidate = Join-Path $root "acsys360"
-            if (Test-Path -LiteralPath (Join-Path $candidate "acsys360.exe")) {
-                $candidate
-            }
-        }
-    )
-    if ($installedRoots.Count -ne 1) {
-        throw "Expected exactly one installed acsys360 directory under Program Files roots, found: $($installedRoots -join ', ')"
-    }
-    $installRoot = $installedRoots[0]
 
     $application = Join-Path $installRoot "acsys360.exe"
     $compiler = Join-Path $installRoot "compiler\arabicc.exe"
     if (-not (Test-Path -LiteralPath $application -PathType Leaf)) {
-        throw "Installed application is missing: $application"
+        $log = if (Test-Path -LiteralPath $installerLog) { Get-Content -LiteralPath $installerLog -Raw } else { "<installer log missing>" }
+        throw "Installed application is missing: $application`nInstaller log:`n$log"
     }
     if (-not (Test-Path -LiteralPath $compiler -PathType Leaf)) {
         throw "Installed compiler is missing: $compiler"
@@ -74,5 +62,8 @@ finally {
     }
     if (Test-Path -LiteralPath $installRoot) {
         Remove-Item -LiteralPath $installRoot -Recurse -Force
+    }
+    if (Test-Path -LiteralPath $installerLog) {
+        Remove-Item -LiteralPath $installerLog -Force
     }
 }
