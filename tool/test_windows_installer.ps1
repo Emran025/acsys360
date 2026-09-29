@@ -10,9 +10,16 @@ Set-StrictMode -Version Latest
 
 $installer = (Resolve-Path -LiteralPath $InstallerPath).Path
 $programFiles = if ($env:ProgramFiles) { $env:ProgramFiles } else { throw "ProgramFiles environment variable is missing." }
+$programFilesRoots = @(
+    $programFiles,
+    ${env:ProgramFiles(x86)}
+) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
 $installRoot = Join-Path $programFiles "acsys360"
-if (Test-Path -LiteralPath $installRoot) {
-    throw "Refusing to overwrite an existing installer test directory: $installRoot"
+foreach ($root in $programFilesRoots) {
+    $existingInstall = Join-Path $root "acsys360"
+    if (Test-Path -LiteralPath $existingInstall) {
+        throw "Refusing to overwrite an existing installer test directory: $existingInstall"
+    }
 }
 
 try {
@@ -23,6 +30,19 @@ try {
     if ($installerExitCode -ne 0) {
         throw "Silent installer exited with code $installerExitCode"
     }
+
+    $installedRoots = @(
+        foreach ($root in $programFilesRoots) {
+            $candidate = Join-Path $root "acsys360"
+            if (Test-Path -LiteralPath (Join-Path $candidate "acsys360.exe")) {
+                $candidate
+            }
+        }
+    )
+    if ($installedRoots.Count -ne 1) {
+        throw "Expected exactly one installed acsys360 directory under Program Files roots, found: $($installedRoots -join ', ')"
+    }
+    $installRoot = $installedRoots[0]
 
     $application = Join-Path $installRoot "acsys360.exe"
     $compiler = Join-Path $installRoot "compiler\arabicc.exe"
