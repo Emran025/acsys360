@@ -173,10 +173,10 @@ jobs:
         shell: pwsh
         run: |
           $version = (Select-String '^version: ([0-9.]+)' pubspec.yaml).Matches.Groups[1].Value
-          New-Item -ItemType Directory -Force dist | Out-Null
+          $outputDir = (New-Item -ItemType Directory -Force "dist").FullName
           $release = (Resolve-Path "build/windows/x64/runner/Release").Path
-          & "C:/Program Files (x86)/Inno Setup 6/ISCC.exe" "/DAppVersion=$version" "/DSourceDir=$release" "/DOutputDir=dist" tool/packaging/acsys360-windows.iss
+          & "C:/Program Files (x86)/Inno Setup 6/ISCC.exe" "/DAppVersion=$version" "/DSourceDir=$release" "/DOutputDir=$outputDir" tool/packaging/acsys360-windows.iss
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
-          $installer = (Resolve-Path "dist/acsys360-windows-$version-setup-x64.exe").Path
+          $installer = (Resolve-Path (Join-Path $outputDir "acsys360-windows-$version-setup-x64.exe")).Path
           & pwsh -NoProfile -ExecutionPolicy Bypass -File tool/test_windows_installer.ps1 -InstallerPath $installer
           if ($LASTEXITCODE -ne 0) { throw "Installed Windows package smoke test failed." }

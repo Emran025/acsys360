@@ -45,6 +45,10 @@ void main() {
         !ci.contains('Export MSYS2 toolchain for CTest') ||
         !ci.contains("steps.setup_msys2.outputs['msys2-location']") ||
         !ci.contains('GITHUB_PATH') ||
+        !ci.contains(r'"/DOutputDir=$outputDir"') ||
+        !ci.contains(
+          r'Join-Path $outputDir "acsys360-windows-$version-setup-x64.exe"',
+        ) ||
         !ci.contains('test_windows_installer.ps1') ||
         !ci.contains('bundle_windows_toolchain.ps1') ||
         !ci.contains('bundle_windows_vc_runtime.ps1') ||
