@@ -166,15 +166,14 @@ int artifact_build_native(const char *artifact_dir,
                "تعذر تحديد مجلد bin لـGCC من ACSYS360_TOOLCHAIN_DIR");
       return 0;
     }
-    snprintf(gcc_prefix_option, sizeof(gcc_prefix_option), "-B%s\\", gcc_bin);
-    char gcc_sysroot_option[1100];
-    snprintf(gcc_sysroot_option, sizeof(gcc_sysroot_option), "--sysroot=%s", gcc_prefix);
+    snprintf(gcc_prefix_option, sizeof(gcc_prefix_option), "%s\\", gcc_bin);
     char *arguments[] = {
       /* This is a single NASM object; LTO is unnecessary. Disabling the
          optional plugin keeps a relocated MSYS2 GCC self-contained. -B is
          required because MSYS2 GCC otherwise retains its install-time prefix
          after being copied into the app bundle. */
-      "gcc.exe", gcc_prefix_option, gcc_sysroot_option, "-fno-use-linker-plugin", object_path,
+      "gcc.exe", "-B", gcc_prefix_option, "--sysroot", (char *)gcc_prefix,
+      "-fno-use-linker-plugin", object_path,
       "-o", artifact_path, NULL
     };
     char stderr_output[2048];

@@ -10,7 +10,7 @@ Set-StrictMode -Version Latest
 
 $installer = (Resolve-Path -LiteralPath $InstallerPath).Path
 $temporaryRoot = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } elseif ($env:TEMP) { $env:TEMP } else { [System.IO.Path]::GetTempPath() }
-$installRoot = Join-Path $temporaryRoot "acsys360-installer-smoke-$PID"
+$installRoot = Join-Path $temporaryRoot "acsys360 installer smoke-$PID"
 if (Test-Path -LiteralPath $installRoot) {
     throw "Refusing to overwrite an existing installer test directory: $installRoot"
 }
