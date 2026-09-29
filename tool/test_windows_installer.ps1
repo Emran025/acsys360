@@ -17,15 +17,11 @@ if (Test-Path -LiteralPath $installRoot) {
 
 try {
     Write-Host "Installing $installer into temporary directory $installRoot"
-    $installerProcess = Start-Process -FilePath $installer -ArgumentList @(
-        "/VERYSILENT",
-        "/SUPPRESSMSGBOXES",
-        "/NORESTART",
-        "/SP-",
-        "/DIR=$installRoot"
-    ) -Wait -PassThru
-    if ($installerProcess.ExitCode -ne 0) {
-        throw "Silent installer exited with code $($installerProcess.ExitCode)"
+    $LASTEXITCODE = 0
+    & $installer /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- "/DIR=$installRoot"
+    $installerExitCode = $LASTEXITCODE
+    if ($installerExitCode -ne 0) {
+        throw "Silent installer exited with code $installerExitCode"
     }
 
     $application = Join-Path $installRoot "acsys360.exe"
@@ -49,13 +45,11 @@ try {
 finally {
     $uninstaller = Join-Path $installRoot "unins000.exe"
     if (Test-Path -LiteralPath $uninstaller -PathType Leaf) {
-        $uninstallerProcess = Start-Process -FilePath $uninstaller -ArgumentList @(
-            "/VERYSILENT",
-            "/SUPPRESSMSGBOXES",
-            "/NORESTART"
-        ) -Wait -PassThru
-        if ($uninstallerProcess.ExitCode -ne 0) {
-            Write-Warning "Silent uninstall returned exit code $($uninstallerProcess.ExitCode)"
+        $LASTEXITCODE = 0
+        & $uninstaller /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
+        $uninstallerExitCode = $LASTEXITCODE
+        if ($uninstallerExitCode -ne 0) {
+            Write-Warning "Silent uninstall returned exit code $uninstallerExitCode"
         }
     }
     if (Test-Path -LiteralPath $installRoot) {
