@@ -9,8 +9,8 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 $installer = (Resolve-Path -LiteralPath $InstallerPath).Path
-$temporaryRoot = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } elseif ($env:TEMP) { $env:TEMP } else { [System.IO.Path]::GetTempPath() }
-$installRoot = Join-Path $temporaryRoot "acsys360 installer smoke-$PID"
+$programFiles = if ($env:ProgramFiles) { $env:ProgramFiles } else { throw "ProgramFiles environment variable is missing." }
+$installRoot = Join-Path $programFiles "acsys360"
 if (Test-Path -LiteralPath $installRoot) {
     throw "Refusing to overwrite an existing installer test directory: $installRoot"
 }
@@ -18,7 +18,7 @@ if (Test-Path -LiteralPath $installRoot) {
 try {
     Write-Host "Installing $installer into temporary directory $installRoot"
     $LASTEXITCODE = 0
-    & $installer /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- "/DIR=`"$installRoot`""
+    & $installer /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-
     $installerExitCode = $LASTEXITCODE
     if ($installerExitCode -ne 0) {
         throw "Silent installer exited with code $installerExitCode"
