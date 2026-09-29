@@ -8,11 +8,83 @@
 #include <direct.h>
 #include <io.h>
 #include <process.h>
+#include <stdbool.h>
 #else
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#endif
+
+#ifdef _WIN32
+static char *toolchain_quote_windows_argument(const char *argument) {
+  const char *cursor;
+  size_t backslashes = 0U;
+  size_t length = 2U;
+  char *quoted;
+  char *output;
+  bool needs_quotes = argument[0] == '\0';
+
+  for (cursor = argument; *cursor != '\0'; cursor++) {
+    if (*cursor == ' ' || *cursor == '\t' || *cursor == '"') needs_quotes = true;
+  }
+  if (!needs_quotes) return _strdup(argument);
+
+  for (cursor = argument; *cursor != '\0'; cursor++) {
+    if (*cursor == '\\') {
+      backslashes++;
+    } else {
+      length += backslashes + (*cursor == '"' ? 1U : 0U) + 1U;
+      backslashes = 0U;
+    }
+  }
+  length += backslashes * 2U + 1U;
+  quoted = (char *)malloc(length);
+  if (!quoted) return NULL;
+
+  output = quoted;
+  *output++ = '"';
+  backslashes = 0U;
+  for (cursor = argument; *cursor != '\0'; cursor++) {
+    if (*cursor == '\\') {
+      backslashes++;
+      continue;
+    }
+    while (backslashes-- > 0U) *output++ = '\\';
+    if (*cursor == '"') *output++ = '\\';
+    *output++ = *cursor;
+    backslashes = 0U;
+  }
+  while (backslashes-- > 0U) *output++ = '\\';
+  *output++ = '"';
+  *output = '\0';
+  return quoted;
+}
+
+static int toolchain_spawnv_quoted(const char *executable,
+                                   char *const arguments[]) {
+  size_t count = 0U;
+  char **quoted_arguments;
+  int exit_code;
+
+  while (arguments[count] != NULL) count++;
+  quoted_arguments = (char **)calloc(count + 1U, sizeof(char *));
+  if (!quoted_arguments) return -1;
+  for (size_t index = 0U; index < count; index++) {
+    quoted_arguments[index] = toolchain_quote_windows_argument(arguments[index]);
+    if (!quoted_arguments[index]) {
+      for (size_t cleanup = 0U; cleanup < index; cleanup++) {
+        free(quoted_arguments[cleanup]);
+      }
+      free(quoted_arguments);
+      return -1;
+    }
+  }
+  exit_code = _spawnv(_P_WAIT, executable, (const char *const *)quoted_arguments);
+  for (size_t index = 0U; index < count; index++) free(quoted_arguments[index]);
+  free(quoted_arguments);
+  return exit_code;
+}
 #endif
 
 int toolchain_file_exists(const char *path) {
@@ -183,24 +255,20 @@ int toolchain_run_process_capture(const char *executable,
 #ifdef _WIN32
   /* _spawnv does not expose stderr. Redirect only the inherited descriptor
      while the child runs, then restore it so the desktop app stays intact.
-     Keep argv[0] as a short program name (for example, nasm.exe) rather
-     than the absolute path: the MS CRT builds a command line from argv and
-     an absolute argv[0] containing spaces is otherwise parsed as an input
-     argument by tools such as NASM. The executable path remains the separate
-     _spawnv executable parameter. */
-  char *const *spawn_arguments = arguments;
+     Its argv-to-command-line conversion also does not reliably preserve
+     spaces in paths, so quote every argument using the Windows CRT rules
+     before spawning the child. */
   FILE *capture = tmpfile();
   if (!capture) {
-    return _spawnv(_P_WAIT, executable, (const char *const *)spawn_arguments);
+    return toolchain_spawnv_quoted(executable, arguments);
   }
   const int saved_stderr = _dup(_fileno(stderr));
   if (saved_stderr < 0 || _dup2(_fileno(capture), _fileno(stderr)) != 0) {
     if (saved_stderr >= 0) _close(saved_stderr);
     fclose(capture);
-    return _spawnv(_P_WAIT, executable, (const char *const *)spawn_arguments);
+    return toolchain_spawnv_quoted(executable, arguments);
   }
-  const int exit_code = _spawnv(_P_WAIT, executable,
-                                (const char *const *)spawn_arguments);
+  const int exit_code = toolchain_spawnv_quoted(executable, arguments);
   fflush(stderr);
   (void)_dup2(saved_stderr, _fileno(stderr));
   _close(saved_stderr);
