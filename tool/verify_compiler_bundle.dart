@@ -55,8 +55,14 @@ Future<void> main(List<String> arguments) async {
     );
     process.stdin.writeln(jsonEncode(request));
     await process.stdin.close();
-    final outputFuture = process.stdout.transform(utf8.decoder).join();
-    final errorOutputFuture = process.stderr.transform(utf8.decoder).join();
+    // Toolchain diagnostics may use the active Windows code page rather than
+    // UTF-8. Keep collecting both streams so a diagnostic cannot abort the
+    // smoke test with a decoder exception before reporting the real result.
+    const toolOutputDecoder = Utf8Decoder(allowMalformed: true);
+    final outputFuture = process.stdout.transform(toolOutputDecoder).join();
+    final errorOutputFuture = process.stderr
+        .transform(toolOutputDecoder)
+        .join();
     final exitCodeFuture = process.exitCode;
     late final String output;
     late final String errorOutput;
@@ -131,8 +137,12 @@ Future<void> main(List<String> arguments) async {
         includeParentEnvironment: false,
         runInShell: false,
       );
-      final nativeStdout = nativeProcess.stdout.transform(utf8.decoder).join();
-      final nativeStderr = nativeProcess.stderr.transform(utf8.decoder).join();
+      final nativeStdout = nativeProcess.stdout
+          .transform(toolOutputDecoder)
+          .join();
+      final nativeStderr = nativeProcess.stderr
+          .transform(toolOutputDecoder)
+          .join();
       final nativeExitCode = nativeProcess.exitCode;
       try {
         await Future.wait<Object>([
