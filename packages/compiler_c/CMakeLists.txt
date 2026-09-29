@@ -97,6 +97,10 @@ if(DART_EXECUTABLE)
     COMMAND ${DART_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/composite_types.dart
             $<TARGET_FILE:arabicc>)
+  add_test(NAME arabicc_record_array_regression
+    COMMAND ${DART_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/record_array_regression.dart
+            $<TARGET_FILE:arabicc>)
   add_test(NAME arabicc_stability
     COMMAND ${DART_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/stability.dart

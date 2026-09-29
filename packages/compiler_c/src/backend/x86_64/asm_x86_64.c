@@ -34,6 +34,7 @@ static int emit_store_rax(char **text,size_t *len,size_t *cap,const CSemanticRes
 static int emit_store_xmm(char **text,size_t *len,size_t *cap,const CSemanticResult *s,const CTacResult *t,const char *procedure,const char *name){int by_reference=0,off=local_slot(s,t,procedure,name);if(off){if(is_parameter(t,procedure,name,&by_reference)&&by_reference)return append(text,len,cap,"    mov rax, [rbp-%d]\n    movsd [rax], xmm0\n",off);return append(text,len,cap,"    movsd [rbp-%d], xmm0\n",off);}int index=symbol_index(s,name);return index>=0&&append(text,len,cap,"    movsd [rel global_%d], xmm0\n",index);}
 static int emit_address(char **text,size_t *len,size_t *cap,const CSemanticResult *s,const CTacResult *t,const char *procedure,const char *name){int by_reference=0,off=local_slot(s,t,procedure,name);if(off){if(is_parameter(t,procedure,name,&by_reference)&&by_reference)return append(text,len,cap,"    mov rax, [rbp-%d]\n",off);return append(text,len,cap,"    lea rax, [rbp-%d]\n",off);}int index=symbol_index(s,name);return index>=0&&append(text,len,cap,"    lea rax, [rel global_%d]\n",index);}
 static const char *type_of(const CSemanticResult *s,const char *name,const char *hint){if(hint&&strcmp(hint,"غير معروف")&&strcmp(hint,""))return hint;for(size_t i=0;i<s->count;i++)if(!strcmp(s->items[i].name,name))return s->items[i].type;return NULL;}
+static int is_compound_access(const char *name){return name&&(strchr(name,'.')||strchr(name,'['));}
 static int quoted(const char *s){
   if (!s || !s[0]) return 0;
   const size_t n = strlen(s);
@@ -123,6 +124,12 @@ int c_generate_nasm_x86_64(const CTacResult *tac,const CSemanticResult *semantic
  if(!append(&result->text,&len,&cap,"section .text\nmain:\n    push rbp\n    mov rbp, rsp\n    sub rsp, %zu\n",frame+32+reads*256))goto fail;
  size_t read_index=0;int ok=1,main_closed=0;const char *current_procedure=NULL;
  for(size_t i=0;i<tac->count&&ok;i++){CTacInstruction *x=&tac->items[i];int dst=local_slot(semantic,tac,current_procedure,x->result);
+  if ((x->opcode==C_TAC_ASSIGN||x->opcode==C_TAC_PRINT||x->opcode==C_TAC_READ) &&
+      (is_compound_access(x->result)||is_compound_access(x->left))) {
+    diag(result,x,"الوصول إلى عناصر القوائم والسجلات غير مدعوم في هدف Native حاليًا؛ أُوقف البناء لمنع إخراج قيمة ذاكرة خاطئة");
+    ok=0;
+    break;
+  }
   switch(x->opcode){
    case C_TAC_ALLOC: break;
    case C_TAC_PROCEDURE_BEGIN: {
