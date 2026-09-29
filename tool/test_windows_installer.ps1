@@ -17,9 +17,15 @@ if (Test-Path -LiteralPath $installRoot) {
 
 try {
     Write-Host "Installing $installer into temporary directory $installRoot"
-    & $installer /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- "/DIR=$installRoot"
-    if ($LASTEXITCODE -ne 0) {
-        throw "Silent installer exited with code $LASTEXITCODE"
+    $installerProcess = Start-Process -FilePath $installer -ArgumentList @(
+        "/VERYSILENT",
+        "/SUPPRESSMSGBOXES",
+        "/NORESTART",
+        "/SP-",
+        "/DIR=$installRoot"
+    ) -Wait -PassThru
+    if ($installerProcess.ExitCode -ne 0) {
+        throw "Silent installer exited with code $($installerProcess.ExitCode)"
     }
 
     $application = Join-Path $installRoot "acsys360.exe"
@@ -32,18 +38,24 @@ try {
     }
 
     & (Join-Path $PSScriptRoot "inspect_windows_bundle.ps1") -Executable $application
+    $LASTEXITCODE = 0
     & $DartExecutable run tool/verify_compiler_bundle.dart --executable $compiler --native
-    if ($LASTEXITCODE -ne 0) {
-        throw "Installed compiler build-and-run smoke test failed with exit code $LASTEXITCODE"
+    $compilerExitCode = $LASTEXITCODE
+    if ($compilerExitCode -ne 0) {
+        throw "Installed compiler build-and-run smoke test failed with exit code $compilerExitCode"
     }
     Write-Host "[OK] Installed Inno Setup bundle passed topology and native execution tests." -ForegroundColor Green
 }
 finally {
     $uninstaller = Join-Path $installRoot "unins000.exe"
     if (Test-Path -LiteralPath $uninstaller -PathType Leaf) {
-        & $uninstaller /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
-        if ($LASTEXITCODE -ne 0) {
-            Write-Warning "Silent uninstall returned exit code $LASTEXITCODE"
+        $uninstallerProcess = Start-Process -FilePath $uninstaller -ArgumentList @(
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NORESTART"
+        ) -Wait -PassThru
+        if ($uninstallerProcess.ExitCode -ne 0) {
+            Write-Warning "Silent uninstall returned exit code $($uninstallerProcess.ExitCode)"
         }
     }
     if (Test-Path -LiteralPath $installRoot) {
