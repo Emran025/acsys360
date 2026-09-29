@@ -61,7 +61,12 @@ finally {
         }
     }
     if (Test-Path -LiteralPath $installRoot) {
-        Remove-Item -LiteralPath $installRoot -Recurse -Force
+        # The uninstaller may already have removed individual toolchain files.
+        # Ignore stale per-file misses, but fail if the install root remains.
+        Remove-Item -LiteralPath $installRoot -Recurse -Force -ErrorAction SilentlyContinue
+        if (Test-Path -LiteralPath $installRoot) {
+            throw "Failed to remove installer test directory: $installRoot"
+        }
     }
     if (Test-Path -LiteralPath $installerLog) {
         Remove-Item -LiteralPath $installerLog -Force
