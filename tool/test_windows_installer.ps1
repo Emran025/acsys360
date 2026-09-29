@@ -18,7 +18,7 @@ if (Test-Path -LiteralPath $installRoot) {
 try {
     Write-Host "Installing $installer into temporary directory $installRoot"
     $LASTEXITCODE = 0
-    & $installer /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- "/DIR=$installRoot"
+    & $installer /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- "/DIR=`"$installRoot`""
     $installerExitCode = $LASTEXITCODE
     if ($installerExitCode -ne 0) {
         throw "Silent installer exited with code $installerExitCode"
