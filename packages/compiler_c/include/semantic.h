@@ -31,7 +31,7 @@ typedef struct {
   size_t diagnostic_capacity;
 } CSemanticResult;
 
-int c_analyze_semantics(const CAstNode *program, CSemanticResult *result);
+int c_analyze_semantics(CAstNode *program, CSemanticResult *result);
 void c_semantic_result_free(CSemanticResult *result);
 
 #endif

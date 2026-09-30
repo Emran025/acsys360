@@ -16,6 +16,7 @@ static void free_list(CAstNodeList *list) {
 void c_type_free(CTypeSpec *type) {
   if (type == NULL) return;
   free(type->name);
+  free(type->length_name);
   c_type_free(type->element_type);
   for (size_t index = 0U; index < type->fields.count; index++) {
     free(type->fields.items[index].name);

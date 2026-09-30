@@ -74,6 +74,7 @@ typedef struct {
 struct CTypeSpec {
   CTypeKind kind;
   char *name;
+  char *length_name;
   size_t length;
   CTypeSpec *element_type;
   CFieldList fields;

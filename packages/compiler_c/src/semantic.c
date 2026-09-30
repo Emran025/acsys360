@@ -1,5 +1,8 @@
 #include "semantic.h"
 
+#include <errno.h>
+#include <limits.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -66,6 +69,139 @@ static const CTypeSpec *resolve_type(const CSemanticResult *result,
     current = named->type_spec;
   }
   return current;
+}
+
+static const CAstNode *find_constant_declaration(
+    const CAstNodeList *declarations, const char *name) {
+  if (declarations == NULL || name == NULL) return NULL;
+  for (size_t index = 0U; index < declarations->count; index++) {
+    const CAstNode *declaration = declarations->items[index];
+    if (declaration != NULL &&
+        declaration->kind == C_AST_CONSTANT_DECLARATION &&
+        declaration->data.constant.name != NULL &&
+        strcmp(declaration->data.constant.name, name) == 0) {
+      return declaration;
+    }
+  }
+  return NULL;
+}
+
+static int evaluate_integer_constant(const CAstNodeList *declarations,
+                                    const CAstNode *expression,
+                                    long long *value, size_t depth) {
+  if (expression == NULL || value == NULL || depth > 64U) return 0;
+  if (expression->kind == C_AST_LITERAL &&
+      expression->data.literal.literal_kind == C_TOKEN_INTEGER &&
+      expression->data.literal.value != NULL) {
+    char *end = NULL;
+    errno = 0;
+    const long long parsed = strtoll(expression->data.literal.value, &end, 10);
+    if (errno != 0 || end == expression->data.literal.value || *end != '\0') {
+      return 0;
+    }
+    *value = parsed;
+    return 1;
+  }
+  if (expression->kind == C_AST_VARIABLE_REFERENCE &&
+      expression->data.reference.name != NULL &&
+      expression->data.reference.selectors.count == 0U) {
+    const CAstNode *constant = find_constant_declaration(
+        declarations, expression->data.reference.name);
+    return constant != NULL && evaluate_integer_constant(
+        declarations, constant->data.constant.value, value, depth + 1U);
+  }
+  if (expression->kind == C_AST_UNARY) {
+    long long operand = 0;
+    if (!evaluate_integer_constant(declarations,
+                                   expression->data.unary.operand,
+                                   &operand, depth + 1U)) return 0;
+    if (strcmp(expression->data.unary.operator, "+") == 0) {
+      *value = operand;
+      return 1;
+    }
+    if (strcmp(expression->data.unary.operator, "-") == 0 &&
+        operand != LLONG_MIN) {
+      *value = -operand;
+      return 1;
+    }
+    return 0;
+  }
+  if (expression->kind == C_AST_BINARY) {
+    long long left = 0;
+    long long right = 0;
+    if (!evaluate_integer_constant(declarations,
+                                   expression->data.binary.left,
+                                   &left, depth + 1U) ||
+        !evaluate_integer_constant(declarations,
+                                   expression->data.binary.right,
+                                   &right, depth + 1U) ||
+        expression->data.binary.operator == NULL) return 0;
+    const char *operator = expression->data.binary.operator;
+    long double result = 0.0L;
+    if (strcmp(operator, "+") == 0) result = (long double)left + right;
+    else if (strcmp(operator, "-") == 0) result = (long double)left - right;
+    else if (strcmp(operator, "*") == 0) result = (long double)left * right;
+    else if (strcmp(operator, "/") == 0 && right != 0) {
+      result = (long double)left / right;
+    } else if (strcmp(operator, "\\") == 0 && right != 0) {
+      result = truncl((long double)left / right);
+    } else if (strcmp(operator, "%") == 0 && right != 0) {
+      result = fmodl((long double)left, right);
+    } else if (strcmp(operator, "^") == 0) {
+      result = powl((long double)left, right);
+    } else {
+      return 0;
+    }
+    if (!isfinite(result) || truncl(result) != result ||
+        result < (long double)LLONG_MIN ||
+        result > (long double)LLONG_MAX) return 0;
+    *value = (long long)result;
+    return 1;
+  }
+  return 0;
+}
+
+static void resolve_array_bound(CTypeSpec *type,
+                                const CAstNodeList *declarations) {
+  if (type == NULL) return;
+  if (type->kind == C_TYPE_ARRAY) {
+    if (type->length == 0U && type->length_name != NULL) {
+      const CAstNode *constant = find_constant_declaration(
+          declarations, type->length_name);
+      long long value = 0;
+      if (constant != NULL && evaluate_integer_constant(
+              declarations, constant->data.constant.value, &value, 0U) &&
+          value > 0 && value <= 1048576) {
+        type->length = (size_t)value;
+      }
+    }
+    resolve_array_bound(type->element_type, declarations);
+  } else if (type->kind == C_TYPE_RECORD) {
+    for (size_t index = 0U; index < type->fields.count; index++) {
+      resolve_array_bound(type->fields.items[index].type, declarations);
+    }
+  }
+}
+
+static void resolve_declared_array_bounds(CAstNode *program) {
+  const CAstNodeList *declarations = &program->data.program.declarations;
+  for (size_t index = 0U; index < declarations->count; index++) {
+    CAstNode *declaration = declarations->items[index];
+    if (declaration == NULL) continue;
+    if (declaration->kind == C_AST_TYPE_DECLARATION) {
+      resolve_array_bound(declaration->data.type_declaration.type,
+                          declarations);
+    } else if (declaration->kind == C_AST_VARIABLE_DECLARATION) {
+      resolve_array_bound(declaration->data.variable.type, declarations);
+    } else if (declaration->kind == C_AST_PROCEDURE_DECLARATION) {
+      for (size_t parameter = 0U;
+           parameter < declaration->data.procedure.parameter_count;
+           parameter++) {
+        resolve_array_bound(declaration->data.procedure.parameters[parameter].type,
+                            declarations);
+      }
+    }
+  }
 }
 
 static const CTypeSpec *selected_type(const CSemanticResult *result,
@@ -333,9 +469,10 @@ static int check_node(Analyzer *analyzer, const CAstNode *node) {
   }
 }
 
-int c_analyze_semantics(const CAstNode *program, CSemanticResult *result) {
+int c_analyze_semantics(CAstNode *program, CSemanticResult *result) {
   if (program == NULL || result == NULL || program->kind != C_AST_PROGRAM) return 0;
   memset(result, 0, sizeof(*result));
+  resolve_declared_array_bounds(program);
   Analyzer analyzer = {.result = result};
   if (!check_list(&analyzer, &program->data.program.declarations)) return 0;
   if (!check_list(&analyzer, &program->data.program.statements)) return 0;
