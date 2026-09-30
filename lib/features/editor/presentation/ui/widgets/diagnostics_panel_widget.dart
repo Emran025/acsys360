@@ -43,6 +43,7 @@ class _DiagnosticsPanelWidgetState extends State<DiagnosticsPanelWidget> {
     'Assembly',
     'التنفيذ',
     'Artifact',
+    'الاستخدامات',
   ];
 
   @override
@@ -95,7 +96,7 @@ class _DiagnosticsPanelWidgetState extends State<DiagnosticsPanelWidget> {
           child: Row(
             textDirection: TextDirection.rtl,
             children: [
-              for (final index in [8, 0, 1, 2, 3, 4, 5, 6, 7, 9])
+              for (final index in [8, 0, 1, 2, 3, 4, 5, 6, 7, 9, 10])
                 _stageTab(context, index: index, label: _stages[index]),
             ],
           ),
@@ -217,6 +218,7 @@ class _DiagnosticsPanelWidgetState extends State<DiagnosticsPanelWidget> {
               ),
             ),
     9 => _artifacts(result),
+    10 => _usagesTable(result.symbols, result.threeAddressCode),
     _ => const SizedBox.shrink(),
   };
 
@@ -422,6 +424,233 @@ class _DiagnosticsPanelWidgetState extends State<DiagnosticsPanelWidget> {
             source: prettyJson([for (final symbol in symbols) symbol.toJson()]),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Parses the TAC instruction list to build a map from symbol name →
+  /// list of usage descriptions (e.g. "42: ASSIGN", "43: PARAM", …).
+  Map<String, List<String>> _buildUsageMap(List<String> tac) {
+    final usages = <String, List<String>>{};
+
+    void note(String sym, String desc) {
+      // Strip array index selectors to match the bare symbol name.
+      final bare = sym.contains('[') ? sym.substring(0, sym.indexOf('[')) : sym;
+      if (bare.isEmpty) return;
+      (usages[bare] ??= []).add(desc);
+    }
+
+    for (var i = 0; i < tac.length; i++) {
+      final instr = tac[i].trim();
+      final lineLabel = '${i + 1}';
+
+      // CALL <proc>, <n>
+      if (instr.startsWith('CALL ')) {
+        final after = instr.substring(5).split(',');
+        note(after.first.trim(), '$lineLabel: استدعاء');
+        continue;
+      }
+      // PARAM <sym>
+      if (instr.startsWith('PARAM ')) {
+        final sym = instr.substring(6).trim();
+        note(sym, '$lineLabel: معامل');
+        continue;
+      }
+      // PRINT <sym>
+      if (instr.startsWith('PRINT ')) {
+        final sym = instr.substring(6).trim();
+        note(sym, '$lineLabel: طباعة');
+        continue;
+      }
+      // READ <sym>
+      if (instr.startsWith('READ ')) {
+        final sym = instr.substring(5).trim();
+        note(sym, '$lineLabel: قراءة');
+        continue;
+      }
+      // ALLOC <name>, <size>
+      if (instr.startsWith('ALLOC ')) {
+        final parts = instr.substring(6).split(',');
+        note(parts.first.trim(), '$lineLabel: تخصيص');
+        continue;
+      }
+      // Assignment: result = arg1 op arg2  OR  result = arg
+      final eqIdx = instr.indexOf('=');
+      if (eqIdx > 0) {
+        final target = instr.substring(0, eqIdx).trim();
+        final rhs = instr.substring(eqIdx + 1).trim();
+        note(target, '$lineLabel: إسناد');
+        // Scan RHS tokens for symbol references (not temporaries starting $t)
+        for (final token in rhs.split(RegExp(r'[\s,+\-*/^<>=!&|()[\]]+'))) {
+          final t = token.trim();
+          if (t.isNotEmpty && !RegExp(r'^\$t\d+$').hasMatch(t) &&
+              !RegExp(r'^-?\d').hasMatch(t) && t != 'true' && t != 'false') {
+            note(t, '$lineLabel: قراءة');
+          }
+        }
+      }
+    }
+    return usages;
+  }
+
+  Widget _usagesTable(List<SymbolRecord> symbols, List<String> tac) {
+    if (symbols.isEmpty) {
+      return _selectable('لا توجد رموز');
+    }
+    final usageMap = _buildUsageMap(tac);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'جدول الرموز مع مناطق الاستخدام',
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const SizedBox(height: 4),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              headingRowHeight: 36,
+              dataRowMinHeight: 32,
+              dataRowMaxHeight: 120,
+              columnSpacing: 20,
+              border: _tableBorder(context),
+              headingRowColor: _tableHeaderColor(context),
+              headingTextStyle: _tableHeaderTextStyle(context),
+              columns: const [
+                DataColumn(label: Text('الاسم')),
+                DataColumn(label: Text('الصنف')),
+                DataColumn(label: Text('النوع')),
+                DataColumn(label: Text('السطر')),
+                DataColumn(label: Text('الإجراء')),
+                DataColumn(label: Text('مناطق الاستخدام')),
+              ],
+              rows: [
+                for (final symbol in symbols)
+                  DataRow(
+                    cells: [
+                      DataCell(
+                        Text(
+                          symbol.name,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      DataCell(_kindChip(symbol.kind)),
+                      DataCell(Text(symbol.type)),
+                      DataCell(Text('${symbol.span.line}')),
+                      DataCell(
+                        Text(
+                          symbol.procedure ?? '—',
+                          style: const TextStyle(fontStyle: FontStyle.italic),
+                        ),
+                      ),
+                      DataCell(
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 300),
+                          child: Builder(
+                            builder: (ctx) {
+                              final sites =
+                                  usageMap[symbol.name] ?? const [];
+                              if (sites.isEmpty) {
+                                return const Text(
+                                  '—',
+                                  style: TextStyle(color: Colors.grey),
+                                );
+                              }
+                              return Tooltip(
+                                message: sites.join('\n'),
+                                child: Wrap(
+                                  spacing: 4,
+                                  runSpacing: 2,
+                                  children: [
+                                    for (final site in sites)
+                                      _usageChip(ctx, site),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          _codeBlock(
+            title: 'البيانات الأصلية (JSON)',
+            language: 'JSON',
+            source: prettyJson([
+              for (final s in symbols)
+                {
+                  ...s.toJson(),
+                  'usages': usageMap[s.name] ?? [],
+                },
+            ]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _kindChip(String kind) {
+    final (color, label) = switch (kind) {
+      'variable' => (Colors.blue, 'متغير'),
+      'parameter' => (Colors.orange, 'معامل'),
+      'procedure' => (Colors.purple, 'إجراء'),
+      'constant' => (Colors.green, 'ثابت'),
+      'type' => (Colors.teal, 'نوع'),
+      _ => (Colors.grey, kind),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .15),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: .4)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Widget _usageChip(BuildContext ctx, String site) {
+    // site format: "42: إسناد"
+    final parts = site.split(': ');
+    final lineNum = parts.first;
+    final opLabel = parts.length > 1 ? parts.sublist(1).join(': ') : site;
+    final color = switch (opLabel) {
+      'استدعاء' => Colors.purple,
+      'معامل' => Colors.orange,
+      'طباعة' => Colors.teal,
+      'قراءة' => Colors.blue,
+      'إسناد' => Colors.green,
+      'تخصيص' => Colors.indigo,
+      _ => Colors.grey,
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: .35)),
+      ),
+      child: Text(
+        '$lineNum·$opLabel',
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }

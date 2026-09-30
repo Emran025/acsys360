@@ -38,6 +38,7 @@ typedef struct {
   const char *name;
   const char *kind;
   const char *type;
+  const char *procedure;  /* NULL for globals */
   ProtocolSpan span;
 } ProtocolSymbol;
 
@@ -80,7 +81,7 @@ void protocol_response_free(ProtocolResponse *resp);
 
 void protocol_add_diagnostic(ProtocolResponse *resp, DiagnosticSeverity severity, const char *phase, const char *code, const char *message, const ProtocolSpan *span);
 void protocol_add_token(ProtocolResponse *resp, const char *kind, const char *lexeme, ProtocolSpan span);
-void protocol_add_symbol(ProtocolResponse *resp, const char *name, const char *kind, const char *type, ProtocolSpan span);
+void protocol_add_symbol(ProtocolResponse *resp, const char *name, const char *kind, const char *type, const char *procedure, ProtocolSpan span);
 void protocol_add_tac(ProtocolResponse *resp, const char *instruction);
 void protocol_set_assembly(ProtocolResponse *resp, const char *assembly);
 void protocol_add_output(ProtocolResponse *resp, const char *line);

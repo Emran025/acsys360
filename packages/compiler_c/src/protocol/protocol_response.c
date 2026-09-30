@@ -76,7 +76,7 @@ void protocol_add_token(ProtocolResponse *resp, const char *kind, const char *le
   t->span = span;
 }
 
-void protocol_add_symbol(ProtocolResponse *resp, const char *name, const char *kind, const char *type, ProtocolSpan span) {
+void protocol_add_symbol(ProtocolResponse *resp, const char *name, const char *kind, const char *type, const char *procedure, ProtocolSpan span) {
   if (resp->symbol_count >= resp->symbol_capacity) {
     resp->symbol_capacity = resp->symbol_capacity == 0 ? 16 : resp->symbol_capacity * 2;
     resp->symbols = (ProtocolSymbol *)realloc(resp->symbols, resp->symbol_capacity * sizeof(ProtocolSymbol));
@@ -85,6 +85,7 @@ void protocol_add_symbol(ProtocolResponse *resp, const char *name, const char *k
   s->name = name ? protocol_strdup(name) : NULL;
   s->kind = kind ? protocol_strdup(kind) : NULL;
   s->type = type ? protocol_strdup(type) : NULL;
+  s->procedure = procedure ? protocol_strdup(procedure) : NULL;
   s->span = span;
 }
 
@@ -198,6 +199,10 @@ char *protocol_serialize_response(const ProtocolResponse *resp) {
     json_buf_append_escaped(&b, sym->type ? sym->type : "صحيح");
     json_buf_append(&b, ",\"span\":");
     json_buf_append_span(&b, &sym->span);
+    if (sym->procedure) {
+      json_buf_append(&b, ",\"procedure\":");
+      json_buf_append_escaped(&b, sym->procedure);
+    }
     json_buf_append_char(&b, '}');
   }
   json_buf_append_char(&b, ']');

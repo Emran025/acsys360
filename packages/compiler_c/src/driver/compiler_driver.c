@@ -82,7 +82,9 @@ int compiler_driver_run(const char *payload) {
         const char *kind = semantic.items[i].kind != NULL
             ? semantic.items[i].kind : "variable";
         protocol_add_symbol(&resp, semantic.items[i].name, kind,
-                            semantic.items[i].type, span);
+                            semantic.items[i].type,
+                            semantic.items[i].procedure,
+                            span);
       }
       if (semantic_ok) {
         /* 3. Three Address Code (3AC) is the single input to native codegen. */

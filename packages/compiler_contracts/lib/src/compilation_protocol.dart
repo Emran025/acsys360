@@ -131,19 +131,22 @@ class SymbolRecord {
   final String name;
   final String kind;
   final String type;
+  final String? procedure;
   final SourceSpan span;
 
   const SymbolRecord({
     required this.name,
     required this.kind,
     required this.type,
+    this.procedure,
     required this.span,
   });
 
-  Map<String, Object> toJson() => {
+  Map<String, Object?> toJson() => {
     'name': name,
     'kind': kind,
     'type': type,
+    if (procedure != null) 'procedure': procedure,
     'span': span.toJson(),
   };
 
@@ -151,6 +154,7 @@ class SymbolRecord {
     name: _requiredString(json, 'name'),
     kind: _requiredString(json, 'kind'),
     type: _requiredString(json, 'type'),
+    procedure: json['procedure'] as String?,
     span: SourceSpan.fromJson(_requiredMap(json, 'span')),
   );
 }
