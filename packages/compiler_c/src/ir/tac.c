@@ -5,8 +5,9 @@
 
 static char *dup(const char *value);
 static const CAstNode *g_root;
+static char *expression(const CAstNode *node, CTacResult *out, size_t *temporary);
 static const CAstNode *constant_value(const char *name) { if (!g_root || !name) return NULL; for (size_t i=0;i<g_root->data.program.declarations.count;i++){const CAstNode *d=g_root->data.program.declarations.items[i];if(d->kind==C_AST_CONSTANT_DECLARATION && d->data.constant.name && !strcmp(d->data.constant.name,name)) return d->data.constant.value;} return NULL; }
-static char *access_path(const CAstNode *node) {
+static char *access_path(const CAstNode *node, CTacResult *out, size_t *temporary) {
   if (!node || node->kind != C_AST_VARIABLE_REFERENCE || !node->data.reference.name) return dup("");
   size_t length = strlen(node->data.reference.name) + 1U;
   for (size_t i = 0; i < node->data.reference.selectors.count; i++) {
@@ -17,7 +18,7 @@ static char *access_path(const CAstNode *node) {
         const CAstNode *index = selector->data.reference.selectors.items[0];
         if (index && index->kind == C_AST_LITERAL && index->data.literal.value) length += strlen(index->data.literal.value);
         else if (index && index->kind == C_AST_VARIABLE_REFERENCE && index->data.reference.name) length += strlen(index->data.reference.name);
-        else length += 8U;
+        else length += 32U;
       }
     } else if (selector && selector->data.reference.name) length += strlen(selector->data.reference.name) + 1U;
   }
@@ -32,7 +33,12 @@ static char *access_path(const CAstNode *node) {
         const CAstNode *index = selector->data.reference.selectors.items[0];
         if (index && index->kind == C_AST_LITERAL && index->data.literal.value) strcat(path, index->data.literal.value);
         else if (index && index->kind == C_AST_VARIABLE_REFERENCE && index->data.reference.name) strcat(path, index->data.reference.name);
-        else strcat(path, "?");
+        else {
+          char *index_value = expression(index, out, temporary);
+          if (!index_value) { free(path); return NULL; }
+          strcat(path, index_value);
+          free(index_value);
+        }
       }
       strcat(path, "]");
     } else if (selector && selector->data.reference.name) {
@@ -134,7 +140,7 @@ static const CAstNode *procedure_named(const char *name) {
 static char *expression(const CAstNode *node, CTacResult *out, size_t *temporary) {
   if (!node) return dup("0");
   if (node->kind == C_AST_LITERAL) return dup(node->data.literal.value);
-  if (node->kind == C_AST_VARIABLE_REFERENCE) { const CAstNode *constant = node->data.reference.selectors.count == 0U ? constant_value(node->data.reference.name) : NULL; if (constant) return expression(constant, out, temporary); return access_path(node); }
+  if (node->kind == C_AST_VARIABLE_REFERENCE) { const CAstNode *constant = node->data.reference.selectors.count == 0U ? constant_value(node->data.reference.name) : NULL; if (constant) return expression(constant, out, temporary); return access_path(node, out, temporary); }
   if (node->kind == C_AST_BINARY || node->kind == C_AST_UNARY) {
     char *left = expression(node->kind == C_AST_BINARY ? node->data.binary.left : node->data.unary.operand, out, temporary);
     char *right = node->kind == C_AST_BINARY ? expression(node->data.binary.right, out, temporary) : NULL;
@@ -216,7 +222,7 @@ static int statements(const CAstNodeList *list, CTacResult *out, size_t *temp, s
     if (s->kind == C_AST_ASSIGNMENT) {
       char *v=expression(s->data.assignment.expression,out,temp);
       CAstNode reference = {.kind = C_AST_VARIABLE_REFERENCE, .data.reference = {s->data.assignment.name, s->data.assignment.selectors}};
-      char *target = access_path(&reference);
+      char *target = access_path(&reference, out, temp);
       const char *target_type=declared_type(s->data.assignment.name);
       if (!v || !target) { free(v); free(target); return 0; }
       if (target_type && !strcmp(target_type,"حقيقي") && v[0]=='t') {
