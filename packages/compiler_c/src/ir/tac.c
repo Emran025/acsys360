@@ -256,8 +256,25 @@ static int statements(const CAstNodeList *list, CTacResult *out, size_t *temp, s
         }
         free(value);
       }
+      size_t effective_argument_count = s->data.call.arguments.count;
+      if (procedure != NULL) {
+        while (effective_argument_count < procedure->data.procedure.parameter_count) {
+          const size_t parameter_index = effective_argument_count;
+          const CParameter *parameter =
+              &procedure->data.procedure.parameters[parameter_index];
+          char *value = expression(parameter->default_value, out, temp);
+          if (value == NULL || parameter->default_value == NULL ||
+              !add(out, C_TAC_PARAM, NULL, value, NULL, NULL,
+                   expr_type(parameter->default_value), parameter_index, s)) {
+            free(value);
+            return 0;
+          }
+          free(value);
+          effective_argument_count++;
+        }
+      }
       if (!add(out, C_TAC_CALL, s->data.call.name, NULL, NULL, NULL,
-               "إجراء", s->data.call.arguments.count, s)) return 0;
+               "إجراء", effective_argument_count, s)) return 0;
       continue;
     }
     if (s->kind != C_AST_EMPTY) return 0;

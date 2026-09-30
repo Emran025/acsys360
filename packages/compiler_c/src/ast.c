@@ -53,7 +53,18 @@ void c_ast_free(CAstNode *node) {
       free(node->data.procedure.name);
       for (size_t index = 0U; index < node->data.procedure.parameter_count; index++) {
         free(node->data.procedure.parameters[index].name);
-        c_type_free(node->data.procedure.parameters[index].type);
+        int first_type_reference = 1;
+        for (size_t previous = 0U; previous < index; previous++) {
+          if (node->data.procedure.parameters[previous].type ==
+              node->data.procedure.parameters[index].type) {
+            first_type_reference = 0;
+            break;
+          }
+        }
+        if (first_type_reference) {
+          c_type_free(node->data.procedure.parameters[index].type);
+        }
+        c_ast_free(node->data.procedure.parameters[index].default_value);
       }
       free(node->data.procedure.parameters);
       free_list(&node->data.procedure.body);

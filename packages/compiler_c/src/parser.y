@@ -43,6 +43,39 @@ static CAstNode *parser_literal(char *value, CTokenKind kind) {
   }
   return node;
 }
+static CAstNode *parser_clone_expression(const CAstNode *source) {
+  if (source == NULL) return NULL;
+  CAstNode *copy = calloc(1, sizeof(*copy));
+  if (copy == NULL) return NULL;
+  copy->kind = source->kind;
+  switch (source->kind) {
+    case C_AST_LITERAL:
+      copy->data.literal.value = parser_strdup(source->data.literal.value);
+      copy->data.literal.literal_kind = source->data.literal.literal_kind;
+      break;
+    case C_AST_VARIABLE_REFERENCE:
+      copy->data.reference.name = parser_strdup(source->data.reference.name);
+      for (size_t index = 0U; index < source->data.reference.selectors.count; index++) {
+        CAstNode *selector = parser_clone_expression(source->data.reference.selectors.items[index]);
+        if (selector == NULL) { c_ast_free(copy); return NULL; }
+        c_ast_list_append(&copy->data.reference.selectors, selector);
+      }
+      break;
+    case C_AST_BINARY:
+      copy->data.binary.left = parser_clone_expression(source->data.binary.left);
+      copy->data.binary.operator = parser_strdup(source->data.binary.operator);
+      copy->data.binary.right = parser_clone_expression(source->data.binary.right);
+      break;
+    case C_AST_UNARY:
+      copy->data.unary.operator = parser_strdup(source->data.unary.operator);
+      copy->data.unary.operand = parser_clone_expression(source->data.unary.operand);
+      break;
+    default:
+      c_ast_free(copy);
+      return NULL;
+  }
+  return copy;
+}
 static size_t parser_offset_at(int line, int column) {
   const unsigned char *source = (const unsigned char *)g_current_source_text;
   if (source == NULL) return (size_t)yy_token_offset;
@@ -161,7 +194,36 @@ full_field_end : ';' | /* empty */ ;
 full_fields : TOK_IDENTIFIER ':' full_type {$$.items=NULL;$$.count=0;CAstNode*f=calloc(1,sizeof(CAstNode));f->kind=C_AST_VARIABLE_DECLARATION;f->data.variable.names=malloc(sizeof(char*));f->data.variable.names[0]=$1;f->data.variable.name_count=1;f->data.variable.type=$3;c_ast_list_append(&$$,f);} | full_fields ';' TOK_IDENTIFIER ':' full_type {$$=$1;CAstNode*f=calloc(1,sizeof(CAstNode));f->kind=C_AST_VARIABLE_DECLARATION;f->data.variable.names=malloc(sizeof(char*));f->data.variable.names[0]=$3;f->data.variable.name_count=1;f->data.variable.type=$5;c_ast_list_append(&$$,f);} ;
 full_proc : TOK_PROCEDURE TOK_IDENTIFIER '(' full_parameters ')' ';' full_block {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_PROCEDURE_DECLARATION;$$->data.procedure.name=$2;$$->data.procedure.parameters=$4.items;$$->data.procedure.parameter_count=$4.count;$$->data.procedure.body=$7->data.program.statements;parser_set_location($$, @2.first_line, @2.first_column, @2.last_line, @2.last_column);free($7);} | TOK_PROCEDURE TOK_IDENTIFIER '(' ')' ';' full_block {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_PROCEDURE_DECLARATION;$$->data.procedure.name=$2;$$->data.procedure.body=$6->data.program.statements;parser_set_location($$, @2.first_line, @2.first_column, @2.last_line, @2.last_column);free($6);} ;
 full_parameters : full_parameter_group {$$=$1;} | full_parameters ';' full_parameter_group {$$=$1;for(size_t i=0;i<$3.count;i++){CParameter*p=realloc($$.items,($$.count+1)*sizeof(CParameter));$$.items=p;$$.items[$$.count++]=$3.items[i];}free($3.items);} ;
-full_parameter_group : TOK_BY_VALUE full_names ':' full_type {$$.items=NULL;$$.count=0;for(size_t i=0;i<$2.count;i++){CParameter*p=realloc($$.items,($$.count+1)*sizeof(CParameter));$$.items=p;$$.items[$$.count++]=(CParameter){.name=$2.items[i],.type=$4,.by_reference=0};}free($2.items);} | TOK_BY_REF full_names ':' full_type {$$.items=NULL;$$.count=0;for(size_t i=0;i<$2.count;i++){CParameter*p=realloc($$.items,($$.count+1)*sizeof(CParameter));$$.items=p;$$.items[$$.count++]=(CParameter){.name=$2.items[i],.type=$4,.by_reference=1};}free($2.items);} ;
+full_parameter_group
+  : TOK_BY_VALUE full_names ':' full_type {
+      $$.items=NULL;$$.count=0;
+      for(size_t i=0;i<$2.count;i++){
+        CParameter*p=realloc($$.items,($$.count+1)*sizeof(CParameter));
+        $$.items=p;
+        $$.items[$$.count++]=(CParameter){.name=$2.items[i],.type=$4,.by_reference=0};
+      }
+      free($2.items);
+    }
+  | TOK_BY_VALUE full_names ':' full_type '=' full_expr {
+      $$.items=NULL;$$.count=0;
+      for(size_t i=0;i<$2.count;i++){
+        CParameter*p=realloc($$.items,($$.count+1)*sizeof(CParameter));
+        $$.items=p;
+        CAstNode *default_value=i+1U==$2.count?$6:parser_clone_expression($6);
+        $$.items[$$.count++]=(CParameter){.name=$2.items[i],.type=$4,.by_reference=0,.default_value=default_value};
+      }
+      free($2.items);
+    }
+  | TOK_BY_REF full_names ':' full_type {
+      $$.items=NULL;$$.count=0;
+      for(size_t i=0;i<$2.count;i++){
+        CParameter*p=realloc($$.items,($$.count+1)*sizeof(CParameter));
+        $$.items=p;
+        $$.items[$$.count++]=(CParameter){.name=$2.items[i],.type=$4,.by_reference=1};
+      }
+      free($2.items);
+    }
+  ;
 full_statements : /* empty */ {$$.items=NULL;$$.count=0;} | full_statements full_statement ';' {$$=$1;c_ast_list_append(&$$,$2);} | full_statements full_if {$$=$1;c_ast_list_append(&$$,$2);} | full_statements full_if ';' {$$=$1;c_ast_list_append(&$$,$2);} ;
 full_statement : full_assign {$$=$1;} | full_read {$$=$1;} | full_print {$$=$1;} | full_call {$$=$1;} | full_if {$$=$1;} | full_while {$$=$1;} | full_repeat {$$=$1;} | full_repeat_until {$$=$1;} | full_block {$$=$1;} ;
 full_selectors : full_selector {$$.items=NULL;$$.count=0;c_ast_list_append(&$$,$1);} | full_selectors full_selector {$$=$1;c_ast_list_append(&$$,$2);} ;

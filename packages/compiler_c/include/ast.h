@@ -59,6 +59,7 @@ typedef struct {
   char *name;
   CTypeSpec *type;
   int by_reference;
+  CAstNode *default_value;
 } CParameter;
 
 typedef struct {

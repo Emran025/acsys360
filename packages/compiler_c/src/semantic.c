@@ -10,6 +10,7 @@
 
 typedef struct {
   CSemanticResult *result;
+  const CAstNode *program;
 } Analyzer;
 
 static char *duplicate(const char *value) {
@@ -303,6 +304,36 @@ static int types_compatible(const char *expected, const char *actual) {
       (strcmp(expected, "حقيقي") == 0 && strcmp(actual, "صحيح") == 0);
 }
 
+static int is_constant_default_expression(const CAstNode *expression) {
+  if (expression == NULL) return 0;
+  switch (expression->kind) {
+    case C_AST_LITERAL:
+      return 1;
+    case C_AST_UNARY:
+      return is_constant_default_expression(expression->data.unary.operand);
+    case C_AST_BINARY:
+      return is_constant_default_expression(expression->data.binary.left) &&
+          is_constant_default_expression(expression->data.binary.right);
+    default:
+      return 0;
+  }
+}
+
+static const CAstNode *procedure_declaration_named(const Analyzer *analyzer,
+                                                   const char *name) {
+  if (analyzer == NULL || analyzer->program == NULL || name == NULL) return NULL;
+  const CAstNodeList *declarations = &analyzer->program->data.program.declarations;
+  for (size_t index = 0U; index < declarations->count; index++) {
+    const CAstNode *declaration = declarations->items[index];
+    if (declaration != NULL && declaration->kind == C_AST_PROCEDURE_DECLARATION &&
+        declaration->data.procedure.name != NULL &&
+        strcmp(declaration->data.procedure.name, name) == 0) {
+      return declaration;
+    }
+  }
+  return NULL;
+}
+
 static int add_symbol(Analyzer *analyzer, const char *name, const char *type,
                       const CTypeSpec *type_spec, const CAstNode *node,
                       int is_constant) {
@@ -394,12 +425,42 @@ static int check_node(Analyzer *analyzer, const CAstNode *node) {
     case C_AST_PROCEDURE_DECLARATION:
       if (!add_symbol(analyzer, node->data.procedure.name, "اجراء", NULL,
                       node, 0)) return 0;
-      for (size_t index = 0U; index < node->data.procedure.parameter_count; index++) {
-        const CParameter *parameter = &node->data.procedure.parameters[index];
-        const char *type = parameter->type && parameter->type->name
-            ? parameter->type->name : "نوع مركب";
-        if (!add_symbol(analyzer, parameter->name, type, parameter->type,
-                        node, 0)) return 0;
+      {
+        int optional_parameter_seen = 0;
+        for (size_t index = 0U;
+             index < node->data.procedure.parameter_count; index++) {
+          const CParameter *parameter = &node->data.procedure.parameters[index];
+          const CTypeSpec *resolved =
+              resolve_type(analyzer->result, parameter->type);
+          const char *type = resolved && resolved->name
+              ? resolved->name : "نوع مركب";
+          if (parameter->default_value != NULL) {
+            optional_parameter_seen = 1;
+            if (parameter->by_reference) {
+              return diagnostic(analyzer, node,
+                                "لا يمكن وضع قيمة افتراضية لمعامل بالمرجع: %s",
+                                parameter->name);
+            }
+            if (!is_constant_default_expression(parameter->default_value)) {
+              return diagnostic(analyzer, node,
+                                "يجب أن تكون القيمة الافتراضية للمعامل «%s» تعبيرًا ثابتًا",
+                                parameter->name);
+            }
+            if (!check_expression(analyzer, parameter->default_value)) return 0;
+            const char *actual = expression_type(analyzer->result,
+                                                 parameter->default_value);
+            if (!types_compatible(type, actual)) {
+              return diagnostic(analyzer, node,
+                                "نوع القيمة الافتراضية للمعامل «%s» غير متوافق",
+                                parameter->name);
+            }
+          } else if (optional_parameter_seen) {
+            return diagnostic(analyzer, node,
+                              "يجب أن تأتي المعاملات ذات القيم الافتراضية في نهاية قائمة المعاملات");
+          }
+          if (!add_symbol(analyzer, parameter->name, type, parameter->type,
+                          node, 0)) return 0;
+        }
       }
       return check_list(analyzer, &node->data.procedure.body);
     case C_AST_ASSIGNMENT:
@@ -443,10 +504,40 @@ static int check_node(Analyzer *analyzer, const CAstNode *node) {
     case C_AST_READ:
       return find_symbol(analyzer->result, node->data.access.name) != NULL;
     case C_AST_CALL:
-      for (size_t index = 0U; index < node->data.call.arguments.count; index++) {
-        if (!check_expression(analyzer, node->data.call.arguments.items[index])) return 0;
+      {
+        const CAstNode *procedure = procedure_declaration_named(
+            analyzer, node->data.call.name);
+        if (procedure == NULL) {
+          for (size_t index = 0U;
+               index < node->data.call.arguments.count; index++) {
+            if (!check_expression(analyzer,
+                                  node->data.call.arguments.items[index])) return 0;
+          }
+          return 1;
+        }
+        size_t required_count = procedure->data.procedure.parameter_count;
+        for (size_t index = 0U;
+             index < procedure->data.procedure.parameter_count; index++) {
+          if (procedure->data.procedure.parameters[index].default_value != NULL) {
+            required_count = index;
+            break;
+          }
+        }
+        if (node->data.call.arguments.count < required_count ||
+            node->data.call.arguments.count >
+                procedure->data.procedure.parameter_count) {
+          return diagnostic(analyzer, node,
+                            "عدد وسائط الإجراء «%s» يجب أن يكون بين %zu و%zu",
+                            node->data.call.name, required_count,
+                            procedure->data.procedure.parameter_count);
+        }
+        for (size_t index = 0U;
+             index < node->data.call.arguments.count; index++) {
+          if (!check_expression(analyzer,
+                                node->data.call.arguments.items[index])) return 0;
+        }
+        return 1;
       }
-      return 1;
     case C_AST_IF:
       return check_expression(analyzer, node->data.conditional.condition) &&
           check_list(analyzer, &node->data.conditional.then_branch) &&
@@ -473,7 +564,7 @@ int c_analyze_semantics(CAstNode *program, CSemanticResult *result) {
   if (program == NULL || result == NULL || program->kind != C_AST_PROGRAM) return 0;
   memset(result, 0, sizeof(*result));
   resolve_declared_array_bounds(program);
-  Analyzer analyzer = {.result = result};
+  Analyzer analyzer = {.result = result, .program = program};
   if (!check_list(&analyzer, &program->data.program.declarations)) return 0;
   if (!check_list(&analyzer, &program->data.program.statements)) return 0;
   return 1;

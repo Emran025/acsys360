@@ -59,6 +59,28 @@ test "$(grep -v '"requestType":"input"' "$tmp/sort_array.output" | tail -10)" = 
 5
 7
 9'
+cat >"$tmp/default_parameters.arb" <<'SRC'
+برنامج اختبار_القيم_الافتراضية؛
+إجراء اجمع(بالقيمة أ: صحيح؛ بالقيمة ب: صحيح = 1 + 2؛ بالقيمة ج: صحيح = 4)؛
+{
+  اطبع(أ + ب + ج)؛
+}؛
+إجراء اجمع_مجموعة(بالقيمة س: صحيح؛ بالقيمة ص، ع: صحيح = 4)؛
+{
+  اطبع(س + ص + ع)؛
+}؛
+{
+  اجمع(1)؛
+  اجمع(1، 2)؛
+  اجمع_مجموعة(1)؛
+}.
+SRC
+"$compiler" --asm <"$tmp/default_parameters.arb" >"$tmp/default_parameters.asm"
+nasm -f elf64 "$tmp/default_parameters.asm" -o "$tmp/default_parameters.o"
+cc -no-pie "$tmp/default_parameters.o" -o "$tmp/default_parameters"
+test "$("$tmp/default_parameters")" = '8
+7
+9'
 cat >"$tmp/regressions.arb" <<'SRC'
 برنامج تراجعات؛ ثابت حد = 2 + 3؛ متغير صحيح_م: صحيح؛ متغير حقيقي_م: حقيقي؛ متغير سالب: حقيقي؛ متغير i: صحيح؛ { صحيح_م = 4؛ حقيقي_م = صحيح_م + 2.5؛ سالب = -2.5؛ اطبع(حد، حقيقي_م، سالب)؛ كرر(i = 3 الى 1 أضف -1) اطبع(i)؛ }.
 SRC

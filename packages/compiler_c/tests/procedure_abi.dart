@@ -23,7 +23,7 @@ Future<void> main(List<String> args) async {
 متغير المعدل: حقيقي؛
 نوع اعداد = قائمة[3] من صحيح؛
 متغير بيانات: اعداد؛
-إجراء جمع_بالقيمة(بالقيمة ا: صحيح؛ بالقيمة ب: صحيح)؛
+إجراء جمع_بالقيمة(بالقيمة ا: صحيح؛ بالقيمة ب: صحيح = 3)؛
 {
   اطبع(ا + ب)؛
 }؛
@@ -47,7 +47,7 @@ Future<void> main(List<String> args) async {
 {
   الناتج = 4؛
   المعدل = 1.5؛
-  جمع_بالقيمة(2, 3)؛
+  جمع_بالقيمة(2)؛
   زد_بالمرجع(الناتج)؛
   بلا_وسائط()؛
   اطبع_بالمرجع(المعدل)؛
@@ -92,6 +92,7 @@ Future<void> main(List<String> args) async {
     );
     check(
       tac.contains('CALL جمع_بالقيمة, 2') &&
+          tac.contains('PARAM 3') &&
           tac.contains('CALL زد_بالمرجع, 1') &&
           tac.contains('CALL بلا_وسائط, 0') &&
           tac.contains('CALL اطبع_بالمرجع, 1') &&
@@ -181,10 +182,11 @@ Future<void> main(List<String> args) async {
     check(
       (invalidResponse['diagnostics'] as List).any(
         (diagnostic) =>
-            (diagnostic as Map)['phase'] == 'backend' &&
-            diagnostic['code'] == 'A001',
+            (diagnostic as Map)['phase'] == 'semantic' &&
+            diagnostic['code'] == 'SEM001' &&
+            (diagnostic['message'] as String).contains('وسائط'),
       ),
-      'wrong argument count did not produce a backend diagnostic',
+      'missing required argument did not produce a semantic diagnostic',
     );
   } finally {
     await artifactDirectory.delete(recursive: true);
