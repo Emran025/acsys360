@@ -1,0 +1,203 @@
+name: Package & Release G28
+
+on:
+  push:
+    tags:
+      - 'G28-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. G28-v1.0.0)'
+        required: true
+        default: 'G28-v1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  # ─────────────────────────────────────────────
+  # 1. Build Windows installer (same as release.yml)
+  # ─────────────────────────────────────────────
+  build-windows:
+    name: Build Windows Installer
+    runs-on: windows-latest
+    outputs:
+      installer_name: ${{ steps.find_installer.outputs.name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.44.5
+          cache: true
+
+      - run: flutter pub get
+
+      - name: Install Flex & Bison + Inno Setup
+        shell: pwsh
+        run: choco install winflexbison3 innosetup --yes --no-progress
+
+      - name: Install MSYS2 toolchain
+        uses: msys2/setup-msys2@v2
+        id: setup_msys2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-nasm
+
+      - name: Export MSYS2 toolchain paths
+        shell: pwsh
+        run: |
+          $msys2Location = "${{ steps.setup_msys2.outputs['msys2-location'] }}"
+          $toolchainDirectory = Join-Path $msys2Location "ucrt64\bin"
+          "ACSYS360_TOOLCHAIN_DIR=$toolchainDirectory" | Add-Content -Path $env:GITHUB_ENV -Encoding utf8
+          $toolchainDirectory | Add-Content -Path $env:GITHUB_PATH -Encoding utf8
+
+      - run: flutter config --enable-windows-desktop
+      - run: flutter build windows --release
+
+      - name: Build C compiler (Windows)
+        shell: pwsh
+        run: |
+          cd packages/compiler_c
+          $flex  = Get-Command win_flex.exe, flex.exe  -ErrorAction SilentlyContinue | Select-Object -First 1
+          $bison = Get-Command win_bison.exe, bison.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $flex)  { throw "Flex not found" }
+          if (-not $bison) { throw "Bison not found" }
+          cmake -S . -B build "-DFLEX_EXECUTABLE:FILEPATH=$($flex.Source)" "-DBISON_EXECUTABLE:FILEPATH=$($bison.Source)"
+          cmake --build build --parallel --config Release
+
+      - name: Bundle compiler & toolchain
+        shell: pwsh
+        run: |
+          $release = "build/windows/x64/runner/Release"
+          New-Item -ItemType Directory -Force "$release/compiler" | Out-Null
+          $exe = if (Test-Path packages/compiler_c/build/Release/arabicc.exe) { "packages/compiler_c/build/Release/arabicc.exe" } else { "packages/compiler_c/build/arabicc.exe" }
+          Copy-Item $exe "$release/compiler/arabicc.exe"
+          & pwsh -NoProfile -ExecutionPolicy Bypass -File tool/bundle_windows_toolchain.ps1 -DestinationDirectory "$release/toolchain/windows"
+          & pwsh -NoProfile -ExecutionPolicy Bypass -File tool/bundle_windows_vc_runtime.ps1 -DestinationDirectory $release
+
+      - name: Build Windows setup installer
+        shell: pwsh
+        run: |
+          $tag = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME } else { "${{ github.event.inputs.tag }}" }
+          $version = if ($tag -match 'G28-v([\d.]+)') { $Matches[1] } `
+                     elseif ($tag -match 'v([\d.]+)')  { $Matches[1] } `
+                     else { (Select-String '^version: ([0-9.]+)' pubspec.yaml).Matches.Groups[1].Value }
+          $sourceDir = (Resolve-Path "build/windows/x64/runner/Release").Path
+          $outputDir = (New-Item -ItemType Directory -Force dist).FullName
+          & "C:/Program Files (x86)/Inno Setup 6/ISCC.exe" "/DAppVersion=$version" "/DSourceDir=$sourceDir" "/DOutputDir=$outputDir" tool/packaging/acsys360-windows.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
+
+      - name: Rename installer to G28-E.exe
+        id: find_installer
+        shell: pwsh
+        run: |
+          $src = Get-ChildItem dist -Filter "*.exe" | Select-Object -First 1
+          if (-not $src) { throw "Installer EXE not found in dist/" }
+          Rename-Item $src.FullName "dist\G28-E.exe"
+          echo "name=G28-E.exe" >> $env:GITHUB_OUTPUT
+          Write-Host "Renamed $($src.Name) -> G28-E.exe"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: dist/G28-E.exe
+          if-no-files-found: error
+
+  # ─────────────────────────────────────────────
+  # 2. Package source code as G28-Code.zip
+  # ─────────────────────────────────────────────
+  package-source:
+    name: Package Source Code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create G28-Code.zip (git archive)
+        run: |
+          git archive --format=zip --prefix=G28-Code/ HEAD -o G28-Code.zip
+          echo "Source zip size: $(du -sh G28-Code.zip | cut -f1)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: source-code
+          path: G28-Code.zip
+          if-no-files-found: error
+
+  # ─────────────────────────────────────────────
+  # 3. Publish Release with all 3 files
+  # ─────────────────────────────────────────────
+  publish:
+    name: Publish GitHub Release
+    needs: [build-windows, package-source]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Windows installer
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+          path: release-assets
+
+      - name: Download source zip
+        uses: actions/download-artifact@v4
+        with:
+          name: source-code
+          path: release-assets
+
+      - name: Download PDF report
+        uses: dawidd6/action-download-artifact@v3
+        continue-on-error: true
+        with:
+          name: G28-Report
+          path: release-assets
+
+      - name: Verify release assets
+        run: |
+          echo "=== Release Assets ==="
+          ls -lh release-assets/
+          echo "Required: G28-E.exe and G28-Code.zip"
+
+      - name: Get tag name
+        id: tag
+        run: |
+          TAG="${{ github.ref_name }}"
+          if [ -z "$TAG" ] || [ "$TAG" = "main" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Release tag: $TAG"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: "G28 Release – ${{ steps.tag.outputs.tag }}"
+          body: |
+            ## G28 – Arabic Programming Environment
+
+            ### الملفات المرفقة / Included Files
+
+            | الملف | الوصف |
+            |-------|-------|
+            | **G28-E.exe** | مثبّت Windows (Inno Setup) – قابل للتشغيل مباشرة |
+            | **G28-Code.zip** | الكود المصدري الكامل للمشروع |
+            | **G28-Report.pdf** | تقرير المشروع |
+
+            ### التثبيت / Installation
+            1. حمّل `G28-E.exe`
+            2. شغّل كمدير نظام (Run as Administrator)
+            3. اتبع خطوات المثبّت
+
+            ---
+            Built from commit: `${{ github.sha }}`
+          generate_release_notes: false
+          files: |
+            release-assets/G28-E.exe
+            release-assets/G28-Code.zip
+            release-assets/G28-Report.pdf
+          fail_on_unmatched_files: false
