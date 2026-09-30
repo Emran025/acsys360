@@ -130,13 +130,18 @@ jobs:
           if-no-files-found: error
 
   # ─────────────────────────────────────────────
-  # 3. Publish Release with all 3 files
+  # 3. Publish Release with all 3 files + G28.zip
   # ─────────────────────────────────────────────
   publish:
     name: Publish GitHub Release
     needs: [build-windows, package-source]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Create release-assets directory
+        run: mkdir -p release-assets
+
       - name: Download Windows installer
         uses: actions/download-artifact@v4
         with:
@@ -149,18 +154,23 @@ jobs:
           name: source-code
           path: release-assets
 
-      - name: Download PDF report
-        uses: dawidd6/action-download-artifact@v3
-        continue-on-error: true
-        with:
-          name: G28-Report
-          path: release-assets
-
-      - name: Verify release assets
+      - name: Copy PDF report
         run: |
-          echo "=== Release Assets ==="
-          ls -lh release-assets/
-          echo "Required: G28-E.exe and G28-Code.zip"
+          if [ -f "G28-Report.pdf" ]; then
+            cp "G28-Report.pdf" "release-assets/G28-Report.pdf"
+            echo "Copied G28-Report.pdf from repo."
+          else
+            echo "Warning: G28-Report.pdf not found in repo root."
+          fi
+
+      - name: Package all three files into G28.zip
+        run: |
+          cd release-assets
+          echo "Packaging G28.zip..."
+          zip G28.zip G28-E.exe G28-Code.zip G28-Report.pdf
+          echo "=== Content of release-assets ==="
+          ls -lh
+          cd ..
 
       - name: Get tag name
         id: tag
@@ -180,23 +190,29 @@ jobs:
           body: |
             ## G28 – Arabic Programming Environment
 
-            ### الملفات المرفقة / Included Files
+            ### 📦 التحميل المباشر للحقيبة الكاملة (Direct Download)
+            - **[G28.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.tag }}/G28.zip)**: يحتوي على الملفات الثلاثة معاً في ملف واحد مضغوط.
+
+            ---
+
+            ### 📄 الملفات المرفقة بالتفصيل (Release Assets)
 
             | الملف | الوصف |
             |-------|-------|
-            | **G28-E.exe** | مثبّت Windows (Inno Setup) – قابل للتشغيل مباشرة |
-            | **G28-Code.zip** | الكود المصدري الكامل للمشروع |
-            | **G28-Report.pdf** | تقرير المشروع |
+            | 🎁 **G28.zip** | الحزمة الشاملة التي تضم المثبت والكود المصدري وتقرير المشروع |
+            | 💻 **G28-E.exe** | مثبّت Windows (Inno Setup) – قابل للتشغيل والتثبيت مباشرة |
+            | 📁 **G28-Code.zip** | الكود المصدري الكامل للمشروع (clean archive) |
+            | 📑 **G28-Report.pdf** | التقرير التوثيقي الكامل لمشروع G28 |
 
-            ### التثبيت / Installation
-            1. حمّل `G28-E.exe`
-            2. شغّل كمدير نظام (Run as Administrator)
-            3. اتبع خطوات المثبّت
+            ### خطوات التثبيت والتشغيل:
+            1. حمّل ملف **G28.zip** أو **G28-E.exe** مباشرة.
+            2. قم بتشغيل `G28-E.exe` كمسؤول لتثبيت بيئة البرمجة العربية ACSYS360 ومترجمها على نظام Windows.
 
             ---
             Built from commit: `${{ github.sha }}`
           generate_release_notes: false
           files: |
+            release-assets/G28.zip
             release-assets/G28-E.exe
             release-assets/G28-Code.zip
             release-assets/G28-Report.pdf

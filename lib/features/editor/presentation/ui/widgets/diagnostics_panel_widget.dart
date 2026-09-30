@@ -483,8 +483,11 @@ class _DiagnosticsPanelWidgetState extends State<DiagnosticsPanelWidget> {
         // Scan RHS tokens for symbol references (not temporaries starting $t)
         for (final token in rhs.split(RegExp(r'[\s,+\-*/^<>=!&|()[\]]+'))) {
           final t = token.trim();
-          if (t.isNotEmpty && !RegExp(r'^\$t\d+$').hasMatch(t) &&
-              !RegExp(r'^-?\d').hasMatch(t) && t != 'true' && t != 'false') {
+          if (t.isNotEmpty &&
+              !RegExp(r'^\$t\d+$').hasMatch(t) &&
+              !RegExp(r'^-?\d').hasMatch(t) &&
+              t != 'true' &&
+              t != 'false') {
             note(t, '$lineLabel: قراءة');
           }
         }
@@ -551,8 +554,7 @@ class _DiagnosticsPanelWidgetState extends State<DiagnosticsPanelWidget> {
                           constraints: const BoxConstraints(maxWidth: 300),
                           child: Builder(
                             builder: (ctx) {
-                              final sites =
-                                  usageMap[symbol.name] ?? const [];
+                              final sites = usageMap[symbol.name] ?? const [];
                               if (sites.isEmpty) {
                                 return const Text(
                                   '—',
@@ -585,10 +587,7 @@ class _DiagnosticsPanelWidgetState extends State<DiagnosticsPanelWidget> {
             language: 'JSON',
             source: prettyJson([
               for (final s in symbols)
-                {
-                  ...s.toJson(),
-                  'usages': usageMap[s.name] ?? [],
-                },
+                {...s.toJson(), 'usages': usageMap[s.name] ?? []},
             ]),
           ),
         ],
