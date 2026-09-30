@@ -21,6 +21,8 @@ Future<void> main(List<String> args) async {
 برنامج اختبار_الاجراءات؛
 متغير الناتج: صحيح؛
 متغير المعدل: حقيقي؛
+نوع اعداد = قائمة[3] من صحيح؛
+متغير بيانات: اعداد؛
 إجراء جمع_بالقيمة(بالقيمة ا: صحيح؛ بالقيمة ب: صحيح)؛
 {
   اطبع(ا + ب)؛
@@ -37,6 +39,11 @@ Future<void> main(List<String> args) async {
 {
   اطبع(قيمة_حقيقية)؛
 }؛
+إجراء عدل_المصفوفة(بالقيمة مصفوفة: اعداد؛ بالقيمة زيادة: صحيح)؛
+{
+  مصفوفة[0] = مصفوفة[0] + زيادة؛
+  اطبع(مصفوفة[0])؛
+}؛
 {
   الناتج = 4؛
   المعدل = 1.5؛
@@ -44,6 +51,9 @@ Future<void> main(List<String> args) async {
   زد_بالمرجع(الناتج)؛
   بلا_وسائط()؛
   اطبع_بالمرجع(المعدل)؛
+  بيانات[0] = 10؛
+  عدل_المصفوفة(بيانات، 5)؛
+  اطبع(بيانات[0])؛
   اطبع(الناتج)؛
   اطبع("done")؛
 }.
@@ -84,7 +94,10 @@ Future<void> main(List<String> args) async {
       tac.contains('CALL جمع_بالقيمة, 2') &&
           tac.contains('CALL زد_بالمرجع, 1') &&
           tac.contains('CALL بلا_وسائط, 0') &&
-          tac.contains('CALL اطبع_بالمرجع, 1'),
+          tac.contains('CALL اطبع_بالمرجع, 1') &&
+          tac.contains('CALL عدل_المصفوفة, 2') &&
+          tac.contains('PARAM بيانات') &&
+          tac.contains('PARAM 5'),
       'procedure calls or argument counts are missing from TAC',
     );
 
@@ -93,7 +106,9 @@ Future<void> main(List<String> args) async {
       assembly.contains('proc_0:') &&
           assembly.contains('proc_1:') &&
           assembly.contains('proc_2:') &&
-          assembly.contains('proc_3:'),
+          assembly.contains('proc_3:') &&
+          assembly.contains('proc_4:') &&
+          assembly.contains('global_array_'),
       'NASM procedure labels are missing',
     );
     check(
@@ -134,7 +149,7 @@ Future<void> main(List<String> args) async {
     check(
       nativeRun.exitCode == 0 &&
           (nativeRun.stdout as String).trim().split('\r\n').join('\n') ==
-              '5\n9\n1.5\n5\ndone',
+              '5\n9\n1.5\n15\n15\n5\ndone',
       'native procedure output was incorrect: ${nativeRun.stdout}; '
       '${nativeRun.stderr}',
     );
