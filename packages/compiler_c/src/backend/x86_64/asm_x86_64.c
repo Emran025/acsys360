@@ -136,8 +136,8 @@ int c_generate_nasm_x86_64(const CTacResult *tac,const CSemanticResult *semantic
  for(size_t i=0;i<semantic->count;i++) {
    const CSymbol *symbol=&semantic->items[i];
    if(symbol->procedure != NULL || !symbol->name || !is_allocated(tac,symbol->name) ||
-      !is_any_parameter(tac,symbol->name) &&
-      (is_array_symbol(semantic,symbol->name) || has_array_base(tac,symbol->name))) {
+      (!is_any_parameter(tac,symbol->name) &&
+       (is_array_symbol(semantic,symbol->name) || has_array_base(tac,symbol->name)))) {
      int capacity=array_declared_capacity(semantic,symbol->name);
      if(capacity<1)capacity=array_capacity(tac,symbol->name);
      if(!append(&result->text,&len,&cap,"global_array_%zu: resq %d\n",i,capacity))goto fail;
