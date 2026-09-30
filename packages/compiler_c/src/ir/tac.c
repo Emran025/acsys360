@@ -234,7 +234,16 @@ static int statements(const CAstNodeList *list, CTacResult *out, size_t *temp, s
                target_type && !strcmp(target_type,"حقيقي") ? "حقيقي" : expr_type(s->data.assignment.expression),0U,s)) { free(target); free(v); return 0; }
       free(target); free(v); continue;
     }
-    if (s->kind == C_AST_READ) { if (!add(out,C_TAC_READ,s->data.access.name,NULL,NULL,NULL,"غير معروف",0U,s)) return 0; continue; }
+    if (s->kind == C_AST_READ) {
+      CAstNode reference = {.kind = C_AST_VARIABLE_REFERENCE, .data.reference = {s->data.access.name, s->data.access.selectors}};
+      char *target = access_path(&reference, out, temp);
+      if (!target || !add(out, C_TAC_READ, target, NULL, NULL, NULL, "غير معروف", 0U, s)) {
+        free(target);
+        return 0;
+      }
+      free(target);
+      continue;
+    }
     if (s->kind == C_AST_PRINT) { for (size_t j=0;j<s->data.print.values.count;j++) { char *v=expression(s->data.print.values.items[j],out,temp); if (!v || !add(out,C_TAC_PRINT,NULL,v,NULL,NULL,expr_type(s->data.print.values.items[j]),1U,s)) { free(v); return 0; } free(v); } continue; }
     if (s->kind == C_AST_CALL) {
       const CAstNode *procedure = procedure_named(s->data.call.name);
@@ -275,6 +284,20 @@ static int statements(const CAstNodeList *list, CTacResult *out, size_t *temp, s
       }
       if (!add(out, C_TAC_CALL, s->data.call.name, NULL, NULL, NULL,
                "إجراء", effective_argument_count, s)) return 0;
+      continue;
+    }
+    if (s->kind == C_AST_VARIABLE_DECLARATION) {
+      /* تصريح متغير محلي داخل جسم الإجراء — أصدر تعليمة تخصيص */
+      for (size_t j = 0; j < s->data.variable.name_count; j++) {
+        const char *type_name = s->data.variable.type && s->data.variable.type->name
+            ? s->data.variable.type->name : "نوع مركب";
+        if (!add(out, C_TAC_ALLOC, s->data.variable.names[j], NULL, NULL, NULL,
+                 type_name, 0U, s)) return 0;
+      }
+      continue;
+    }
+    if (s->kind == C_AST_CONSTANT_DECLARATION || s->kind == C_AST_TYPE_DECLARATION) {
+      /* تصريحات ثابت/نوع محلية — لا تُولِّد كوداً */
       continue;
     }
     if (s->kind != C_AST_EMPTY) return 0;

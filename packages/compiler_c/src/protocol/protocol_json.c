@@ -420,7 +420,28 @@ static void serialize_ast_node(JsonBuffer *b, const CAstNode *n) {
       json_buf_append(b, "\"kind\":\"type_declaration\",\"name\":"); json_buf_append_escaped(b, n->data.type_declaration.name); json_buf_append(b, ",\"type\":"); serialize_type(b, n->data.type_declaration.type); break;
 
     case C_AST_PROCEDURE_DECLARATION:
-      json_buf_append(b, "\"kind\":\"procedure_declaration\",\"name\":"); json_buf_append_escaped(b, n->data.procedure.name); json_buf_append(b, ",\"parameterCount\":"); char pc[32]; snprintf(pc, sizeof(pc), "%zu", n->data.procedure.parameter_count); json_buf_append(b, pc); break;
+      json_buf_append(b, "\"kind\":\"procedure_declaration\",\"name\":");
+      json_buf_append_escaped(b, n->data.procedure.name);
+      json_buf_append(b, ",\"parameters\":[");
+      for (size_t i = 0; i < n->data.procedure.parameter_count; i++) {
+        if (i > 0) json_buf_append_char(b, ',');
+        const CParameter *p = &n->data.procedure.parameters[i];
+        json_buf_append(b, "{\"name\":");
+        json_buf_append_escaped(b, p->name ? p->name : "");
+        json_buf_append(b, ",\"byReference\":");
+        json_buf_append(b, p->by_reference ? "true" : "false");
+        json_buf_append(b, ",\"type\":");
+        if (p->type && p->type->name) json_buf_append_escaped(b, p->type->name);
+        else json_buf_append(b, "null");
+        json_buf_append_char(b, '}');
+      }
+      json_buf_append(b, "],\"body\":[");
+      for (size_t i = 0; i < n->data.procedure.body.count; i++) {
+        if (i > 0) json_buf_append_char(b, ',');
+        serialize_ast_node(b, n->data.procedure.body.items[i]);
+      }
+      json_buf_append(b, "]");
+      break;
 
     case C_AST_VARIABLE_DECLARATION:
       json_buf_append(b, "\"kind\":\"variable_declaration\",\"names\":[");
@@ -449,6 +470,80 @@ static void serialize_ast_node(JsonBuffer *b, const CAstNode *n) {
       json_buf_append(b, "]");
       break;
 
+    case C_AST_READ:
+      json_buf_append(b, "\"kind\":\"read\",\"name\":");
+      json_buf_append_escaped(b, n->data.access.name ? n->data.access.name : "");
+      { char sc[32]; snprintf(sc, sizeof(sc), "%zu", n->data.access.selectors.count);
+        json_buf_append(b, ",\"selectorCount\":"); json_buf_append(b, sc); }
+      break;
+
+    case C_AST_CALL:
+      json_buf_append(b, "\"kind\":\"call\",\"name\":");
+      json_buf_append_escaped(b, n->data.call.name ? n->data.call.name : "");
+      json_buf_append(b, ",\"arguments\":[");
+      for (size_t i = 0; i < n->data.call.arguments.count; i++) {
+        if (i > 0) json_buf_append_char(b, ',');
+        serialize_ast_node(b, n->data.call.arguments.items[i]);
+      }
+      json_buf_append(b, "]");
+      break;
+
+    case C_AST_IF:
+      json_buf_append(b, "\"kind\":\"if\",\"condition\":");
+      serialize_ast_node(b, n->data.conditional.condition);
+      json_buf_append(b, ",\"then\":[");
+      for (size_t i = 0; i < n->data.conditional.then_branch.count; i++) {
+        if (i > 0) json_buf_append_char(b, ',');
+        serialize_ast_node(b, n->data.conditional.then_branch.items[i]);
+      }
+      json_buf_append(b, "],\"else\":[");
+      for (size_t i = 0; i < n->data.conditional.else_branch.count; i++) {
+        if (i > 0) json_buf_append_char(b, ',');
+        serialize_ast_node(b, n->data.conditional.else_branch.items[i]);
+      }
+      json_buf_append(b, "]");
+      break;
+
+    case C_AST_WHILE:
+      json_buf_append(b, "\"kind\":\"while\",\"condition\":");
+      serialize_ast_node(b, n->data.loop.condition);
+      json_buf_append(b, ",\"body\":[");
+      for (size_t i = 0; i < n->data.loop.body.count; i++) {
+        if (i > 0) json_buf_append_char(b, ',');
+        serialize_ast_node(b, n->data.loop.body.items[i]);
+      }
+      json_buf_append(b, "]");
+      break;
+
+    case C_AST_REPEAT:
+      json_buf_append(b, "\"kind\":\"repeat\",\"variable\":");
+      json_buf_append_escaped(b, n->data.repeat.variable ? n->data.repeat.variable : "");
+      json_buf_append(b, ",\"from\":");
+      serialize_ast_node(b, n->data.repeat.from);
+      json_buf_append(b, ",\"to\":");
+      serialize_ast_node(b, n->data.repeat.to);
+      if (n->data.repeat.step) {
+        json_buf_append(b, ",\"step\":");
+        serialize_ast_node(b, n->data.repeat.step);
+      }
+      json_buf_append(b, ",\"body\":[");
+      for (size_t i = 0; i < n->data.repeat.body.count; i++) {
+        if (i > 0) json_buf_append_char(b, ',');
+        serialize_ast_node(b, n->data.repeat.body.items[i]);
+      }
+      json_buf_append(b, "]");
+      break;
+
+    case C_AST_REPEAT_UNTIL:
+      json_buf_append(b, "\"kind\":\"repeat_until\",\"body\":[");
+      for (size_t i = 0; i < n->data.repeat_until.body.count; i++) {
+        if (i > 0) json_buf_append_char(b, ',');
+        serialize_ast_node(b, n->data.repeat_until.body.items[i]);
+      }
+      json_buf_append(b, "],\"condition\":");
+      serialize_ast_node(b, n->data.repeat_until.condition);
+      break;
+
     case C_AST_UNARY:
       json_buf_append(b, "\"kind\":\"unary\",\"operator\":"); json_buf_append_escaped(b, n->data.unary.operator); json_buf_append(b, ",\"operand\":"); serialize_ast_node(b, n->data.unary.operand); break;
 
@@ -461,7 +556,7 @@ static void serialize_ast_node(JsonBuffer *b, const CAstNode *n) {
       serialize_ast_node(b, n->data.binary.right);
       break;
 
-    case C_AST_LITERAL:
+    case C_AST_LITERAL: {
       json_buf_append(b, "\"kind\":\"literal\",\"literalKind\":");
       const char *lk = "integer";
       if (n->data.literal.literal_kind == C_TOKEN_STRING) lk = "string";
@@ -472,15 +567,21 @@ static void serialize_ast_node(JsonBuffer *b, const CAstNode *n) {
       json_buf_append(b, ",\"value\":");
       json_buf_append_escaped(b, n->data.literal.value ? n->data.literal.value : "");
       break;
+    }
 
     case C_AST_VARIABLE_REFERENCE:
       json_buf_append(b, "\"kind\":\"variable_reference\",\"name\":");
       json_buf_append_escaped(b, n->data.reference.name);
-      json_buf_append(b, ",\"selectorCount\":"); char rc[32]; snprintf(rc, sizeof(rc), "%zu", n->data.reference.selectors.count); json_buf_append(b, rc);
+      { char rc[32]; snprintf(rc, sizeof(rc), "%zu", n->data.reference.selectors.count);
+        json_buf_append(b, ",\"selectorCount\":"); json_buf_append(b, rc); }
+      break;
+
+    case C_AST_EMPTY:
+      json_buf_append(b, "\"kind\":\"empty\"");
       break;
 
     default:
-      json_buf_append(b, "\"kind\":\"statement\"");
+      json_buf_append(b, "\"kind\":\"unknown\"");
       break;
   }
   json_buf_append_char(b, '}');

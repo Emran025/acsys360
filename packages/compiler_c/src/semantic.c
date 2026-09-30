@@ -11,6 +11,7 @@
 typedef struct {
   CSemanticResult *result;
   const CAstNode *program;
+  const char *current_procedure;
 } Analyzer;
 
 static char *duplicate(const char *value) {
@@ -50,12 +51,31 @@ static int diagnostic(Analyzer *analyzer, const CAstNode *node,
   return 1;
 }
 
-static const CSymbol *find_symbol(const CSemanticResult *result,
-                                  const char *name) {
+static const CSymbol *find_symbol_scoped(const CSemanticResult *result,
+                                         const char *procedure,
+                                         const char *name) {
+  if (result == NULL || name == NULL) return NULL;
+  if (procedure != NULL) {
+    for (size_t index = 0U; index < result->count; index++) {
+      const CSymbol *sym = &result->items[index];
+      if (sym->procedure != NULL && strcmp(sym->procedure, procedure) == 0 &&
+          sym->name != NULL && strcmp(sym->name, name) == 0) {
+        return sym;
+      }
+    }
+  }
   for (size_t index = 0U; index < result->count; index++) {
-    if (strcmp(result->items[index].name, name) == 0) return &result->items[index];
+    const CSymbol *sym = &result->items[index];
+    if (sym->procedure == NULL && sym->name != NULL && strcmp(sym->name, name) == 0) {
+      return sym;
+    }
   }
   return NULL;
+}
+
+static const CSymbol *find_symbol(const CSemanticResult *result,
+                                  const char *name) {
+  return find_symbol_scoped(result, NULL, name);
 }
 
 static const CTypeSpec *resolve_type(const CSemanticResult *result,
@@ -236,9 +256,10 @@ static const CTypeSpec *selected_type(const CSemanticResult *result,
 }
 
 static const char *access_type(const CSemanticResult *result,
+                               const char *procedure,
                                const char *name,
                                const CAstNodeList *selectors) {
-  const CSymbol *symbol = find_symbol(result, name);
+  const CSymbol *symbol = find_symbol_scoped(result, procedure, name);
   if (symbol == NULL) return NULL;
   const CTypeSpec *type = selected_type(result, symbol, selectors);
   if (type != NULL && type->kind == C_TYPE_NAMED) return type->name;
@@ -246,6 +267,7 @@ static const char *access_type(const CSemanticResult *result,
 }
 
 static const char *expression_type(const CSemanticResult *result,
+                                   const char *procedure,
                                    const CAstNode *node) {
   if (!node) return NULL;
   if (node->kind == C_AST_LITERAL) {
@@ -259,16 +281,16 @@ static const char *expression_type(const CSemanticResult *result,
     }
   }
   if (node->kind == C_AST_VARIABLE_REFERENCE) {
-    return access_type(result, node->data.reference.name,
+    return access_type(result, procedure, node->data.reference.name,
                        &node->data.reference.selectors);
   }
   if (node->kind == C_AST_UNARY) {
     if (strcmp(node->data.unary.operator, "!") == 0) return "منطقي";
-    return expression_type(result, node->data.unary.operand);
+    return expression_type(result, procedure, node->data.unary.operand);
   }
   if (node->kind == C_AST_BINARY) {
-    const char *left = expression_type(result, node->data.binary.left);
-    const char *right = expression_type(result, node->data.binary.right);
+    const char *left = expression_type(result, procedure, node->data.binary.left);
+    const char *right = expression_type(result, procedure, node->data.binary.right);
     const char *op = node->data.binary.operator;
     if (!left || !right) return NULL;
     if (strcmp(op, "==") == 0 || strcmp(op, "!=") == 0 ||
@@ -336,10 +358,23 @@ static const CAstNode *procedure_declaration_named(const Analyzer *analyzer,
 
 static int add_symbol(Analyzer *analyzer, const char *name, const char *type,
                       const CTypeSpec *type_spec, const CAstNode *node,
-                      int is_constant) {
+                      int is_constant, const char *kind) {
   CSemanticResult *result = analyzer->result;
-  if (find_symbol(result, name) != NULL) {
-    return diagnostic(analyzer, node, "تعريف مكرر للرمز: %s", name);
+  /* التحقق من عدم تكرار التعريف في نفس النطاق فقط */
+  for (size_t index = 0U; index < result->count; index++) {
+    const CSymbol *existing = &result->items[index];
+    if (existing->name == NULL) continue;
+    if (analyzer->current_procedure != NULL) {
+      if (existing->procedure != NULL &&
+          strcmp(existing->procedure, analyzer->current_procedure) == 0 &&
+          strcmp(existing->name, name) == 0) {
+        return diagnostic(analyzer, node, "تعريف مكرر للرمز: %s", name);
+      }
+    } else {
+      if (existing->procedure == NULL && strcmp(existing->name, name) == 0) {
+        return diagnostic(analyzer, node, "تعريف مكرر للرمز: %s", name);
+      }
+    }
   }
   if (result->count == result->capacity) {
     const size_t capacity = result->capacity == 0U ? 8U : result->capacity * 2U;
@@ -350,12 +385,14 @@ static int add_symbol(Analyzer *analyzer, const char *name, const char *type,
   }
   CSymbol *symbol = &result->items[result->count++];
   symbol->name = duplicate(name);
-  symbol->type = duplicate(type);
+  symbol->type = duplicate(type ? type : "غير معروف");
   symbol->type_spec = type_spec;
   symbol->offset = node->offset;
   symbol->line = node->line;
   symbol->column = node->column;
   symbol->is_constant = is_constant;
+  symbol->procedure = analyzer->current_procedure ? duplicate(analyzer->current_procedure) : NULL;
+  symbol->kind = duplicate(kind ? kind : "variable");
   if (symbol->name == NULL || symbol->type == NULL) return 0;
   return 1;
 }
@@ -375,7 +412,8 @@ static int check_expression(Analyzer *analyzer, const CAstNode *node) {
     case C_AST_LITERAL:
       return 1;
     case C_AST_VARIABLE_REFERENCE:
-      if (find_symbol(analyzer->result, node->data.reference.name) == NULL) {
+      if (find_symbol_scoped(analyzer->result, analyzer->current_procedure,
+                             node->data.reference.name) == NULL) {
         return diagnostic(analyzer, node, "رمز غير معرف: %s",
                           node->data.reference.name);
       }
@@ -408,24 +446,28 @@ static int check_node(Analyzer *analyzer, const CAstNode *node) {
     case C_AST_CONSTANT_DECLARATION:
       if (!check_expression(analyzer, node->data.constant.value)) return 0;
       if (!add_symbol(analyzer, node->data.constant.name,
-                      expression_type(analyzer->result, node->data.constant.value),
-                      NULL, node, 1)) return 0;
+                      expression_type(analyzer->result, analyzer->current_procedure,
+                                      node->data.constant.value),
+                      NULL, node, 1, "constant")) return 0;
       return 1;
     case C_AST_TYPE_DECLARATION:
       return add_symbol(analyzer, node->data.type_declaration.name, "نوع",
-                        node->data.type_declaration.type, node, 0);
+                        node->data.type_declaration.type, node, 0, "type");
     case C_AST_VARIABLE_DECLARATION:
       for (size_t index = 0U; index < node->data.variable.name_count; index++) {
         if (!add_symbol(analyzer, node->data.variable.names[index],
                         node->data.variable.type && node->data.variable.type->name
                             ? node->data.variable.type->name : "نوع مركب",
-                        node->data.variable.type, node, 0)) return 0;
+                        node->data.variable.type, node, 0, "variable")) return 0;
       }
       return 1;
     case C_AST_PROCEDURE_DECLARATION:
       if (!add_symbol(analyzer, node->data.procedure.name, "اجراء", NULL,
-                      node, 0)) return 0;
+                      node, 0, "procedure")) return 0;
       {
+        const char *prev_proc = analyzer->current_procedure;
+        analyzer->current_procedure = node->data.procedure.name;
+        int ok = 1;
         int optional_parameter_seen = 0;
         for (size_t index = 0U;
              index < node->data.procedure.parameter_count; index++) {
@@ -437,35 +479,45 @@ static int check_node(Analyzer *analyzer, const CAstNode *node) {
           if (parameter->default_value != NULL) {
             optional_parameter_seen = 1;
             if (parameter->by_reference) {
-              return diagnostic(analyzer, node,
-                                "لا يمكن وضع قيمة افتراضية لمعامل بالمرجع: %s",
-                                parameter->name);
+              ok = diagnostic(analyzer, node,
+                              "لا يمكن وضع قيمة افتراضية لمعامل بالمرجع: %s",
+                              parameter->name);
+              goto proc_scope_exit;
             }
             if (!is_constant_default_expression(parameter->default_value)) {
-              return diagnostic(analyzer, node,
-                                "يجب أن تكون القيمة الافتراضية للمعامل «%s» تعبيرًا ثابتًا",
-                                parameter->name);
+              ok = diagnostic(analyzer, node,
+                              "يجب أن تكون القيمة الافتراضية للمعامل «%s» تعبيرًا ثابتًا",
+                              parameter->name);
+              goto proc_scope_exit;
             }
-            if (!check_expression(analyzer, parameter->default_value)) return 0;
+            if (!check_expression(analyzer, parameter->default_value)) { ok = 0; goto proc_scope_exit; }
             const char *actual = expression_type(analyzer->result,
+                                                 analyzer->current_procedure,
                                                  parameter->default_value);
             if (!types_compatible(type, actual)) {
-              return diagnostic(analyzer, node,
-                                "نوع القيمة الافتراضية للمعامل «%s» غير متوافق",
-                                parameter->name);
+              ok = diagnostic(analyzer, node,
+                              "نوع القيمة الافتراضية للمعامل «%s» غير متوافق",
+                              parameter->name);
+              goto proc_scope_exit;
             }
           } else if (optional_parameter_seen) {
-            return diagnostic(analyzer, node,
-                              "يجب أن تأتي المعاملات ذات القيم الافتراضية في نهاية قائمة المعاملات");
+            ok = diagnostic(analyzer, node,
+                            "يجب أن تأتي المعاملات ذات القيم الافتراضية في نهاية قائمة المعاملات");
+            goto proc_scope_exit;
           }
           if (!add_symbol(analyzer, parameter->name, type, parameter->type,
-                          node, 0)) return 0;
+                          node, 0, "parameter")) { ok = 0; goto proc_scope_exit; }
         }
+        ok = check_list(analyzer, &node->data.procedure.body);
+        proc_scope_exit:
+        analyzer->current_procedure = prev_proc;
+        return ok;
       }
-      return check_list(analyzer, &node->data.procedure.body);
     case C_AST_ASSIGNMENT:
       {
-        const CSymbol *symbol = find_symbol(analyzer->result, node->data.assignment.name);
+        const CSymbol *symbol = find_symbol_scoped(analyzer->result,
+                                                   analyzer->current_procedure,
+                                                   node->data.assignment.name);
         if (symbol == NULL) {
           return diagnostic(analyzer, node, "رمز غير معرف: %s",
                             node->data.assignment.name);
@@ -485,8 +537,10 @@ static int check_node(Analyzer *analyzer, const CAstNode *node) {
         }
         if (!check_expression(analyzer, node->data.assignment.expression)) return 0;
         const char *actual = expression_type(analyzer->result,
+                                             analyzer->current_procedure,
                                              node->data.assignment.expression);
         const char *expected = access_type(analyzer->result,
+                                           analyzer->current_procedure,
                                            node->data.assignment.name,
                                            &node->data.assignment.selectors);
         if (expected == NULL || !types_compatible(expected, actual))
@@ -502,7 +556,9 @@ static int check_node(Analyzer *analyzer, const CAstNode *node) {
       }
       return 1;
     case C_AST_READ:
-      return find_symbol(analyzer->result, node->data.access.name) != NULL;
+      return find_symbol_scoped(analyzer->result,
+                                analyzer->current_procedure,
+                                node->data.access.name) != NULL;
     case C_AST_CALL:
       {
         const CAstNode *procedure = procedure_declaration_named(
@@ -575,6 +631,8 @@ void c_semantic_result_free(CSemanticResult *result) {
   for (size_t index = 0U; index < result->count; index++) {
     free(result->items[index].name);
     free(result->items[index].type);
+    free(result->items[index].procedure);
+    free(result->items[index].kind);
   }
   for (size_t index = 0U; index < result->diagnostic_count; index++) {
     free(result->diagnostics[index].message);

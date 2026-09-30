@@ -79,7 +79,9 @@ int compiler_driver_run(const char *payload) {
           semantic.items[i].column,
           0
         };
-        protocol_add_symbol(&resp, semantic.items[i].name, "variable",
+        const char *kind = semantic.items[i].kind != NULL
+            ? semantic.items[i].kind : "variable";
+        protocol_add_symbol(&resp, semantic.items[i].name, kind,
                             semantic.items[i].type, span);
       }
       if (semantic_ok) {

@@ -155,7 +155,7 @@ static void parser_set_location(CAstNode *node, int first_line,
 %type <list> declaration_list statement_list print_arg_list
 %type <node> read_stmt call_stmt if_stmt while_stmt repeat_stmt
 %type <node> repeat_step block_stmt
-%type <list> argument_list full_arguments full_declarations full_statements full_fields full_selectors
+%type <list> argument_list full_arguments full_declarations full_local_declarations full_statements full_fields full_selectors
 %type <node> full_program full_block full_declaration full_const full_type_decl full_var full_proc full_statement full_assign full_read full_call full_if full_while full_repeat full_repeat_until full_print full_access full_selector full_expr full_term full_factor
 %type <type> full_type
 %type <parameters> full_parameters full_parameter_group
@@ -192,7 +192,46 @@ full_names : TOK_IDENTIFIER {$$.items=NULL;$$.count=0; char **p=realloc($$.items
 full_type : TOK_TYPE_INT {$$=calloc(1,sizeof(*$$));$$->kind=C_TYPE_NAMED;$$->name=parser_strdup("صحيح");} | TOK_TYPE_REAL {$$=calloc(1,sizeof(*$$));$$->kind=C_TYPE_NAMED;$$->name=parser_strdup("حقيقي");} | TOK_TYPE_BOOL {$$=calloc(1,sizeof(*$$));$$->kind=C_TYPE_NAMED;$$->name=parser_strdup("منطقي");} | TOK_TYPE_CHAR {$$=calloc(1,sizeof(*$$));$$->kind=C_TYPE_NAMED;$$->name=parser_strdup("حرفي");} | TOK_TYPE_STRING {$$=calloc(1,sizeof(*$$));$$->kind=C_TYPE_NAMED;$$->name=parser_strdup("خيط_رمزي");} | TOK_IDENTIFIER {$$=calloc(1,sizeof(*$$));$$->kind=C_TYPE_NAMED;$$->name=$1;} | TOK_ARRAY '[' TOK_INTEGER_LITERAL ']' TOK_FROM full_type {$$=calloc(1,sizeof(*$$));$$->kind=C_TYPE_ARRAY;$$->length=strtoul($3,NULL,10);$$->element_type=$6;free($3);} | TOK_ARRAY '[' TOK_IDENTIFIER ']' TOK_FROM full_type {$$=calloc(1,sizeof(*$$));$$->kind=C_TYPE_ARRAY;$$->length=0;$$->length_name=$3;$$->element_type=$6;} | TOK_RECORD '{' full_fields full_field_end '}' {$$=calloc(1,sizeof(*$$));$$->kind=C_TYPE_RECORD;$$->fields.items=NULL;$$->fields.count=0; for(size_t i=0;i<$3.count;i++){CAstNode *f=$3.items[i]; CField *p=realloc($$->fields.items,($$->fields.count+1)*sizeof(CField));$$->fields.items=p;$$->fields.items[$$->fields.count].name=f->data.variable.names[0];$$->fields.items[$$->fields.count].type=f->data.variable.type;$$->fields.count++;free(f->data.variable.names);free(f);} free($3.items);} ;
 full_field_end : ';' | /* empty */ ;
 full_fields : TOK_IDENTIFIER ':' full_type {$$.items=NULL;$$.count=0;CAstNode*f=calloc(1,sizeof(CAstNode));f->kind=C_AST_VARIABLE_DECLARATION;f->data.variable.names=malloc(sizeof(char*));f->data.variable.names[0]=$1;f->data.variable.name_count=1;f->data.variable.type=$3;c_ast_list_append(&$$,f);} | full_fields ';' TOK_IDENTIFIER ':' full_type {$$=$1;CAstNode*f=calloc(1,sizeof(CAstNode));f->kind=C_AST_VARIABLE_DECLARATION;f->data.variable.names=malloc(sizeof(char*));f->data.variable.names[0]=$3;f->data.variable.name_count=1;f->data.variable.type=$5;c_ast_list_append(&$$,f);} ;
-full_proc : TOK_PROCEDURE TOK_IDENTIFIER '(' full_parameters ')' ';' full_block {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_PROCEDURE_DECLARATION;$$->data.procedure.name=$2;$$->data.procedure.parameters=$4.items;$$->data.procedure.parameter_count=$4.count;$$->data.procedure.body=$7->data.program.statements;parser_set_location($$, @2.first_line, @2.first_column, @2.last_line, @2.last_column);free($7);} | TOK_PROCEDURE TOK_IDENTIFIER '(' ')' ';' full_block {$$=calloc(1,sizeof(CAstNode));$$->kind=C_AST_PROCEDURE_DECLARATION;$$->data.procedure.name=$2;$$->data.procedure.body=$6->data.program.statements;parser_set_location($$, @2.first_line, @2.first_column, @2.last_line, @2.last_column);free($6);} ;
+/* تصريحات محلية للإجراء: تقبل متغير/ثابت/نوع فقط (لا إجراءات متداخلة) */
+full_local_declarations
+  : /* empty */ { $$.items = NULL; $$.count = 0; }
+  | full_local_declarations full_var ';'  { $$ = $1; c_ast_list_append(&$$, $2); }
+  | full_local_declarations full_const ';' { $$ = $1; c_ast_list_append(&$$, $2); }
+  | full_local_declarations full_type_decl ';' { $$ = $1; c_ast_list_append(&$$, $2); }
+  ;
+full_proc
+  : TOK_PROCEDURE TOK_IDENTIFIER '(' full_parameters ')' ';' full_local_declarations full_block {
+      $$ = calloc(1, sizeof(CAstNode));
+      $$->kind = C_AST_PROCEDURE_DECLARATION;
+      $$->data.procedure.name = $2;
+      $$->data.procedure.parameters = $4.items;
+      $$->data.procedure.parameter_count = $4.count;
+      /* دمج التصريحات المحلية ثم التعليمات في body */
+      $$->data.procedure.body.items = NULL;
+      $$->data.procedure.body.count = 0;
+      for (size_t i = 0; i < $7.count; i++) c_ast_list_append(&$$->data.procedure.body, $7.items[i]);
+      free($7.items);
+      for (size_t i = 0; i < $8->data.program.statements.count; i++)
+        c_ast_list_append(&$$->data.procedure.body, $8->data.program.statements.items[i]);
+      free($8->data.program.statements.items);
+      free($8);
+      parser_set_location($$, @2.first_line, @2.first_column, @2.last_line, @2.last_column);
+    }
+  | TOK_PROCEDURE TOK_IDENTIFIER '(' ')' ';' full_local_declarations full_block {
+      $$ = calloc(1, sizeof(CAstNode));
+      $$->kind = C_AST_PROCEDURE_DECLARATION;
+      $$->data.procedure.name = $2;
+      $$->data.procedure.body.items = NULL;
+      $$->data.procedure.body.count = 0;
+      for (size_t i = 0; i < $6.count; i++) c_ast_list_append(&$$->data.procedure.body, $6.items[i]);
+      free($6.items);
+      for (size_t i = 0; i < $7->data.program.statements.count; i++)
+        c_ast_list_append(&$$->data.procedure.body, $7->data.program.statements.items[i]);
+      free($7->data.program.statements.items);
+      free($7);
+      parser_set_location($$, @2.first_line, @2.first_column, @2.last_line, @2.last_column);
+    }
+  ;
 full_parameters : full_parameter_group {$$=$1;} | full_parameters ';' full_parameter_group {$$=$1;for(size_t i=0;i<$3.count;i++){CParameter*p=realloc($$.items,($$.count+1)*sizeof(CParameter));$$.items=p;$$.items[$$.count++]=$3.items[i];}free($3.items);} ;
 full_parameter_group
   : TOK_BY_VALUE full_names ':' full_type {

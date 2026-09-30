@@ -12,6 +12,8 @@ typedef struct {
   size_t line;
   size_t column;
   int is_constant;
+  char *procedure;
+  char *kind;
 } CSymbol;
 
 typedef struct {
