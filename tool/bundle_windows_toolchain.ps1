@@ -67,11 +67,37 @@ foreach ($tool in @("gcc.exe", "nasm.exe")) {
         throw "Bundled tool is missing: $path"
     }
 }
+$targetLibraryRoot = Join-Path (Join-Path $DestinationDirectory "lib\gcc") $target
+if (-not (Test-Path -LiteralPath $targetLibraryRoot -PathType Container)) {
+    throw "Bundled GCC target library directory is missing: $targetLibraryRoot"
+}
+$gccRuntimeDirectory = Get-ChildItem -LiteralPath $targetLibraryRoot -Directory |
+    Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName "libgcc.a") -PathType Leaf } |
+    Select-Object -First 1
+if (-not $gccRuntimeDirectory) {
+    throw "Bundled GCC runtime directory with libgcc.a was not found under $targetLibraryRoot"
+}
+foreach ($runtimeLibrary in @("libgcc.a", "libgcc_eh.a")) {
+    $source = Join-Path $gccRuntimeDirectory.FullName $runtimeLibrary
+    if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+        throw "Bundled GCC runtime library is missing: $source"
+    }
+    # -B points GCC at bin; stage the runtime archives there so both GCC and
+    # ld resolve -lgcc/-lgcc_eh after the MSYS2 prefix is relocated.
+    $destination = Join-Path $destinationBin $runtimeLibrary
+    Copy-Item -LiteralPath $source -Destination $destination -Force
+}
 foreach ($file in @("crt2.o", "crtbegin.o", "libmingw32.a", "libgcc.a", "libmsvcrt.a", "libkernel32.a")) {
     $found = Get-ChildItem -Path $DestinationDirectory -Recurse -File -Filter $file -ErrorAction SilentlyContinue |
         Select-Object -First 1
     if (-not $found) {
         throw "Bundled GCC prefix is missing required linker file: $file"
+    }
+}
+foreach ($runtimeLibrary in @("libgcc.a", "libgcc_eh.a")) {
+    $path = Join-Path $destinationBin $runtimeLibrary
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        throw "Bundled GCC linker search directory is missing: $path"
     }
 }
 

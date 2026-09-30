@@ -81,7 +81,11 @@ void main() {
     ).readAsStringSync();
     if (!toolchainBundler.contains('gcc.exe') ||
         !toolchainBundler.contains('nasm.exe') ||
-        !toolchainBundler.contains('libkernel32.a')) {
+        !toolchainBundler.contains('libkernel32.a') ||
+        !toolchainBundler.contains('libgcc_eh.a') ||
+        !toolchainBundler.contains(
+          'Join-Path $destinationBin $runtimeLibrary',
+        )) {
       throw StateError('Windows bundle toolchain validation is incomplete');
     }
     stdout.writeln('[OK] Windows install topology simulation passed:');
