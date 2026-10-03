@@ -14,9 +14,9 @@
 | TAC وTyped IR | `src/ir/tac.c` و`src/ir/typed_ir.c` | `tac_golden_test.c` ونتائج البروتوكول | Typed IR وسيط، وليس machine code |
 | Runtime | `src/runtime/interpreter.c` | اختبارات protocol والأمثلة المسجلة في CMake | التشغيل ضمن التركيبات التي يدعمها compiler |
 | Assembly وartifact | `src/backend/x86_64/` و`src/backend/artifact_builder.c` و`src/backend/toolchain.c` | `asm_3ac_golden_test.c` و`native_3ac_smoke.sh` و`artifact_security_test.c` | `assembly` نص؛ artifact منفصل ومحدود بالـtarget والـtoolchain |
-| Protocol | `src/protocol/` و`packages/compiler_contracts/` | اختبارات العقد و`packages/compiler_c/tests/protocol_smoke.dart` | يجب تحديث الجانبين معًا عند تغيير schema |
+| Protocol | `src/protocol/` و`packages/compiler_contracts/` | اختبارات العقد و`packages/compiler_c/tests/integration/protocol_smoke.dart` | يجب تحديث الجانبين معًا عند تغيير schema |
 | Assist | executable يقبل `--assist`، وحزمة Dart تعرف موديلات assist | `packages/compiler_contracts/test/assist_protocol_test.dart` يختبر نماذج العقد؛ لا يوجد حاليًا اختبار CTest مستقل لتكامل executable assist | لا يعني اكتمال ميزات Language Server |
-| Flutter integration | `ProcessCompilerRepository` يشغّل executable | `test/process_compiler_repository_test.dart` واختبارات التطبيق | لا تستدعي Widgets compiler أو أدوات toolchain مباشرة |
+| Flutter integration | `ProcessCompilerRepository` يشغّل executable | `test/integration/compiler/process_compiler_repository_test.dart` واختبارات التطبيق | لا تستدعي Widgets compiler أو أدوات toolchain مباشرة |
 | CI | jobs للعقد وC وFlutter وبناء Linux Desktop | `.github/workflows/ci.yml` | راجع workflow نفسه لنطاق المنصات المنشور |
 
 ## قاعدة وصف الدعم

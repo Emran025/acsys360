@@ -29,7 +29,7 @@
 | Assembly | نص في حقل `assembly`؛ ليس artifact تنفيذيًا بحد ذاته |
 | executable artifact | يعاد ضمن `artifacts` بعد إنشاء حقيقي ونجاح target المدعوم |
 | مستكشف Workspace | `WorkspaceExplorer`؛ الأسماء LTR ومحاذاة اليمين ضمن shell RTL |
-| اختبارات التطبيق | `test/`، ومنها `test/widget_test.dart` |
+| اختبارات التطبيق | `test/`، ومنها `test/features/editor/presentation/ui/widget_test.dart` |
 | اختبارات compiler والعقد | `packages/compiler_c/tests/` و`packages/compiler_contracts/test/` |
 
 ## 3. حالة الإثبات

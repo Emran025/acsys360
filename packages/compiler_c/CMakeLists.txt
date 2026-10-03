@@ -58,14 +58,14 @@ enable_testing()
 add_test(NAME arabicc_version COMMAND arabicc --version)
 add_test(NAME arabicc_help COMMAND arabicc --help)
 add_executable(arabicc_tac_golden_test
-  tests/tac_golden_test.c
+  tests/unit/tac_golden_test.c
   src/ir/tac.c
   src/ast.c
 )
 target_include_directories(arabicc_tac_golden_test PRIVATE include)
 add_test(NAME arabicc_tac_golden COMMAND arabicc_tac_golden_test)
 add_executable(arabicc_asm_3ac_golden_test
-  tests/asm_3ac_golden_test.c
+  tests/unit/asm_3ac_golden_test.c
   src/ir/tac.c
   src/backend/x86_64/asm_x86_64.c
 )
@@ -73,10 +73,10 @@ target_include_directories(arabicc_asm_3ac_golden_test PRIVATE include)
 add_test(NAME arabicc_asm_3ac_golden COMMAND arabicc_asm_3ac_golden_test)
 if(UNIX)
   add_test(NAME arabicc_native_3ac_smoke
-    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/native_3ac_smoke.sh $<TARGET_FILE:arabicc>)
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/native_3ac_smoke.sh $<TARGET_FILE:arabicc>)
 endif()
 add_executable(arabicc_artifact_security_test
-  tests/artifact_security_test.c
+  tests/security/artifact_security_test.c
   src/backend/artifact_builder.c
   src/backend/toolchain.c
 )
@@ -86,39 +86,39 @@ find_program(DART_EXECUTABLE dart)
 if(DART_EXECUTABLE)
   add_test(NAME arabicc_protocol_smoke
     COMMAND ${DART_EXECUTABLE}
-            ${CMAKE_CURRENT_SOURCE_DIR}/tests/protocol_smoke.dart
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/protocol_smoke.dart
             $<TARGET_FILE:arabicc>)
   add_test(NAME arabicc_manual_examples
     COMMAND ${DART_EXECUTABLE}
-            ${CMAKE_CURRENT_SOURCE_DIR}/tests/manual_examples.dart
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/manual_examples.dart
             $<TARGET_FILE:arabicc>)
   add_test(NAME arabicc_semicolon_rule
     COMMAND ${DART_EXECUTABLE}
-            ${CMAKE_CURRENT_SOURCE_DIR}/tests/semicolon_rule.dart
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/semicolon_rule.dart
             $<TARGET_FILE:arabicc>)
   add_test(NAME arabicc_composite_types
     COMMAND ${DART_EXECUTABLE}
-            ${CMAKE_CURRENT_SOURCE_DIR}/tests/composite_types.dart
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/composite_types.dart
             $<TARGET_FILE:arabicc>)
   add_test(NAME arabicc_record_array_regression
     COMMAND ${DART_EXECUTABLE}
-            ${CMAKE_CURRENT_SOURCE_DIR}/tests/record_array_regression.dart
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/record_array_regression.dart
             $<TARGET_FILE:arabicc>)
   add_test(NAME arabicc_stability
     COMMAND ${DART_EXECUTABLE}
-            ${CMAKE_CURRENT_SOURCE_DIR}/tests/stability.dart
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/stability.dart
             $<TARGET_FILE:arabicc>)
   add_test(NAME arabicc_repeat_until
     COMMAND ${DART_EXECUTABLE}
-            ${CMAKE_CURRENT_SOURCE_DIR}/tests/repeat_until.dart
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/repeat_until.dart
             $<TARGET_FILE:arabicc>)
   add_test(NAME arabicc_procedure_abi
     COMMAND ${DART_EXECUTABLE}
-            ${CMAKE_CURRENT_SOURCE_DIR}/tests/procedure_abi.dart
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/procedure_abi.dart
             $<TARGET_FILE:arabicc>)
   add_test(NAME arabicc_editor_protocol
     COMMAND ${DART_EXECUTABLE}
-            ${CMAKE_CURRENT_SOURCE_DIR}/tests/editor_protocol_smoke.dart
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/editor_protocol_smoke.dart
             $<TARGET_FILE:arabicc>)
 else()
   message(STATUS "Dart not found: skipping compiler Dart integration tests")

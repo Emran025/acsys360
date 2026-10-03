@@ -13,7 +13,7 @@
 | executable | `src/main.c` وCMake target باسم `arabicc` | اختبارات CTest لـ`--version` و`--help` |
 | Lexer وParser | `src/lexer.l` و`src/parser.y` مع AST في `src/ast.c` | اختبارات compiler integration والأمثلة اليدوية |
 | Semantic | `src/semantic.c` | protocol smoke، fixtures سلبية، ونتائج `symbolTable` و`diagnostics` |
-| Protocol | `src/protocol.c` و`src/protocol/` | `packages/compiler_c/tests/protocol_smoke.dart` وعقد `packages/compiler_contracts/test/` |
+| Protocol | `src/protocol.c` و`src/protocol/` | `packages/compiler_c/tests/integration/protocol_smoke.dart` وعقد `packages/compiler_contracts/test/` |
 | TAC وTyped IR | `src/ir/tac.c` و`src/ir/typed_ir.c` | `tac_golden_test.c` وحقول الاستجابة |
 | Interpreter | `src/runtime/interpreter.c` | protocol smoke واختبارات أمثلة CMake |
 | Assembly | `src/backend/x86_64/` | `asm_3ac_golden_test.c` و`assembly` النصية |

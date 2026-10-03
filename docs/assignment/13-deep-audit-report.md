@@ -50,16 +50,16 @@
 
 | السلوك | الاختبار أو الدليل | الحالة |
 |---|---|---|
-| stale compile/completion/save | `test/editor_controller_async_test.dart` | مثبت |
-| source path diagnostics | `test/editor_language_server_test.dart` | مثبت |
-| POSIX وWindows-style path policy | `test/workspace_path_service_test.dart` | مثبت |
-| comment mapping والاتجاه والفراغ | `test/toggle_line_comment_test.dart` | مثبت |
-| formatter وCRLF وliteral غير مغلق | `test/format_arabic_source_test.dart` | مثبت |
-| RTL وEnter عند offset صفر وghost | `test/widget_test.dart` | مثبت |
-| Ctrl/Cmd+/ وzoom/reset وexecution output | `test/widget_test.dart` | مثبت |
+| stale compile/completion/save | `test/features/editor/presentation/controllers/editor_controller_async_test.dart` | مثبت |
+| source path diagnostics | `test/features/editor/domain/services/editor_language_server_test.dart` | مثبت |
+| POSIX وWindows-style path policy | `test/core/services/workspace_path_service_test.dart` | مثبت |
+| comment mapping والاتجاه والفراغ | `test/features/editor/domain/usecases/toggle_line_comment_test.dart` | مثبت |
+| formatter وCRLF وliteral غير مغلق | `test/features/editor/domain/usecases/format_arabic_source_test.dart` | مثبت |
+| RTL وEnter عند offset صفر وghost | `test/features/editor/presentation/ui/widget_test.dart` | مثبت |
+| Ctrl/Cmd+/ وzoom/reset وexecution output | `test/features/editor/presentation/ui/widget_test.dart` | مثبت |
 | compiler protocol وexecution output | `packages/compiler_contracts/test/compilation_protocol_test.dart` و`tool/verify_compiler_bundle.dart` | مثبت |
 | C backend build وsmoke | `packages/compiler_c/CMakeLists.txt` و`tool/verify_compiler_bundle.dart` | مثبت |
-| process timeout | `test/process_compiler_repository_test.dart` | مثبت |
+| process timeout | `test/integration/compiler/process_compiler_repository_test.dart` | مثبت |
 | syntax/semantic negative fixtures | `examples/errors/` واختبارات compiler المسجلة في `packages/compiler_c/CMakeLists.txt` | مثبت ضمن اختبارات compiler الحالية |
 
 ## نتيجة الجولة المحلية

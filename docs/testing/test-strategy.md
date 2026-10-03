@@ -1,12 +1,16 @@
 # استراتيجية الاختبار
 
+## شجرة الاختبارات
+
+تعكس شجرة `test/` طبقات Clean Architecture: `core/`، ثم `features/editor/domain` للكيانات والخدمات وuse cases، ثم `data/repositories_impl`، ثم `presentation/controllers` و`presentation/ui`، وأخيرًا `integration/` لحدود العمليات الخارجية. أما `packages/compiler_c/tests/` فتقسم إلى `unit/` و`security/` و`integration/`، وجميعها مسجلة في CTest. يوجد وصف مختصر في `test/README.md` و`packages/compiler_c/tests/README.md`.
+
 ## الاختبارات الموجودة حاليًا
 
 | الحزمة/الطبقة | موضع الاختبارات وما تغطيه |
 |---|---|
-| تطبيق Flutter | `test/`: وحدات للمستندات وworkspace، المحرر وخدمات اللغة، التنسيق والبحث والتعليق، المستودعات المحلية، مسارات الملفات، والاتصال بعملية compiler. يتضمن `test/widget_test.dart` اختبارات واجهة للـrouting، workspace الترحيبي، لوحات النتائج، RTL والمؤشر، Minimap، themes، completion، الاختصارات والتشخيصات |
+| تطبيق Flutter | `test/core/` و`test/features/editor/`: اختبارات الوحدات مرتبة حسب طبقات Clean Architecture، و`test/integration/compiler/` لاختبار حدود عملية compiler. اختبار الواجهة موجود في `test/features/editor/presentation/ui/widget_test.dart` ويغطي routing وworkspace واللوحات وRTL وMinimap وthemes وcompletion والاختصارات والتشخيصات |
 | عقد JSON | `packages/compiler_contracts/test/`: اختبارات compilation وassist requests/responses |
-| مترجم C | `packages/compiler_c/tests/` وCTest: فحوص تشغيل `--version` و`--help`، golden tests لـTAC وAssembly، smoke لـnative 3AC، واختبار أمان artifact |
+| مترجم C | `packages/compiler_c/tests/unit/` و`security/` و`integration/` عبر CTest: فحوص التشغيل، golden tests لـTAC وAssembly، smoke لـnative 3AC، واختبار أمان artifact |
 | تكامل المترجم | اختبارات Dart المسجلة في CMake عند توفر Dart: protocol smoke، الأمثلة اليدوية، قاعدة الفاصلة المنقوطة، الأنواع المركبة، والاستقرار |
 | CI | `.github/workflows/ci.yml`: تحليل واختبار العقود، بناء C وتشغيل CTest، تنسيق وتحليل واختبار Flutter، ثم بناء Linux Desktop |
 

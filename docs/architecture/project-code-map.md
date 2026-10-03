@@ -302,15 +302,15 @@ acsys360/
 
 | النطاق | ملفات الاختبار |
 |---|---|
-| widgets والrouting ولوحات النتائج وRTL وcompletion والـminimap | `test/widget_test.dart` |
-| Document وWorkspace | `test/document_workspace_test.dart` |
-| عمليات controller غير المتزامنة ومنع النتائج القديمة | `test/editor_controller_async_test.dart` |
-| filesystem/path traversal CRUD | `test/local_workspace_repository_test.dart` |
-| تشغيل compiler process وJSON/error/timeout | `test/process_compiler_repository_test.dart` |
-| سياسة المسارات | `test/workspace_path_service_test.dart` |
-| language service وdiagnostics | `test/editor_language_server_test.dart`, `test/arabic_language_service_test.dart` |
-| highlighting | `test/arabic_syntax_highlighter_test.dart` |
-| البحث والاستبدال والتنسيق والتعليق | `test/find_replace_test.dart`, `test/format_arabic_source_test.dart`, `test/toggle_line_comment_test.dart` |
+| widgets والrouting ولوحات النتائج وRTL وcompletion والـminimap | `test/features/editor/presentation/ui/widget_test.dart` |
+| Document وWorkspace | `test/features/editor/domain/entities/document_workspace_test.dart` |
+| عمليات controller غير المتزامنة ومنع النتائج القديمة | `test/features/editor/presentation/controllers/editor_controller_async_test.dart` |
+| filesystem/path traversal CRUD | `test/features/editor/data/repositories_impl/local_workspace_repository_test.dart` |
+| تشغيل compiler process وJSON/error/timeout | `test/integration/compiler/process_compiler_repository_test.dart` |
+| سياسة المسارات | `test/core/services/workspace_path_service_test.dart` |
+| language service وdiagnostics | `test/features/editor/domain/services/editor_language_server_test.dart`, `test/features/editor/domain/usecases/arabic_language_service_test.dart` |
+| highlighting | `test/features/editor/domain/usecases/arabic_syntax_highlighter_test.dart` |
+| البحث والاستبدال والتنسيق والتعليق | `test/features/editor/domain/usecases/find_replace_test.dart`, `test/features/editor/domain/usecases/format_arabic_source_test.dart`, `test/features/editor/domain/usecases/toggle_line_comment_test.dart` |
 | protocol Dart models | `packages/compiler_contracts/test/` |
 | C compiler | `packages/compiler_c/tests/` وCTest، بما فيها `arabicc_repeat_until` الذي يختبر الجسم المفرد والكتلة والجسم الفارغ والتنفيذ |
 | end-to-end bundle | `tool/verify_compiler_bundle.dart`، ويستدعى من workflow release بعد bundling |

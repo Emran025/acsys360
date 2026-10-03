@@ -65,7 +65,7 @@ void main() {
     }
     final cmake = File('packages/compiler_c/CMakeLists.txt').readAsStringSync();
     if (!cmake.contains('if(UNIX)') ||
-        !cmake.contains('tests/native_3ac_smoke.sh')) {
+        !cmake.contains('tests/integration/native_3ac_smoke.sh')) {
       throw StateError('CMake registers a shell-only test on Windows');
     }
     final runtimeBundler = File(
