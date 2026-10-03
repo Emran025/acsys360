@@ -14,6 +14,10 @@
 | تكامل المترجم | اختبارات Dart المسجلة في CMake عند توفر Dart: protocol smoke، الأمثلة اليدوية، قاعدة الفاصلة المنقوطة، الأنواع المركبة، والاستقرار |
 | CI | `.github/workflows/ci.yml`: تحليل واختبار العقود، بناء C وتشغيل CTest، تنسيق وتحليل واختبار Flutter، ثم بناء Linux Desktop |
 
+## التغطية
+
+يُقاس coverage عبر `flutter test --coverage`، وتوجد آخر نتيجة والفجوات المعروفة في `docs/testing/coverage-baseline.md`. النسبة ليست بديلًا عن اختبارات سلوكية لحالات الفشل والتكامل.
+
 ## Fixtures
 
 توجد الأمثلة اليدوية المرقمة في `examples/manual/`، وأمثلة أخرى في `examples/`، وملفات الأخطاء في `examples/errors/`. لا تستخدم الشجرة الحالية مجلدات `examples/valid/` أو `examples/syntax-errors/` أو `examples/semantic-errors/`؛ تُضاف أي أمثلة جديدة إلى التنظيم الموجود مع تحديث الاختبارات التي تستهلكها.

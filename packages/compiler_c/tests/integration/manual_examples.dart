@@ -34,7 +34,7 @@ Future<void> main(List<String> args) async {
   check(args.length == 1, 'usage: dart manual_examples.dart <arabicc>');
   final directory = File(
     Platform.script.toFilePath(),
-  ).parent.parent.parent.parent.uri.resolve('examples/manual/');
+  ).parent.parent.parent.parent.parent.uri.resolve('examples/manual/');
   final positive = [
     '01_basics.arb',
     '02_composite_types.arb',

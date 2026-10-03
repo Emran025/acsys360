@@ -12,6 +12,7 @@ Future<void> main(List<String> args) async {
       .parent
       .parent
       .parent
+      .parent
       .uri
       .resolve('examples/manual/02_composite_types.arb')
       .toFilePath();

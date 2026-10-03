@@ -9,8 +9,9 @@ void main() {
   test(
     'communicates with the compiled C arabicc binary over protocol',
     () async {
+      final executableName = Platform.isWindows ? 'arabicc.exe' : 'arabicc';
       final cExecutable =
-          '${Directory.current.path}/packages/compiler_c/build/arabicc.exe';
+          '${Directory.current.path}/packages/compiler_c/build/$executableName';
       if (!File(cExecutable).existsSync()) return;
 
       final repository = ProcessCompilerRepository(
@@ -39,8 +40,9 @@ void main() {
   test(
     'compiles a program through the C binary protocol (multi-statement)',
     () async {
+      final executableName = Platform.isWindows ? 'arabicc.exe' : 'arabicc';
       final cExecutable =
-          '${Directory.current.path}/packages/compiler_c/build/arabicc.exe';
+          '${Directory.current.path}/packages/compiler_c/build/$executableName';
       if (!File(cExecutable).existsSync()) return;
 
       final repository = ProcessCompilerRepository(
