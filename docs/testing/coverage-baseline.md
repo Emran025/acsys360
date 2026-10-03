@@ -10,8 +10,8 @@ flutter test --coverage
 
 | المقياس | النتيجة |
 |---|---:|
-| اختبارات Flutter | 103 ناجحة |
-| تغطية أسطر Dart | 2955 / 4100 = **72.07%** |
+| اختبارات Flutter | 105 ناجحة |
+| تغطية أسطر Dart | 3014 / 4100 = **73.51%** |
 | ملفات Dart المغطاة بالكامل | 14 من 51 |
 | اختبارات compiler C عبر CTest | 15 / 15 ناجحة |
 | اختبارات compiler contracts | 6 ناجحة |
@@ -21,6 +21,7 @@ flutter test --coverage
 - اختبارات composition root و`ServiceLocator`.
 - اختبارات workflow كاملة للـ`EditorController` تشمل workspace والحفظ والبحث/compiler/assist/build/run.
 - اختبارات عزل لـ`ProcessCompilerRepository` للردود الصحيحة، assist، JSON غير الصالح، ومسارات فشل التشغيل.
+- اختبارات widget لـ`DiagnosticsPanelWidget` و`WorkspaceExplorer` لمسارات empty/error/loading/tree وتبديل المراحل.
 - اختبارات exceptions وfailures.
 - اختبارات `SourceFilePolicy` و`DocumentFileService`.
 - اختبارات `LocalWorkspacePathService` و`WorkspaceActions`.
