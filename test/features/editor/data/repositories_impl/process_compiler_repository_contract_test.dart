@@ -61,6 +61,7 @@ fi
       );
       expect(completion.items, isEmpty);
     },
+    skip: Platform.isWindows ? 'The fixture is a POSIX shell script.' : null,
   );
 
   test(
@@ -93,6 +94,7 @@ printf '%s' 'not-json'
       expect(missing.success, isFalse);
       expect(missing.diagnostics.single.code, 'P004');
     },
+    skip: Platform.isWindows ? 'The fixture is a POSIX shell script.' : null,
   );
 }
 

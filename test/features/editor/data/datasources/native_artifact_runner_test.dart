@@ -21,17 +21,21 @@ printf 'got:%s\\n' "\$value"
 
   tearDown(() => directory.delete(recursive: true));
 
-  test('returns output and serves interactive input requests', () async {
-    final output = await const NativeArtifactRunner().run(
-      executable.path,
-      onInputRequest: (request) async {
-        expect(request.name, 'الاسم');
-        expect(request.type, 'نص');
-        return 'علي';
-      },
-    );
-    expect(output, ['hello', 'got:علي']);
-  });
+  test(
+    'returns output and serves interactive input requests',
+    () async {
+      final output = await const NativeArtifactRunner().run(
+        executable.path,
+        onInputRequest: (request) async {
+          expect(request.name, 'الاسم');
+          expect(request.type, 'نص');
+          return 'علي';
+        },
+      );
+      expect(output, ['hello', 'got:علي']);
+    },
+    skip: Platform.isWindows ? 'The fixture is a POSIX shell script.' : null,
+  );
 
   test('rejects missing executables', () {
     expect(

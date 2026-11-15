@@ -7,18 +7,22 @@ class LocalWorkspacePathService implements WorkspacePathService {
 
   @override
   String parentOf(String path, {required String fallback}) {
-    final separatorIndex = path.lastIndexOf(Platform.pathSeparator);
+    final separatorIndex = _lastSeparatorIndex(path);
     if (separatorIndex <= 0) return fallback;
     return path.substring(0, separatorIndex);
   }
 
   @override
   String baseName(String path) {
-    final separator = Platform.pathSeparator;
-    final normalized = path.endsWith(separator)
-        ? path.substring(0, path.length - separator.length)
-        : path;
-    return normalized.split(separator).last;
+    var normalized = path;
+    while (normalized.isNotEmpty &&
+        _isSeparator(normalized.codeUnitAt(normalized.length - 1))) {
+      normalized = normalized.substring(0, normalized.length - 1);
+    }
+    final separatorIndex = _lastSeparatorIndex(normalized);
+    return separatorIndex < 0
+        ? normalized
+        : normalized.substring(separatorIndex + 1);
   }
 
   @override
@@ -44,4 +48,12 @@ class LocalWorkspacePathService implements WorkspacePathService {
     }
     return path;
   }
+
+  int _lastSeparatorIndex(String path) {
+    final slash = path.lastIndexOf('/');
+    final backslash = path.lastIndexOf(r'\');
+    return slash > backslash ? slash : backslash;
+  }
+
+  bool _isSeparator(int codeUnit) => codeUnit == 0x2f || codeUnit == 0x5c;
 }
