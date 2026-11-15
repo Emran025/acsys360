@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 
 Future<String?> showNewFileDialog(BuildContext context) async {
@@ -53,7 +51,7 @@ Future<bool> confirmDiscardDialog(
   BuildContext context, {
   required String path,
 }) async {
-  final name = path.split(Platform.pathSeparator).last;
+  final name = path.split(RegExp(r'[/\\]')).last;
   return await showDialog<bool>(
         context: context,
         builder: (context) => AppDialog(
@@ -79,7 +77,7 @@ Future<bool> confirmDeleteDialog(
   BuildContext context, {
   required String path,
 }) async {
-  final name = path.split(Platform.pathSeparator).last;
+  final name = path.split(RegExp(r'[/\\]')).last;
   return await showDialog<bool>(
         context: context,
         builder: (context) => AppDialog(
